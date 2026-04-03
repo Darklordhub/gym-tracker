@@ -1,15 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  completeActiveWorkoutSession,
   createWorkout,
   createWorkoutTemplate,
-  fetchWorkouts,
+  fetchActiveWorkoutSession,
   fetchWorkoutTemplates,
+  fetchWorkouts,
+  startActiveWorkoutSession,
+  updateActiveWorkoutSession,
 } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
 import { formatDate } from '../lib/format'
 import { getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { getRequestErrorMessage } from '../lib/http'
-import type { Workout, WorkoutTemplate } from '../types/workout'
+import type {
+  ActiveWorkoutSession,
+  ExerciseEntryPayload,
+  Workout,
+  WorkoutTemplate,
+} from '../types/workout'
 
 type ExerciseFormState = {
   exerciseName: string
@@ -44,13 +53,25 @@ const createExerciseForm = (): ExerciseFormState => ({
   weightKg: '',
 })
 
-const initialFormState = (): WorkoutFormState => ({
+const initialQuickLogFormState = (): WorkoutFormState => ({
   date: new Date().toISOString().slice(0, 10),
   notes: '',
   exerciseEntries: [createExerciseForm()],
 })
 
-function validateWorkoutForm(form: WorkoutFormState): WorkoutFormErrors {
+const initialActiveFormState = (): WorkoutFormState => ({
+  date: new Date().toISOString().slice(0, 10),
+  notes: '',
+  exerciseEntries: [],
+})
+
+function validateWorkoutForm(
+  form: WorkoutFormState,
+  options?: { requireDate?: boolean; requireExercises?: boolean },
+): WorkoutFormErrors {
+  const requireDate = options?.requireDate ?? true
+  const requireExercises = options?.requireExercises ?? true
+
   const exerciseErrors = form.exerciseEntries.map<ExerciseFieldErrors>((exercise) => {
     const currentErrors: ExerciseFieldErrors = {}
 
@@ -84,17 +105,19 @@ function validateWorkoutForm(form: WorkoutFormState): WorkoutFormErrors {
 
   const errors: WorkoutFormErrors = { exercises: exerciseErrors }
 
-  if (!form.date) {
-    errors.date = 'Date is required.'
-  } else if (form.date > new Date().toISOString().slice(0, 10)) {
-    errors.date = 'Date cannot be in the future.'
+  if (requireDate) {
+    if (!form.date) {
+      errors.date = 'Date is required.'
+    } else if (form.date > new Date().toISOString().slice(0, 10)) {
+      errors.date = 'Date cannot be in the future.'
+    }
   }
 
   if (form.notes.length > 500) {
     errors.notes = 'Notes must be 500 characters or less.'
   }
 
-  if (form.exerciseEntries.length === 0) {
+  if (requireExercises && form.exerciseEntries.length === 0) {
     errors.exerciseEntries = 'Add at least one exercise.'
   }
 
@@ -110,11 +133,49 @@ function hasWorkoutErrors(errors: WorkoutFormErrors) {
   )
 }
 
+function toExercisePayload(exerciseEntries: ExerciseFormState[]): ExerciseEntryPayload[] {
+  return exerciseEntries.map((exercise) => ({
+    exerciseName: exercise.exerciseName.trim(),
+    sets: Number(exercise.sets),
+    reps: Number(exercise.reps),
+    weightKg: Number(exercise.weightKg),
+  }))
+}
+
+function mapSessionToForm(session: ActiveWorkoutSession): WorkoutFormState {
+  return {
+    date: session.startedAtUtc.slice(0, 10),
+    notes: session.notes,
+    exerciseEntries: session.exerciseEntries.map((exercise) => ({
+      exerciseName: exercise.exerciseName,
+      sets: exercise.sets.toString(),
+      reps: exercise.reps.toString(),
+      weightKg: exercise.weightKg.toString(),
+    })),
+  }
+}
+
+function mapTemplateToForm(template: WorkoutTemplate): WorkoutFormState {
+  return {
+    date: new Date().toISOString().slice(0, 10),
+    notes: template.notes,
+    exerciseEntries: template.exerciseEntries.map((exercise) => ({
+      exerciseName: exercise.exerciseName,
+      sets: exercise.sets.toString(),
+      reps: exercise.reps.toString(),
+      weightKg: exercise.weightKg.toString(),
+    })),
+  }
+}
+
 export function WorkoutsPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
-  const [form, setForm] = useState<WorkoutFormState>(initialFormState)
-  const [errors, setErrors] = useState<WorkoutFormErrors>({ exercises: [] })
+  const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null)
+  const [activeForm, setActiveForm] = useState<WorkoutFormState>(initialActiveFormState)
+  const [activeErrors, setActiveErrors] = useState<WorkoutFormErrors>({ exercises: [] })
+  const [quickLogForm, setQuickLogForm] = useState<WorkoutFormState>(initialQuickLogFormState)
+  const [quickLogErrors, setQuickLogErrors] = useState<WorkoutFormErrors>({ exercises: [] })
   const [workoutSearch, setWorkoutSearch] = useState('')
   const [workoutDateFrom, setWorkoutDateFrom] = useState('')
   const [workoutDateTo, setWorkoutDateTo] = useState('')
@@ -123,6 +184,9 @@ export function WorkoutsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
+  const [isStartingSession, setIsStartingSession] = useState(false)
+  const [isSavingSession, setIsSavingSession] = useState(false)
+  const [isCompletingSession, setIsCompletingSession] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -193,42 +257,79 @@ export function WorkoutsPage() {
     try {
       setIsLoading(true)
       setErrorMessage(null)
-      const [workoutData, templateData] = await Promise.all([
+
+      const [workoutData, templateData, currentActiveSession] = await Promise.all([
         fetchWorkouts(),
         fetchWorkoutTemplates(),
+        fetchActiveWorkoutSession(),
       ])
+
       setWorkouts(workoutData)
       setTemplates(templateData)
+      setActiveSession(currentActiveSession)
+      setActiveForm(currentActiveSession ? mapSessionToForm(currentActiveSession) : initialActiveFormState())
     } catch {
-      setErrorMessage('Unable to load workouts and templates. Check that the API is running.')
+      setErrorMessage('Unable to load workouts, templates, and active session. Check that the API is running.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  function resetForm() {
-    setForm(initialFormState())
-    setErrors({ exercises: [] })
+  function resetQuickLogForm() {
+    setQuickLogForm(initialQuickLogFormState())
+    setQuickLogErrors({ exercises: [] })
   }
 
-  function applyTemplate(template: WorkoutTemplate) {
-    setForm({
-      date: new Date().toISOString().slice(0, 10),
-      notes: template.notes,
-      exerciseEntries: template.exerciseEntries.map((exercise) => ({
-        exerciseName: exercise.exerciseName,
-        sets: exercise.sets.toString(),
-        reps: exercise.reps.toString(),
-        weightKg: exercise.weightKg.toString(),
-      })),
-    })
-    setErrors({ exercises: [] })
-    setFeedback(`Started a new workout from "${template.name}".`)
+  function resetActiveForm(session: ActiveWorkoutSession | null) {
+    setActiveForm(session ? mapSessionToForm(session) : initialActiveFormState())
+    setActiveErrors({ exercises: [] })
+  }
+
+  function applyTemplateToQuickLog(template: WorkoutTemplate) {
+    setQuickLogForm(mapTemplateToForm(template))
+    setQuickLogErrors({ exercises: [] })
+    setFeedback(`Loaded "${template.name}" into quick log.`)
     setErrorMessage(null)
   }
 
-  function updateExercise(index: number, field: keyof ExerciseFormState, value: string) {
-    setForm((current) => ({
+  async function handleStartActiveSession(template?: WorkoutTemplate) {
+    if (activeSession) {
+      return
+    }
+
+    try {
+      setIsStartingSession(true)
+      setFeedback(null)
+      setErrorMessage(null)
+
+      const session = await startActiveWorkoutSession({
+        notes: template?.notes ?? '',
+        exerciseEntries: template
+          ? template.exerciseEntries.map((exercise) => ({
+              exerciseName: exercise.exerciseName,
+              sets: exercise.sets,
+              reps: exercise.reps,
+              weightKg: exercise.weightKg,
+            }))
+          : [],
+      })
+
+      setActiveSession(session)
+      resetActiveForm(session)
+      setFeedback(
+        template
+          ? `Started active workout from "${template.name}".`
+          : 'Started a new active workout session.',
+      )
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to start an active workout.'))
+    } finally {
+      setIsStartingSession(false)
+    }
+  }
+
+  function updateQuickLogExercise(index: number, field: keyof ExerciseFormState, value: string) {
+    setQuickLogForm((current) => ({
       ...current,
       exerciseEntries: current.exerciseEntries.map((exercise, currentIndex) =>
         currentIndex === index ? { ...exercise, [field]: value } : exercise,
@@ -236,25 +337,48 @@ export function WorkoutsPage() {
     }))
   }
 
-  function addExercise() {
-    setForm((current) => ({
+  function updateActiveExercise(index: number, field: keyof ExerciseFormState, value: string) {
+    setActiveForm((current) => ({
+      ...current,
+      exerciseEntries: current.exerciseEntries.map((exercise, currentIndex) =>
+        currentIndex === index ? { ...exercise, [field]: value } : exercise,
+      ),
+    }))
+  }
+
+  function addQuickLogExercise() {
+    setQuickLogForm((current) => ({
       ...current,
       exerciseEntries: [...current.exerciseEntries, createExerciseForm()],
     }))
   }
 
-  function removeExercise(index: number) {
-    setForm((current) => ({
+  function addActiveExercise() {
+    setActiveForm((current) => ({
+      ...current,
+      exerciseEntries: [...current.exerciseEntries, createExerciseForm()],
+    }))
+  }
+
+  function removeQuickLogExercise(index: number) {
+    setQuickLogForm((current) => ({
       ...current,
       exerciseEntries: current.exerciseEntries.filter((_, currentIndex) => currentIndex !== index),
     }))
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function removeActiveExercise(index: number) {
+    setActiveForm((current) => ({
+      ...current,
+      exerciseEntries: current.exerciseEntries.filter((_, currentIndex) => currentIndex !== index),
+    }))
+  }
+
+  async function handleQuickLogSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const nextErrors = validateWorkoutForm(form)
-    setErrors(nextErrors)
+    const nextErrors = validateWorkoutForm(quickLogForm)
+    setQuickLogErrors(nextErrors)
     setFeedback(null)
     setErrorMessage(null)
 
@@ -262,23 +386,17 @@ export function WorkoutsPage() {
       return
     }
 
-    const payload = {
-      date: form.date,
-      notes: form.notes.trim(),
-      exerciseEntries: form.exerciseEntries.map((exercise) => ({
-        exerciseName: exercise.exerciseName.trim(),
-        sets: Number(exercise.sets),
-        reps: Number(exercise.reps),
-        weightKg: Number(exercise.weightKg),
-      })),
-    }
-
     try {
       setIsSaving(true)
-      const createdWorkout = await createWorkout(payload)
+      const createdWorkout = await createWorkout({
+        date: quickLogForm.date,
+        notes: quickLogForm.notes.trim(),
+        exerciseEntries: toExercisePayload(quickLogForm.exerciseEntries),
+      })
+
       setWorkouts((current) => [createdWorkout, ...current].sort(compareWorkouts))
       setFeedback('Workout saved.')
-      resetForm()
+      resetQuickLogForm()
     } catch (error) {
       setErrorMessage(getRequestErrorMessage(error, 'Unable to save this workout.'))
     } finally {
@@ -294,8 +412,8 @@ export function WorkoutsPage() {
       return
     }
 
-    const nextErrors = validateWorkoutForm(form)
-    setErrors(nextErrors)
+    const nextErrors = validateWorkoutForm(quickLogForm)
+    setQuickLogErrors(nextErrors)
     setTemplateErrors({})
     setFeedback(null)
     setErrorMessage(null)
@@ -308,17 +426,14 @@ export function WorkoutsPage() {
       setIsSavingTemplate(true)
       const createdTemplate = await createWorkoutTemplate({
         name,
-        notes: form.notes.trim(),
-        exerciseEntries: form.exerciseEntries.map((exercise) => ({
-          exerciseName: exercise.exerciseName.trim(),
-          sets: Number(exercise.sets),
-          reps: Number(exercise.reps),
-          weightKg: Number(exercise.weightKg),
-        })),
+        notes: quickLogForm.notes.trim(),
+        exerciseEntries: toExercisePayload(quickLogForm.exerciseEntries),
       })
 
       setTemplates((current) =>
-        [...current, createdTemplate].sort((left, right) => left.name.localeCompare(right.name) || left.id - right.id),
+        [...current, createdTemplate].sort(
+          (left, right) => left.name.localeCompare(right.name) || left.id - right.id,
+        ),
       )
       setTemplateName('')
       setFeedback(`Template "${createdTemplate.name}" saved.`)
@@ -329,6 +444,77 @@ export function WorkoutsPage() {
     }
   }
 
+  async function handleSaveActiveSession() {
+    if (!activeSession) {
+      return
+    }
+
+    const nextErrors = validateWorkoutForm(activeForm, {
+      requireDate: false,
+      requireExercises: false,
+    })
+    setActiveErrors(nextErrors)
+    setFeedback(null)
+    setErrorMessage(null)
+
+    if (hasWorkoutErrors(nextErrors)) {
+      return
+    }
+
+    try {
+      setIsSavingSession(true)
+      const updatedSession = await updateActiveWorkoutSession({
+        notes: activeForm.notes.trim(),
+        exerciseEntries: toExercisePayload(activeForm.exerciseEntries),
+      })
+
+      setActiveSession(updatedSession)
+      resetActiveForm(updatedSession)
+      setFeedback('Active workout progress saved.')
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to save active workout progress.'))
+    } finally {
+      setIsSavingSession(false)
+    }
+  }
+
+  async function handleCompleteActiveSession() {
+    if (!activeSession) {
+      return
+    }
+
+    const nextErrors = validateWorkoutForm(activeForm, {
+      requireDate: false,
+      requireExercises: true,
+    })
+    setActiveErrors(nextErrors)
+    setFeedback(null)
+    setErrorMessage(null)
+
+    if (hasWorkoutErrors(nextErrors)) {
+      return
+    }
+
+    try {
+      setIsCompletingSession(true)
+      await updateActiveWorkoutSession({
+        notes: activeForm.notes.trim(),
+        exerciseEntries: toExercisePayload(activeForm.exerciseEntries),
+      })
+
+      const completedWorkout = await completeActiveWorkoutSession()
+
+      setWorkouts((current) => [completedWorkout, ...current].sort(compareWorkouts))
+      setActiveSession(null)
+      resetActiveForm(null)
+      setFeedback('Active workout completed and moved into workout history.')
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to complete the active workout.'))
+    } finally {
+      setIsCompletingSession(false)
+    }
+  }
+
   return (
     <main className="page-shell">
       <section className="hero-panel">
@@ -336,7 +522,7 @@ export function WorkoutsPage() {
           <span className="eyebrow">Gym Tracker</span>
           <h1>Workouts</h1>
           <p className="hero-text">
-            Build one workout at a time, stack multiple exercises into it, and keep the session details together.
+            Run an active workout session, quick-log completed sessions, reuse templates, and keep the full history intact.
           </p>
         </div>
 
@@ -360,6 +546,15 @@ export function WorkoutsPage() {
             <strong>{stats.totalExercises}</strong>
             <span className="stat-subtext">Entries across all workouts</span>
           </article>
+          <article className="stat-card">
+            <span className="stat-label">Active Session</span>
+            <strong>{activeSession ? 'In progress' : 'Idle'}</strong>
+            <span className="stat-subtext">
+              {activeSession
+                ? `Started ${formatDate(activeSession.startedAtUtc)}`
+                : 'Start from scratch or a template'}
+            </span>
+          </article>
         </div>
       </section>
 
@@ -367,8 +562,194 @@ export function WorkoutsPage() {
         <div className="panel">
           <div className="panel-header">
             <div>
-              <h2>Add workout</h2>
-              <p>Create a workout, or start from a saved template before saving.</p>
+              <h2>{activeSession ? 'Active workout' : 'Start workout'}</h2>
+              <p>
+                {activeSession
+                  ? 'This session stays in progress until you complete it.'
+                  : 'Start from scratch here, or start from a template on the right.'}
+              </p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <StateCard title="Loading active workout" description="Checking whether you already have a session in progress." loading />
+          ) : activeSession ? (
+            <>
+              <div className="session-banner">
+                <span className="pr-badge">In Progress</span>
+                <span className="record-hint">Started on {formatDate(activeSession.startedAtUtc)}</span>
+              </div>
+
+              <div className="weight-form">
+                <label className="field">
+                  <span>Notes</span>
+                  <textarea
+                    className="text-area"
+                    rows={4}
+                    maxLength={500}
+                    placeholder="Optional notes for this active session"
+                    value={activeForm.notes}
+                    onChange={(event) =>
+                      setActiveForm((current) => ({ ...current, notes: event.target.value }))
+                    }
+                    aria-invalid={Boolean(activeErrors.notes)}
+                  />
+                  {activeErrors.notes ? <small className="field-error">{activeErrors.notes}</small> : null}
+                </label>
+
+                <div className="exercise-builder">
+                  <div className="section-title-row">
+                    <div>
+                      <h3>Session exercises</h3>
+                      <p>Add movements as you work through the session.</p>
+                    </div>
+                    <button type="button" className="ghost-button" onClick={addActiveExercise}>
+                      Add exercise
+                    </button>
+                  </div>
+
+                  {activeErrors.exerciseEntries ? (
+                    <small className="field-error">{activeErrors.exerciseEntries}</small>
+                  ) : null}
+
+                  {activeForm.exerciseEntries.length === 0 ? (
+                    <StateCard
+                      title="No exercises yet"
+                      description="Add your first exercise to start building this active session."
+                    />
+                  ) : (
+                    <div className="exercise-list">
+                      {activeForm.exerciseEntries.map((exercise, index) => (
+                        <ExerciseEditorCard
+                          key={`active-${index}`}
+                          title={`Exercise ${index + 1}`}
+                          exercise={exercise}
+                          errors={activeErrors.exercises[index]}
+                          workouts={workouts}
+                          onChange={(field, value) => updateActiveExercise(index, field, value)}
+                          onRemove={
+                            activeForm.exerciseEntries.length > 0
+                              ? () => removeActiveExercise(index)
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="action-row">
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => void handleSaveActiveSession()}
+                    disabled={isSavingSession || isCompletingSession}
+                  >
+                    {isSavingSession ? 'Saving...' : 'Save progress'}
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => void handleCompleteActiveSession()}
+                    disabled={isSavingSession || isCompletingSession}
+                  >
+                    {isCompletingSession ? 'Completing...' : 'Complete workout'}
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="start-workout-stack">
+              <StateCard
+                title="No active workout"
+                description="Start from scratch here, or start from one of your saved templates."
+              />
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => void handleStartActiveSession()}
+                disabled={isStartingSession}
+              >
+                {isStartingSession ? 'Starting...' : 'Start from scratch'}
+              </button>
+            </div>
+          )}
+
+          {feedback ? <p className="feedback success">{feedback}</p> : null}
+          {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Templates</h2>
+              <p>Reusable workout structures for quick logging or active sessions.</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <StateCard title="Loading templates" description="Fetching your saved workout structures." loading />
+          ) : templates.length === 0 ? (
+            <StateCard
+              title="No templates yet"
+              description="Save your quick-log workout structure to reuse it later."
+            />
+          ) : (
+            <div className="template-list" role="list">
+              {templates.map((template) => (
+                <article key={template.id} className="template-card" role="listitem">
+                  <div className="workout-card-header">
+                    <div>
+                      <p className="entry-date">{template.name}</p>
+                      <strong className="entry-weight">{template.exerciseEntries.length} exercises</strong>
+                    </div>
+                  </div>
+
+                  {template.notes ? <p className="workout-notes">{template.notes}</p> : null}
+
+                  <div className="exercise-summary-list">
+                    {template.exerciseEntries.map((exercise) => (
+                      <div key={exercise.id} className="exercise-summary-item">
+                        <div className="exercise-summary-copy">
+                          <strong>{exercise.exerciseName}</strong>
+                          <span>
+                            {exercise.sets} x {exercise.reps} at {exercise.weightKg} kg
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="action-row">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => applyTemplateToQuickLog(template)}
+                    >
+                      Use for quick log
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={() => void handleStartActiveSession(template)}
+                      disabled={Boolean(activeSession) || isStartingSession}
+                    >
+                      Start active
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="content-grid workout-grid">
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Quick log workout</h2>
+              <p>Save a completed workout directly without using active mode.</p>
             </div>
           </div>
 
@@ -395,16 +776,18 @@ export function WorkoutsPage() {
             </button>
           </div>
 
-          <form className="weight-form" onSubmit={handleSubmit} noValidate>
+          <form className="weight-form" onSubmit={handleQuickLogSubmit} noValidate>
             <label className="field">
               <span>Date</span>
               <input
                 type="date"
-                value={form.date}
-                onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
-                aria-invalid={Boolean(errors.date)}
+                value={quickLogForm.date}
+                onChange={(event) =>
+                  setQuickLogForm((current) => ({ ...current, date: event.target.value }))
+                }
+                aria-invalid={Boolean(quickLogErrors.date)}
               />
-              {errors.date ? <small className="field-error">{errors.date}</small> : null}
+              {quickLogErrors.date ? <small className="field-error">{quickLogErrors.date}</small> : null}
             </label>
 
             <label className="field">
@@ -414,11 +797,13 @@ export function WorkoutsPage() {
                 rows={4}
                 maxLength={500}
                 placeholder="Optional notes for this session"
-                value={form.notes}
-                onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-                aria-invalid={Boolean(errors.notes)}
+                value={quickLogForm.notes}
+                onChange={(event) =>
+                  setQuickLogForm((current) => ({ ...current, notes: event.target.value }))
+                }
+                aria-invalid={Boolean(quickLogErrors.notes)}
               />
-              {errors.notes ? <small className="field-error">{errors.notes}</small> : null}
+              {quickLogErrors.notes ? <small className="field-error">{quickLogErrors.notes}</small> : null}
             </label>
 
             <div className="exercise-builder">
@@ -427,106 +812,30 @@ export function WorkoutsPage() {
                   <h3>Exercises</h3>
                   <p>Add each movement in the order you performed it.</p>
                 </div>
-                <button type="button" className="ghost-button" onClick={addExercise}>
+                <button type="button" className="ghost-button" onClick={addQuickLogExercise}>
                   Add exercise
                 </button>
               </div>
 
-              {errors.exerciseEntries ? <small className="field-error">{errors.exerciseEntries}</small> : null}
+              {quickLogErrors.exerciseEntries ? (
+                <small className="field-error">{quickLogErrors.exerciseEntries}</small>
+              ) : null}
 
               <div className="exercise-list">
-                {form.exerciseEntries.map((exercise, index) => (
-                  <div key={index} className="exercise-card">
-                    <div className="exercise-card-header">
-                      <h3>Exercise {index + 1}</h3>
-                      {form.exerciseEntries.length > 1 ? (
-                        <button
-                          type="button"
-                          className="danger-button"
-                          onClick={() => removeExercise(index)}
-                        >
-                          Remove
-                        </button>
-                      ) : null}
-                    </div>
-
-                    {exercise.exerciseName.trim() ? (
-                      <ExerciseSuggestionNotice
-                        suggestion={getSuggestedNextWeight(
-                          workouts,
-                          exercise.exerciseName,
-                          Number.isNaN(Number(exercise.sets)) || !exercise.sets.trim()
-                            ? null
-                            : Number(exercise.sets),
-                          Number.isNaN(Number(exercise.reps)) || !exercise.reps.trim()
-                            ? null
-                            : Number(exercise.reps),
-                        )}
-                      />
-                    ) : null}
-
-                    <div className="exercise-fields">
-                      <label className="field field-span-2">
-                        <span>Name</span>
-                        <input
-                          type="text"
-                          placeholder="Bench Press"
-                          value={exercise.exerciseName}
-                          onChange={(event) => updateExercise(index, 'exerciseName', event.target.value)}
-                          aria-invalid={Boolean(errors.exercises[index]?.exerciseName)}
-                        />
-                        {errors.exercises[index]?.exerciseName ? (
-                          <small className="field-error">{errors.exercises[index]?.exerciseName}</small>
-                        ) : null}
-                      </label>
-
-                      <label className="field">
-                        <span>Sets</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="20"
-                          value={exercise.sets}
-                          onChange={(event) => updateExercise(index, 'sets', event.target.value)}
-                          aria-invalid={Boolean(errors.exercises[index]?.sets)}
-                        />
-                        {errors.exercises[index]?.sets ? (
-                          <small className="field-error">{errors.exercises[index]?.sets}</small>
-                        ) : null}
-                      </label>
-
-                      <label className="field">
-                        <span>Reps</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="100"
-                          value={exercise.reps}
-                          onChange={(event) => updateExercise(index, 'reps', event.target.value)}
-                          aria-invalid={Boolean(errors.exercises[index]?.reps)}
-                        />
-                        {errors.exercises[index]?.reps ? (
-                          <small className="field-error">{errors.exercises[index]?.reps}</small>
-                        ) : null}
-                      </label>
-
-                      <label className="field">
-                        <span>Weight (kg)</span>
-                        <input
-                          type="number"
-                          min="0"
-                          max="500"
-                          step="0.1"
-                          value={exercise.weightKg}
-                          onChange={(event) => updateExercise(index, 'weightKg', event.target.value)}
-                          aria-invalid={Boolean(errors.exercises[index]?.weightKg)}
-                        />
-                        {errors.exercises[index]?.weightKg ? (
-                          <small className="field-error">{errors.exercises[index]?.weightKg}</small>
-                        ) : null}
-                      </label>
-                    </div>
-                  </div>
+                {quickLogForm.exerciseEntries.map((exercise, index) => (
+                  <ExerciseEditorCard
+                    key={`quick-log-${index}`}
+                    title={`Exercise ${index + 1}`}
+                    exercise={exercise}
+                    errors={quickLogErrors.exercises[index]}
+                    workouts={workouts}
+                    onChange={(field, value) => updateQuickLogExercise(index, field, value)}
+                    onRemove={
+                      quickLogForm.exerciseEntries.length > 1
+                        ? () => removeQuickLogExercise(index)
+                        : undefined
+                    }
+                  />
                 ))}
               </div>
             </div>
@@ -535,62 +844,8 @@ export function WorkoutsPage() {
               {isSaving ? 'Saving...' : 'Save workout'}
             </button>
           </form>
-
-          {feedback ? <p className="feedback success">{feedback}</p> : null}
-          {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
         </div>
 
-        <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Templates</h2>
-              <p>Reusable workout structures you can apply to a new session.</p>
-            </div>
-          </div>
-
-          {isLoading ? (
-            <StateCard title="Loading templates" description="Fetching your saved workout structures." loading />
-          ) : templates.length === 0 ? (
-            <StateCard
-              title="No templates yet"
-              description="Save your current workout structure to reuse it later."
-            />
-          ) : (
-            <div className="template-list" role="list">
-              {templates.map((template) => (
-                <article key={template.id} className="template-card" role="listitem">
-                  <div className="workout-card-header">
-                    <div>
-                      <p className="entry-date">{template.name}</p>
-                      <strong className="entry-weight">{template.exerciseEntries.length} exercises</strong>
-                    </div>
-                    <button type="button" className="primary-button" onClick={() => applyTemplate(template)}>
-                      Use template
-                    </button>
-                  </div>
-
-                  {template.notes ? <p className="workout-notes">{template.notes}</p> : null}
-
-                  <div className="exercise-summary-list">
-                    {template.exerciseEntries.map((exercise) => (
-                      <div key={exercise.id} className="exercise-summary-item">
-                        <div className="exercise-summary-copy">
-                          <strong>{exercise.exerciseName}</strong>
-                          <span>
-                            {exercise.sets} x {exercise.reps} at {exercise.weightKg} kg
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="content-grid workout-grid">
         <div className="panel">
           <div className="panel-header">
             <div>
@@ -695,9 +950,7 @@ export function WorkoutsPage() {
                         </div>
                         <div className="exercise-summary-meta">
                           {exercise.isPersonalRecord ? <span className="pr-badge">PR</span> : null}
-                          <span className="record-hint">
-                            Best: {exercise.personalRecordWeightKg} kg
-                          </span>
+                          <span className="record-hint">Best: {exercise.personalRecordWeightKg} kg</span>
                         </div>
                       </div>
                     ))}
@@ -714,6 +967,98 @@ export function WorkoutsPage() {
 
 function compareWorkouts(left: Workout, right: Workout) {
   return new Date(right.date).getTime() - new Date(left.date).getTime() || right.id - left.id
+}
+
+function ExerciseEditorCard({
+  title,
+  exercise,
+  errors,
+  workouts,
+  onChange,
+  onRemove,
+}: {
+  title: string
+  exercise: ExerciseFormState
+  errors?: ExerciseFieldErrors
+  workouts: Workout[]
+  onChange: (field: keyof ExerciseFormState, value: string) => void
+  onRemove?: () => void
+}) {
+  const sets = !exercise.sets.trim() || Number.isNaN(Number(exercise.sets)) ? null : Number(exercise.sets)
+  const reps = !exercise.reps.trim() || Number.isNaN(Number(exercise.reps)) ? null : Number(exercise.reps)
+
+  return (
+    <div className="exercise-card">
+      <div className="exercise-card-header">
+        <h3>{title}</h3>
+        {onRemove ? (
+          <button type="button" className="danger-button" onClick={onRemove}>
+            Remove
+          </button>
+        ) : null}
+      </div>
+
+      {exercise.exerciseName.trim() ? (
+        <ExerciseSuggestionNotice
+          suggestion={getSuggestedNextWeight(workouts, exercise.exerciseName, sets, reps)}
+        />
+      ) : null}
+
+      <div className="exercise-fields">
+        <label className="field field-span-2">
+          <span>Name</span>
+          <input
+            type="text"
+            placeholder="Bench Press"
+            value={exercise.exerciseName}
+            onChange={(event) => onChange('exerciseName', event.target.value)}
+            aria-invalid={Boolean(errors?.exerciseName)}
+          />
+          {errors?.exerciseName ? <small className="field-error">{errors.exerciseName}</small> : null}
+        </label>
+
+        <label className="field">
+          <span>Sets</span>
+          <input
+            type="number"
+            min="1"
+            max="20"
+            value={exercise.sets}
+            onChange={(event) => onChange('sets', event.target.value)}
+            aria-invalid={Boolean(errors?.sets)}
+          />
+          {errors?.sets ? <small className="field-error">{errors.sets}</small> : null}
+        </label>
+
+        <label className="field">
+          <span>Reps</span>
+          <input
+            type="number"
+            min="1"
+            max="100"
+            value={exercise.reps}
+            onChange={(event) => onChange('reps', event.target.value)}
+            aria-invalid={Boolean(errors?.reps)}
+          />
+          {errors?.reps ? <small className="field-error">{errors.reps}</small> : null}
+        </label>
+
+        <label className="field">
+          <span>Weight (kg)</span>
+          <input
+            type="number"
+            min="0"
+            max="500"
+            step="0.1"
+            value={exercise.weightKg}
+            onChange={(event) => onChange('weightKg', event.target.value)}
+            aria-invalid={Boolean(errors?.weightKg)}
+          />
+          {errors?.weightKg ? <small className="field-error">{errors.weightKg}</small> : null}
+        </label>
+      </div>
+    </div>
+  )
 }
 
 function ExerciseSuggestionNotice({

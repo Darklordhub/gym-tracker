@@ -326,6 +326,30 @@
   margin-top: 0;
 }
 
+.session-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(15, 88, 79, 0.08);
+}
+
+.start-workout-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.action-row {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 .template-toolbar {
   display: flex;
   gap: 12px;
@@ -730,6 +754,7 @@
   .entry-card,
   .weekly-average-card,
   .state-card,
+  .session-banner,
   .panel-header,
   .template-toolbar,
   .filter-toolbar,
@@ -753,6 +778,14 @@
   .state-card {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .action-row {
+    justify-content: stretch;
+  }
+
+  .action-row button {
+    flex: 1 1 0;
   }
 
   .entry-actions {

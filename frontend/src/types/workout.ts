@@ -55,3 +55,23 @@ export type WorkoutTemplatePayload = {
   notes: string
   exerciseEntries: WorkoutTemplateExerciseEntryPayload[]
 }
+
+export type ActiveWorkoutSessionExerciseEntry = {
+  id: number
+  exerciseName: string
+  sets: number
+  reps: number
+  weightKg: number
+}
+
+export type ActiveWorkoutSession = {
+  id: number
+  startedAtUtc: string
+  notes: string
+  exerciseEntries: ActiveWorkoutSessionExerciseEntry[]
+}
+
+export type ActiveWorkoutSessionPayload = {
+  notes: string
+  exerciseEntries: ExerciseEntryPayload[]
+}
