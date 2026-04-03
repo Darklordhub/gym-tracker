@@ -5,6 +5,7 @@ import {
   fetchWeightEntries,
   updateWeightEntry,
 } from '../api/weightEntries'
+import { StateCard } from '../components/StateCard'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { WeightEntry } from '../types/weight'
@@ -66,11 +67,28 @@ export function WeightPage() {
       latestEntry && previousEntry
         ? Number((latestEntry.weightKg - previousEntry.weightKg).toFixed(1))
         : null
+    const weeklyAverages = buildWeeklyAverages(entries)
+    const latestWeek = weeklyAverages[0]
+    const previousWeek = weeklyAverages[1]
+    const weeklyDelta =
+      latestWeek && previousWeek
+        ? Number((latestWeek.averageWeightKg - previousWeek.averageWeightKg).toFixed(1))
+        : null
+    const trendLabel =
+      weeklyDelta === null || weeklyDelta === 0
+        ? 'Stable'
+        : weeklyDelta > 0
+          ? 'Increasing'
+          : 'Decreasing'
 
     return {
       latestEntry,
       totalEntries: entries.length,
       delta,
+      latestWeek,
+      weeklyAverages,
+      weeklyDelta,
+      trendLabel,
     }
   }, [entries])
 
@@ -208,6 +226,24 @@ export function WeightPage() {
             </strong>
             <span className="stat-subtext">Compared with previous entry</span>
           </article>
+          <article className="stat-card">
+            <span className="stat-label">Weekly Average</span>
+            <strong>
+              {stats.latestWeek ? `${stats.latestWeek.averageWeightKg} kg` : 'No data'}
+            </strong>
+            <span className="stat-subtext">
+              {stats.latestWeek ? stats.latestWeek.label : 'Need weigh-ins this week'}
+            </span>
+          </article>
+          <article className="stat-card">
+            <span className="stat-label">Trend</span>
+            <strong className={getTrendClassName(stats.weeklyDelta)}>{stats.trendLabel}</strong>
+            <span className="stat-subtext">
+              {stats.weeklyDelta === null
+                ? 'Need two weeks of data'
+                : `${stats.weeklyDelta > 0 ? '+' : ''}${stats.weeklyDelta} kg vs previous week`}
+            </span>
+          </article>
         </div>
       </section>
 
@@ -273,11 +309,59 @@ export function WeightPage() {
           </div>
 
           {isLoading ? (
-            <div className="empty-state">Loading chart...</div>
+            <StateCard title="Loading chart" description="Building your body-weight trend." loading />
           ) : chartData.length < 2 ? (
-            <div className="empty-state">Add at least two entries to see your progress chart.</div>
+            <StateCard
+              title="Not enough data yet"
+              description="Add at least two weigh-ins to unlock the progress chart."
+            />
           ) : (
             <WeightProgressChart entries={chartData} />
+          )}
+        </div>
+      </section>
+
+      <section className="content-grid">
+        <div className="panel panel-span-2">
+          <div className="panel-header">
+            <div>
+              <h2>Weekly averages</h2>
+              <p>Average body weight grouped by week.</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <StateCard title="Loading weekly averages" description="Grouping your weigh-ins by week." loading />
+          ) : stats.weeklyAverages.length === 0 ? (
+            <StateCard
+              title="No weekly averages yet"
+              description="Add weigh-ins on different days to generate weekly summaries."
+            />
+          ) : (
+            <div className="weekly-average-list" role="list">
+              {stats.weeklyAverages.map((week, index) => {
+                const previousWeek = stats.weeklyAverages[index + 1]
+                const change =
+                  previousWeek
+                    ? Number((week.averageWeightKg - previousWeek.averageWeightKg).toFixed(1))
+                    : null
+
+                return (
+                  <article key={week.weekKey} className="weekly-average-card" role="listitem">
+                    <div>
+                      <p className="entry-date">{week.label}</p>
+                      <strong className="entry-weight">{week.averageWeightKg} kg</strong>
+                    </div>
+                    <div className="weekly-average-meta">
+                      <span className="stat-subtext">{week.entryCount} weigh-ins</span>
+                      <span className={getTrendClassName(change)}>
+                        {change === null ? 'Baseline' : `${change > 0 ? '+' : ''}${change} kg`}
+                      </span>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
           )}
         </div>
       </section>
@@ -292,9 +376,12 @@ export function WeightPage() {
           </div>
 
           {isLoading ? (
-            <div className="empty-state">Loading weight entries...</div>
+            <StateCard title="Loading weigh-ins" description="Fetching your recorded entries." loading />
           ) : entries.length === 0 ? (
-            <div className="empty-state">No entries yet. Add your first weigh-in to start tracking.</div>
+            <StateCard
+              title="No weigh-ins yet"
+              description="Add your first body-weight entry to start building history."
+            />
           ) : (
             <div className="entry-list" role="list">
               {entries.map((entry) => (
@@ -323,6 +410,61 @@ export function WeightPage() {
 
 function compareEntries(left: WeightEntry, right: WeightEntry) {
   return new Date(right.date).getTime() - new Date(left.date).getTime() || right.id - left.id
+}
+
+function buildWeeklyAverages(entries: WeightEntry[]) {
+  const groupedEntries = new Map<string, WeightEntry[]>()
+
+  for (const entry of entries) {
+    const weekStart = getWeekStart(entry.date)
+    const weekKey = weekStart.toISOString().slice(0, 10)
+    const currentWeek = groupedEntries.get(weekKey) ?? []
+    currentWeek.push(entry)
+    groupedEntries.set(weekKey, currentWeek)
+  }
+
+  return [...groupedEntries.entries()]
+    .map(([weekKey, weekEntries]) => {
+      const averageWeightKg = Number(
+        (
+          weekEntries.reduce((sum, entry) => sum + entry.weightKg, 0) /
+          weekEntries.length
+        ).toFixed(1),
+      )
+
+      return {
+        weekKey,
+        label: formatWeekLabel(weekKey),
+        averageWeightKg,
+        entryCount: weekEntries.length,
+      }
+    })
+    .sort((left, right) => new Date(right.weekKey).getTime() - new Date(left.weekKey).getTime())
+}
+
+function getWeekStart(date: string) {
+  const result = new Date(date)
+  const day = result.getDay()
+  const diff = (day + 6) % 7
+  result.setHours(0, 0, 0, 0)
+  result.setDate(result.getDate() - diff)
+  return result
+}
+
+function formatWeekLabel(weekKey: string) {
+  const start = new Date(weekKey)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+
+  return `${formatDate(start.toISOString())} to ${formatDate(end.toISOString())}`
+}
+
+function getTrendClassName(change: number | null) {
+  if (change === null || change === 0) {
+    return 'trend-neutral'
+  }
+
+  return change > 0 ? 'trend-up' : 'trend-down'
 }
 
 type ChartEntry = WeightEntry & {

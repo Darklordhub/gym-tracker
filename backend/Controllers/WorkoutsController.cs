@@ -26,7 +26,9 @@ public class WorkoutsController : ControllerBase
             .ThenByDescending(workout => workout.Id)
             .ToListAsync();
 
-        return Ok(workouts.Select(MapWorkout));
+        var personalRecords = BuildPersonalRecordLookup(workouts);
+
+        return Ok(workouts.Select(workout => MapWorkout(workout, personalRecords)));
     }
 
     [HttpGet("{id:int}")]
@@ -41,7 +43,9 @@ public class WorkoutsController : ControllerBase
             return NotFound();
         }
 
-        return Ok(MapWorkout(workout));
+        var personalRecords = await GetPersonalRecordLookupAsync();
+
+        return Ok(MapWorkout(workout, personalRecords));
     }
 
     [HttpPost]
@@ -63,10 +67,17 @@ public class WorkoutsController : ControllerBase
         _dbContext.Workouts.Add(workout);
         await _dbContext.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetWorkout), new { id = workout.Id }, MapWorkout(workout));
+        var personalRecords = await GetPersonalRecordLookupAsync();
+
+        return CreatedAtAction(
+            nameof(GetWorkout),
+            new { id = workout.Id },
+            MapWorkout(workout, personalRecords));
     }
 
-    private static WorkoutResponse MapWorkout(Workout workout)
+    private static WorkoutResponse MapWorkout(
+        Workout workout,
+        IReadOnlyDictionary<string, decimal> personalRecords)
     {
         return new WorkoutResponse
         {
@@ -82,6 +93,8 @@ public class WorkoutsController : ControllerBase
                     Sets = exercise.Sets,
                     Reps = exercise.Reps,
                     WeightKg = exercise.WeightKg,
+                    IsPersonalRecord = IsPersonalRecord(exercise, personalRecords),
+                    PersonalRecordWeightKg = GetPersonalRecordWeight(exercise, personalRecords),
                 })
                 .ToList(),
         };
@@ -90,5 +103,51 @@ public class WorkoutsController : ControllerBase
     private static DateTime NormalizeDate(DateTime date)
     {
         return DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+    }
+
+    private async Task<IReadOnlyDictionary<string, decimal>> GetPersonalRecordLookupAsync()
+    {
+        var exerciseEntries = await _dbContext.ExerciseEntries
+            .AsNoTracking()
+            .Select(exercise => new
+            {
+                exercise.ExerciseName,
+                exercise.WeightKg,
+            })
+            .ToListAsync();
+
+        return exerciseEntries
+            .GroupBy(exercise => NormalizeExerciseName(exercise.ExerciseName))
+            .ToDictionary(group => group.Key, group => group.Max(exercise => exercise.WeightKg));
+    }
+
+    private static IReadOnlyDictionary<string, decimal> BuildPersonalRecordLookup(IEnumerable<Workout> workouts)
+    {
+        return workouts
+            .SelectMany(workout => workout.ExerciseEntries)
+            .GroupBy(exercise => NormalizeExerciseName(exercise.ExerciseName))
+            .ToDictionary(group => group.Key, group => group.Max(exercise => exercise.WeightKg));
+    }
+
+    private static bool IsPersonalRecord(
+        ExerciseEntry exercise,
+        IReadOnlyDictionary<string, decimal> personalRecords)
+    {
+        return personalRecords.TryGetValue(NormalizeExerciseName(exercise.ExerciseName), out var personalRecord)
+            && exercise.WeightKg == personalRecord;
+    }
+
+    private static decimal GetPersonalRecordWeight(
+        ExerciseEntry exercise,
+        IReadOnlyDictionary<string, decimal> personalRecords)
+    {
+        return personalRecords.TryGetValue(NormalizeExerciseName(exercise.ExerciseName), out var personalRecord)
+            ? personalRecord
+            : exercise.WeightKg;
+    }
+
+    private static string NormalizeExerciseName(string exerciseName)
+    {
+        return exerciseName.Trim().ToUpperInvariant();
     }
 }
