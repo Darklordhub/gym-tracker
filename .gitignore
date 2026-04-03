@@ -1,0 +1,21 @@
+# Node
+node_modules/
+dist/
+
+# Env
+.env
+.env.*
+
+# React
+frontend/node_modules/
+frontend/dist/
+
+# .NET
+backend/bin/
+backend/obj/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store

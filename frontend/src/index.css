@@ -1,0 +1,79 @@
+:root {
+  --page-bg: #f5efe6;
+  --surface: rgba(255, 249, 242, 0.84);
+  --surface-strong: #fff6ee;
+  --card-bg: rgba(255, 255, 255, 0.78);
+  --input-bg: rgba(255, 255, 255, 0.95);
+  --border: rgba(89, 72, 52, 0.14);
+  --text: #54463a;
+  --text-strong: #20160f;
+  --muted: #7d6b5b;
+  --accent-strong: #0f584f;
+  --accent-soft: rgba(15, 88, 79, 0.12);
+  --danger: #a43f2a;
+  --danger-soft: rgba(164, 63, 42, 0.12);
+  --success: #0d6b45;
+  --success-soft: rgba(13, 107, 69, 0.12);
+  --focus-ring: rgba(15, 88, 79, 0.24);
+  --shadow: 0 20px 60px rgba(48, 34, 22, 0.08);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(219, 118, 61, 0.18), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(15, 88, 79, 0.18), transparent 24%),
+    var(--page-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1,
+h2 {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+h1 {
+  font-size: clamp(2.8rem, 6vw, 4.8rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  margin-bottom: 12px;
+}
+
+h2 {
+  font-size: 1.45rem;
+  margin-bottom: 4px;
+}
+
+button,
+input {
+  font: inherit;
+}
