@@ -1,7 +1,19 @@
 import axios from 'axios'
 
+function normalizeApiBaseUrl() {
+  const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+
+  if (!configuredApiBaseUrl) {
+    return '/api'
+  }
+
+  return configuredApiBaseUrl.endsWith('/')
+    ? configuredApiBaseUrl.slice(0, -1)
+    : configuredApiBaseUrl
+}
+
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5224/api',
+  baseURL: normalizeApiBaseUrl(),
 })
 
 export function isNotFoundError(error: unknown) {

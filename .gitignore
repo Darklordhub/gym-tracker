@@ -1,21 +1,37 @@
-# Node
-node_modules/
-dist/
-
 # Env
 .env
 .env.*
+!.env.example
+!.env.*.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+backend/.env
+backend/.env.*
 
-# React
+# Node / frontend
+node_modules/
+dist/
+coverage/
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
 
-# .NET
+# .NET / backend
 backend/bin/
 backend/obj/
 
-# VS Code
+# Docker / local tooling
+.docker/
+
+# Editors
 .vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
 
 # OS
 .DS_Store
+Thumbs.db
