@@ -1,17 +1,32 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { fetchGoals, updateGoals } from '../api/goals'
 import { fetchWeightEntries } from '../api/weightEntries'
 import { fetchWorkouts } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
+import type { GoalSettings, GoalSettingsPayload } from '../types/goals'
 import type { WeightEntry } from '../types/weight'
 import type { Workout } from '../types/workout'
 
 export function DashboardPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([])
+  const [goals, setGoals] = useState<GoalSettings>({
+    targetBodyWeightKg: null,
+    weeklyWorkoutTarget: null,
+    fitnessPhase: 'maintain',
+  })
+  const [goalForm, setGoalForm] = useState({
+    targetBodyWeightKg: '',
+    weeklyWorkoutTarget: '',
+    fitnessPhase: 'maintain',
+  })
   const [isLoading, setIsLoading] = useState(true)
+  const [isSavingGoals, setIsSavingGoals] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [goalMessage, setGoalMessage] = useState<string | null>(null)
+  const [goalErrorMessage, setGoalErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     void loadDashboard()
@@ -55,6 +70,15 @@ export function DashboardPage() {
     const workoutStreakWeeks = getWorkoutWeekStreak(workouts)
     const latestWorkout = workouts[0] ?? null
     const latestWeightEntry = weightEntries[0] ?? null
+    const bodyWeightGoalProgress = getBodyWeightGoalProgress(
+      latestWeightEntry?.weightKg ?? null,
+      goals.targetBodyWeightKg,
+      goals.fitnessPhase,
+    )
+    const weeklyWorkoutGoalProgress = getWeeklyWorkoutGoalProgress(
+      workoutsThisWeek.length,
+      goals.weeklyWorkoutTarget,
+    )
 
     return {
       workoutsThisWeek: workoutsThisWeek.length,
@@ -69,26 +93,65 @@ export function DashboardPage() {
       workoutStreakWeeks,
       latestWorkout,
       latestWeightEntry,
+      bodyWeightGoalProgress,
+      weeklyWorkoutGoalProgress,
     }
-  }, [weightEntries, workouts])
+  }, [goals, weightEntries, workouts])
 
   async function loadDashboard() {
     try {
       setIsLoading(true)
       setErrorMessage(null)
 
-      const [workoutData, weightData] = await Promise.all([
+      const [workoutData, weightData, goalsData] = await Promise.all([
         fetchWorkouts(),
         fetchWeightEntries(),
+        fetchGoals(),
       ])
 
       setWorkouts(workoutData)
       setWeightEntries(weightData)
+      applyGoalState(goalsData)
     } catch (error) {
       setErrorMessage(getRequestErrorMessage(error, 'Unable to load dashboard data.'))
     } finally {
       setIsLoading(false)
     }
+  }
+
+  async function handleGoalSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const payload: GoalSettingsPayload = {
+      targetBodyWeightKg: goalForm.targetBodyWeightKg === '' ? null : Number(goalForm.targetBodyWeightKg),
+      weeklyWorkoutTarget: goalForm.weeklyWorkoutTarget === '' ? null : Number(goalForm.weeklyWorkoutTarget),
+      fitnessPhase: goalForm.fitnessPhase as GoalSettings['fitnessPhase'],
+    }
+
+    try {
+      setIsSavingGoals(true)
+      setGoalErrorMessage(null)
+      setGoalMessage(null)
+
+      const savedGoals = await updateGoals(payload)
+      applyGoalState(savedGoals)
+      setGoalMessage('Goals updated.')
+    } catch (error) {
+      setGoalErrorMessage(getRequestErrorMessage(error, 'Unable to update goals.'))
+    } finally {
+      setIsSavingGoals(false)
+    }
+  }
+
+  function applyGoalState(nextGoals: GoalSettings) {
+    setGoals(nextGoals)
+    setGoalForm({
+      targetBodyWeightKg:
+        nextGoals.targetBodyWeightKg === null ? '' : nextGoals.targetBodyWeightKg.toString(),
+      weeklyWorkoutTarget:
+        nextGoals.weeklyWorkoutTarget === null ? '' : nextGoals.weeklyWorkoutTarget.toString(),
+      fitnessPhase: nextGoals.fitnessPhase,
+    })
   }
 
   return (
@@ -118,10 +181,139 @@ export function DashboardPage() {
             <strong>{metrics.workoutStreakWeeks}</strong>
             <span className="stat-subtext">Consecutive active weeks</span>
           </article>
+          <article className="stat-card">
+            <span className="stat-label">Current Phase</span>
+            <strong>{formatPhase(goals.fitnessPhase)}</strong>
+            <span className="stat-subtext">Active goal setting mode</span>
+          </article>
         </div>
       </section>
 
       <section className="content-grid dashboard-grid">
+        <div className="panel panel-span-2">
+          <div className="panel-header">
+            <div>
+              <h2>Goals</h2>
+              <p>Set simple weekly targets and body-weight direction.</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <StateCard title="Loading goals" description="Pulling your current goal settings." loading />
+          ) : errorMessage ? (
+            <StateCard title="Goals unavailable" description={errorMessage} tone="error" />
+          ) : (
+            <div className="goals-grid">
+              <form className="goal-form" onSubmit={handleGoalSubmit}>
+                <label className="field">
+                  <span>Target body weight (kg)</span>
+                  <input
+                    type="number"
+                    min="20"
+                    max="500"
+                    step="0.1"
+                    value={goalForm.targetBodyWeightKg}
+                    onChange={(event) =>
+                      setGoalForm((current) => ({
+                        ...current,
+                        targetBodyWeightKg: event.target.value,
+                      }))
+                    }
+                    placeholder="e.g. 78.5"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Weekly workout target</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="14"
+                    step="1"
+                    value={goalForm.weeklyWorkoutTarget}
+                    onChange={(event) =>
+                      setGoalForm((current) => ({
+                        ...current,
+                        weeklyWorkoutTarget: event.target.value,
+                      }))
+                    }
+                    placeholder="e.g. 4"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Fitness phase</span>
+                  <select
+                    className="select-input"
+                    value={goalForm.fitnessPhase}
+                    onChange={(event) =>
+                      setGoalForm((current) => ({
+                        ...current,
+                        fitnessPhase: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="cut">Cut</option>
+                    <option value="maintain">Maintain</option>
+                    <option value="bulk">Bulk</option>
+                  </select>
+                </label>
+
+                <div className="action-row">
+                  <button type="submit" disabled={isSavingGoals}>
+                    {isSavingGoals ? 'Saving goals...' : 'Save goals'}
+                  </button>
+                </div>
+
+                {goalMessage ? <p className="feedback success-text">{goalMessage}</p> : null}
+                {goalErrorMessage ? <p className="feedback error-text">{goalErrorMessage}</p> : null}
+              </form>
+
+              <div className="goal-progress-list">
+                <article className="goal-progress-card">
+                  <div className="goal-progress-header">
+                    <span className="stat-label">Body-weight goal</span>
+                    <strong>
+                      {goals.targetBodyWeightKg === null ? 'Not set' : `${goals.targetBodyWeightKg} kg`}
+                    </strong>
+                  </div>
+                  <p className="goal-progress-copy">{metrics.bodyWeightGoalProgress.message}</p>
+                  <div className="progress-track" aria-hidden="true">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${metrics.bodyWeightGoalProgress.percentage}%` }}
+                    />
+                  </div>
+                </article>
+
+                <article className="goal-progress-card">
+                  <div className="goal-progress-header">
+                    <span className="stat-label">Weekly workout goal</span>
+                    <strong>
+                      {goals.weeklyWorkoutTarget === null ? 'Not set' : `${goals.weeklyWorkoutTarget} / week`}
+                    </strong>
+                  </div>
+                  <p className="goal-progress-copy">{metrics.weeklyWorkoutGoalProgress.message}</p>
+                  <div className="progress-track" aria-hidden="true">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${metrics.weeklyWorkoutGoalProgress.percentage}%` }}
+                    />
+                  </div>
+                </article>
+
+                <article className="goal-progress-card">
+                  <div className="goal-progress-header">
+                    <span className="stat-label">Fitness phase</span>
+                    <strong>{formatPhase(goals.fitnessPhase)}</strong>
+                  </div>
+                  <p className="goal-progress-copy">{getPhaseSummary(goals.fitnessPhase)}</p>
+                </article>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="panel">
           <div className="panel-header">
             <div>
@@ -237,4 +429,98 @@ function getWorkoutWeekStreak(workouts: Workout[]) {
   }
 
   return streak
+}
+
+function getBodyWeightGoalProgress(
+  currentWeightKg: number | null,
+  targetWeightKg: number | null,
+  fitnessPhase: GoalSettings['fitnessPhase'],
+) {
+  if (targetWeightKg === null) {
+    return {
+      percentage: 0,
+      message: 'Set a target body weight to track progress here.',
+    }
+  }
+
+  if (currentWeightKg === null) {
+    return {
+      percentage: 0,
+      message: `Target is ${targetWeightKg} kg. Add a weigh-in to start tracking progress.`,
+    }
+  }
+
+  const difference = Number((currentWeightKg - targetWeightKg).toFixed(1))
+
+  if (fitnessPhase === 'bulk') {
+    if (difference >= 0) {
+      return { percentage: 100, message: `Target reached. Current body weight is ${currentWeightKg} kg.` }
+    }
+
+    return {
+      percentage: Math.max(10, Math.min(100, 100 - Math.abs(difference) * 10)),
+      message: `${Math.abs(difference).toFixed(1)} kg to gain to reach ${targetWeightKg} kg.`,
+    }
+  }
+
+  if (fitnessPhase === 'cut') {
+    if (difference <= 0) {
+      return { percentage: 100, message: `Target reached. Current body weight is ${currentWeightKg} kg.` }
+    }
+
+    return {
+      percentage: Math.max(10, Math.min(100, 100 - Math.abs(difference) * 10)),
+      message: `${difference.toFixed(1)} kg to lose to reach ${targetWeightKg} kg.`,
+    }
+  }
+
+  if (Math.abs(difference) <= 0.5) {
+    return {
+      percentage: 100,
+      message: `You are within 0.5 kg of your maintenance target at ${currentWeightKg} kg.`,
+    }
+  }
+
+  return {
+    percentage: Math.max(10, Math.min(100, 100 - Math.abs(difference) * 20)),
+    message: `${Math.abs(difference).toFixed(1)} kg away from your maintenance target.`,
+  }
+}
+
+function getWeeklyWorkoutGoalProgress(workoutCount: number, weeklyWorkoutTarget: number | null) {
+  if (weeklyWorkoutTarget === null) {
+    return {
+      percentage: 0,
+      message: 'Set a weekly workout target to track consistency.',
+    }
+  }
+
+  const percentage = Math.min(100, Math.round((workoutCount / weeklyWorkoutTarget) * 100))
+
+  if (workoutCount >= weeklyWorkoutTarget) {
+    return {
+      percentage,
+      message: `Weekly target met with ${workoutCount} workouts logged this week.`,
+    }
+  }
+
+  return {
+    percentage,
+    message: `${weeklyWorkoutTarget - workoutCount} more workout${weeklyWorkoutTarget - workoutCount === 1 ? '' : 's'} needed this week.`,
+  }
+}
+
+function formatPhase(fitnessPhase: GoalSettings['fitnessPhase']) {
+  return fitnessPhase.charAt(0).toUpperCase() + fitnessPhase.slice(1)
+}
+
+function getPhaseSummary(fitnessPhase: GoalSettings['fitnessPhase']) {
+  switch (fitnessPhase) {
+    case 'cut':
+      return 'Body-weight progress is framed around moving down toward your target.'
+    case 'bulk':
+      return 'Body-weight progress is framed around moving up toward your target.'
+    default:
+      return 'Body-weight progress is framed around staying close to your target.'
+  }
 }
