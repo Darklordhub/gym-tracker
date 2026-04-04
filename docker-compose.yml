@@ -1,62 +1,66 @@
 services:
-  postgres:
+  gym-tracker-db:
     image: postgres:16-alpine
-    container_name: gym-tracker-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: gymtrackerdb
-      POSTGRES_USER: gymuser
-      POSTGRES_PASSWORD: gymtracker
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-gymtrackerdb}
+      POSTGRES_USER: ${POSTGRES_USER:-gymuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - gym-tracker-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 5s
+      start_period: 10s
+    networks:
+      - gym-tracker-net
 
-  backend:
+  gym-tracker-api:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: gym-tracker-backend
+    restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=gymtrackerdb;Username=gymuser;Password=gymtracker
-      Cors__AllowedOrigins__0: http://localhost:8080
-      Cors__AllowedOrigins__1: http://127.0.0.1:8080
-    ports:
-      - "5224:8080"
+      ASPNETCORE_URLS: http://+:8080
+      Http__UseHttpsRedirection: "false"
+      ConnectionStrings__DefaultConnection: Host=gym-tracker-db;Port=5432;Database=${POSTGRES_DB:-gymtrackerdb};Username=${POSTGRES_USER:-gymuser};Password=${POSTGRES_PASSWORD:-change-me}
+      Cors__AllowedOrigins__0: ${APP_BASE_URL:-http://localhost:8080}
     depends_on:
-      postgres:
-        condition: service_healthy
+      - gym-tracker-db
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-      interval: 10s
+      interval: 15s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 30s
+    networks:
+      - gym-tracker-net
 
-  frontend:
+  gym-tracker-web:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: gym-tracker-frontend
-    environment:
-      VITE_BACKEND_PROXY_TARGET: http://backend:8080
+    restart: unless-stopped
     ports:
-      - "8080:4173"
+      - "${WEB_PORT:-8080}:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - gym-tracker-api
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
-      interval: 10s
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 15s
+    networks:
+      - gym-tracker-net
 
 volumes:
-  postgres-data:
+  gym-tracker-postgres-data:
+    name: ${POSTGRES_VOLUME_NAME:-gym-tracker_gym-tracker-postgres-data}
+
+networks:
+  gym-tracker-net:
+    driver: bridge

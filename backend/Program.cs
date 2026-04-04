@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var enableHttpsRedirection = builder.Configuration.GetValue("Http:UseHttpsRedirection", false);
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()?
@@ -43,8 +44,29 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseMigration");
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.Migrate();
+
+    const int maxMigrationAttempts = 10;
+
+    for (var attempt = 1; attempt <= maxMigrationAttempts; attempt++)
+    {
+        try
+        {
+            dbContext.Database.Migrate();
+            break;
+        }
+        catch (Exception exception) when (attempt < maxMigrationAttempts)
+        {
+            logger.LogWarning(
+                exception,
+                "Database migration attempt {Attempt} of {MaxAttempts} failed. Retrying in 5 seconds.",
+                attempt,
+                maxMigrationAttempts);
+
+            Thread.Sleep(TimeSpan.FromSeconds(5));
+        }
+    }
 }
 
 if (app.Environment.IsDevelopment())
@@ -58,9 +80,19 @@ if (allowedOrigins.Length > 0)
     app.UseCors("frontend");
 }
 
-app.UseHttpsRedirection();
+if (enableHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseAuthorization();
 app.MapControllers();
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/healthz", async (AppDbContext dbContext) =>
+{
+    var canConnect = await dbContext.Database.CanConnectAsync();
+    return canConnect
+        ? Results.Ok(new { status = "ok" })
+        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+});
 
 app.Run();
