@@ -244,6 +244,13 @@
   border-color: var(--border-strong);
 }
 
+.field input:disabled,
+.select-input:disabled,
+.text-area:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .field-error {
   color: var(--danger);
   line-height: 1.35;
@@ -272,9 +279,13 @@
   box-shadow: var(--shadow-soft);
 }
 
-.primary-button:disabled {
+.primary-button:disabled,
+.ghost-button:disabled,
+.danger-button:disabled {
   opacity: 0.6;
-  cursor: wait;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .primary-button {

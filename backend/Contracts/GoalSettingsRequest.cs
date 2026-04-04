@@ -15,15 +15,18 @@ public class GoalSettingsRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        var normalizedFitnessPhase = FitnessPhase.Trim().ToLowerInvariant();
-
         if (string.IsNullOrWhiteSpace(FitnessPhase))
         {
             yield return new ValidationResult(
                 "Fitness phase is required.",
                 new[] { nameof(FitnessPhase) });
+
+            yield break;
         }
-        else if (normalizedFitnessPhase is not ("cut" or "maintain" or "bulk"))
+
+        var normalizedFitnessPhase = FitnessPhase.Trim().ToLowerInvariant();
+
+        if (normalizedFitnessPhase is not ("cut" or "maintain" or "bulk"))
         {
             yield return new ValidationResult(
                 "Fitness phase must be cut, maintain, or bulk.",

@@ -6,7 +6,7 @@ import {
   updateWeightEntry,
 } from '../api/weightEntries'
 import { StateCard } from '../components/StateCard'
-import { formatDate } from '../lib/format'
+import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { WeightEntry } from '../types/weight'
 
@@ -18,7 +18,7 @@ type FormState = {
 type FormErrors = Partial<Record<keyof FormState, string>>
 
 const initialFormState = (): FormState => ({
-  date: new Date().toISOString().slice(0, 10),
+  date: getTodayDateValue(),
   weightKg: '',
 })
 
@@ -27,7 +27,7 @@ function validateForm(form: FormState): FormErrors {
 
   if (!form.date) {
     errors.date = 'Date is required.'
-  } else if (form.date > new Date().toISOString().slice(0, 10)) {
+  } else if (form.date > getTodayDateValue()) {
     errors.date = 'Date cannot be in the future.'
   }
 
@@ -110,8 +110,8 @@ export function WeightPage() {
       setErrorMessage(null)
       const data = await fetchWeightEntries()
       setEntries(data)
-    } catch {
-      setErrorMessage('Unable to load weight entries. Check that the API is running.')
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to load weight entries.'))
     } finally {
       setIsLoading(false)
     }

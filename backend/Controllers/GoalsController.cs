@@ -20,14 +20,19 @@ public class GoalsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<GoalSettingsResponse>> GetGoals()
     {
-        var goals = await _dbContext.GoalSettings.AsNoTracking().FirstOrDefaultAsync();
+        var goals = await _dbContext.GoalSettings
+            .AsNoTracking()
+            .OrderByDescending(goalSettings => goalSettings.Id)
+            .FirstOrDefaultAsync();
         return Ok(MapGoals(goals));
     }
 
     [HttpPut]
     public async Task<ActionResult<GoalSettingsResponse>> UpsertGoals(GoalSettingsRequest request)
     {
-        var goals = await _dbContext.GoalSettings.FirstOrDefaultAsync();
+        var goals = await _dbContext.GoalSettings
+            .OrderByDescending(goalSettings => goalSettings.Id)
+            .FirstOrDefaultAsync();
 
         if (goals is null)
         {

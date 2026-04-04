@@ -10,7 +10,7 @@ import {
   updateActiveWorkoutSession,
 } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
-import { formatDate } from '../lib/format'
+import { formatDate, getTodayDateValue } from '../lib/format'
 import { getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { getRequestErrorMessage } from '../lib/http'
 import type {
@@ -66,13 +66,13 @@ const createExerciseForm = (): ExerciseFormState => ({
 })
 
 const initialQuickLogFormState = (): WorkoutFormState => ({
-  date: new Date().toISOString().slice(0, 10),
+  date: getTodayDateValue(),
   notes: '',
   exerciseEntries: [createExerciseForm()],
 })
 
 const initialActiveFormState = (): WorkoutFormState => ({
-  date: new Date().toISOString().slice(0, 10),
+  date: getTodayDateValue(),
   notes: '',
   exerciseEntries: [],
 })
@@ -123,7 +123,7 @@ function validateWorkoutForm(
   if (requireDate) {
     if (!form.date) {
       errors.date = 'Date is required.'
-    } else if (form.date > new Date().toISOString().slice(0, 10)) {
+    } else if (form.date > getTodayDateValue()) {
       errors.date = 'Date cannot be in the future.'
     }
   }
@@ -181,7 +181,7 @@ function mapSessionToForm(session: ActiveWorkoutSession): WorkoutFormState {
 
 function mapTemplateToForm(template: WorkoutTemplate): WorkoutFormState {
   return {
-    date: new Date().toISOString().slice(0, 10),
+    date: getTodayDateValue(),
     notes: template.notes,
     exerciseEntries: template.exerciseEntries.map((exercise) => ({
       exerciseName: exercise.exerciseName,
@@ -303,8 +303,8 @@ export function WorkoutsPage() {
       setTemplates(templateData)
       setActiveSession(currentActiveSession)
       setActiveForm(currentActiveSession ? mapSessionToForm(currentActiveSession) : initialActiveFormState())
-    } catch {
-      setErrorMessage('Unable to load workouts, templates, and active session. Check that the API is running.')
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to load workouts, templates, and active session.'))
     } finally {
       setIsLoading(false)
     }

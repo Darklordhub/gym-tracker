@@ -102,6 +102,8 @@ export function DashboardPage() {
     try {
       setIsLoading(true)
       setErrorMessage(null)
+      setGoalMessage(null)
+      setGoalErrorMessage(null)
 
       const [workoutData, weightData, goalsData] = await Promise.all([
         fetchWorkouts(),
@@ -265,8 +267,8 @@ export function DashboardPage() {
                   </button>
                 </div>
 
-                {goalMessage ? <p className="feedback success-text">{goalMessage}</p> : null}
-                {goalErrorMessage ? <p className="feedback error-text">{goalErrorMessage}</p> : null}
+                {goalMessage ? <p className="feedback success">{goalMessage}</p> : null}
+                {goalErrorMessage ? <p className="feedback error">{goalErrorMessage}</p> : null}
               </form>
 
               <div className="goal-progress-list">

@@ -5,3 +5,7 @@ export function formatDate(date: string) {
     year: 'numeric',
   }).format(new Date(date))
 }
+
+export function getTodayDateValue() {
+  return new Date().toISOString().slice(0, 10)
+}
