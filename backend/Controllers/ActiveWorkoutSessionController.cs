@@ -62,6 +62,8 @@ public class ActiveWorkoutSessionController : ControllerBase
         }
 
         session.Notes = request.Notes.Trim();
+        _dbContext.ActiveWorkoutSessionExerciseSets.RemoveRange(
+            session.ExerciseEntries.SelectMany(exercise => exercise.Sets));
         _dbContext.ActiveWorkoutSessionExerciseEntries.RemoveRange(session.ExerciseEntries);
         session.ExerciseEntries = request.ExerciseEntries.Select(MapSessionExerciseEntry).ToList();
 
@@ -96,9 +98,12 @@ public class ActiveWorkoutSessionController : ControllerBase
             ExerciseEntries = session.ExerciseEntries.Select(exercise => new ExerciseEntry
             {
                 ExerciseName = exercise.ExerciseName,
-                Sets = exercise.Sets,
-                Reps = exercise.Reps,
-                WeightKg = exercise.WeightKg,
+                Sets = exercise.Sets.Select(set => new ExerciseSet
+                {
+                    Order = set.Order,
+                    Reps = set.Reps,
+                    WeightKg = set.WeightKg,
+                }).ToList(),
             }).ToList(),
         };
 
@@ -108,14 +113,15 @@ public class ActiveWorkoutSessionController : ControllerBase
 
         var completedWorkout = await _dbContext.Workouts
             .Include(currentWorkout => currentWorkout.ExerciseEntries)
+            .ThenInclude(exercise => exercise.Sets)
             .FirstAsync(currentWorkout => currentWorkout.Id == workout.Id);
 
-        var personalRecords = await _dbContext.ExerciseEntries
+        var personalRecords = await _dbContext.ExerciseSets
             .AsNoTracking()
-            .Select(exercise => new
+            .Select(set => new
             {
-                exercise.ExerciseName,
-                exercise.WeightKg,
+                ExerciseName = set.ExerciseEntry!.ExerciseName,
+                set.WeightKg,
             })
             .ToListAsync();
 
@@ -134,6 +140,7 @@ public class ActiveWorkoutSessionController : ControllerBase
     {
         return _dbContext.ActiveWorkoutSessions
             .Include(session => session.ExerciseEntries)
+            .ThenInclude(exercise => exercise.Sets)
             .OrderByDescending(session => session.StartedAtUtc)
             .ThenByDescending(session => session.Id);
     }
@@ -152,9 +159,14 @@ public class ActiveWorkoutSessionController : ControllerBase
         return new ActiveWorkoutSessionExerciseEntry
         {
             ExerciseName = exercise.ExerciseName.Trim(),
-            Sets = exercise.Sets,
-            Reps = exercise.Reps,
-            WeightKg = decimal.Round(exercise.WeightKg, 1, MidpointRounding.AwayFromZero),
+            Sets = exercise.Sets
+                .Select((set, index) => new ActiveWorkoutSessionExerciseSet
+                {
+                    Order = index + 1,
+                    Reps = set.Reps,
+                    WeightKg = decimal.Round(set.WeightKg, 1, MidpointRounding.AwayFromZero),
+                })
+                .ToList(),
         };
     }
 
@@ -171,9 +183,16 @@ public class ActiveWorkoutSessionController : ControllerBase
                 {
                     Id = exercise.Id,
                     ExerciseName = exercise.ExerciseName,
-                    Sets = exercise.Sets,
-                    Reps = exercise.Reps,
-                    WeightKg = exercise.WeightKg,
+                    Sets = exercise.Sets
+                        .OrderBy(set => set.Order)
+                        .Select(set => new ExerciseSetResponse
+                        {
+                            Id = set.Id,
+                            Order = set.Order,
+                            Reps = set.Reps,
+                            WeightKg = set.WeightKg,
+                        })
+                        .ToList(),
                 })
                 .ToList(),
         };
@@ -194,15 +213,22 @@ public class ActiveWorkoutSessionController : ControllerBase
                 {
                     Id = exercise.Id,
                     ExerciseName = exercise.ExerciseName,
-                    Sets = exercise.Sets,
-                    Reps = exercise.Reps,
-                    WeightKg = exercise.WeightKg,
+                    Sets = exercise.Sets
+                        .OrderBy(set => set.Order)
+                        .Select(set => new ExerciseSetResponse
+                        {
+                            Id = set.Id,
+                            Order = set.Order,
+                            Reps = set.Reps,
+                            WeightKg = set.WeightKg,
+                        })
+                        .ToList(),
                     IsPersonalRecord = personalRecords.TryGetValue(
                         NormalizeExerciseName(exercise.ExerciseName),
-                        out var personalRecord) && exercise.WeightKg == personalRecord,
+                        out var personalRecord) && exercise.Sets.Any(set => set.WeightKg == personalRecord),
                     PersonalRecordWeightKg = personalRecords.TryGetValue(
                         NormalizeExerciseName(exercise.ExerciseName),
-                        out personalRecord) ? personalRecord : exercise.WeightKg,
+                        out personalRecord) ? personalRecord : exercise.Sets.Count > 0 ? exercise.Sets.Max(set => set.WeightKg) : 0,
                 })
                 .ToList(),
         };

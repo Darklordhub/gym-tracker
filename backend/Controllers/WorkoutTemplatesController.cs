@@ -22,6 +22,7 @@ public class WorkoutTemplatesController : ControllerBase
     {
         var templates = await _dbContext.WorkoutTemplates
             .Include(template => template.ExerciseEntries)
+            .ThenInclude(exercise => exercise.Sets)
             .OrderBy(template => template.Name)
             .ThenBy(template => template.Id)
             .ToListAsync();
@@ -34,6 +35,7 @@ public class WorkoutTemplatesController : ControllerBase
     {
         var template = await _dbContext.WorkoutTemplates
             .Include(currentTemplate => currentTemplate.ExerciseEntries)
+            .ThenInclude(exercise => exercise.Sets)
             .FirstOrDefaultAsync(currentTemplate => currentTemplate.Id == id);
 
         if (template is null)
@@ -54,9 +56,14 @@ public class WorkoutTemplatesController : ControllerBase
             ExerciseEntries = request.ExerciseEntries.Select(exercise => new WorkoutTemplateExerciseEntry
             {
                 ExerciseName = exercise.ExerciseName.Trim(),
-                Sets = exercise.Sets,
-                Reps = exercise.Reps,
-                WeightKg = decimal.Round(exercise.WeightKg, 1, MidpointRounding.AwayFromZero),
+                Sets = exercise.Sets
+                    .Select((set, index) => new WorkoutTemplateExerciseSet
+                    {
+                        Order = index + 1,
+                        Reps = set.Reps,
+                        WeightKg = decimal.Round(set.WeightKg, 1, MidpointRounding.AwayFromZero),
+                    })
+                    .ToList(),
             }).ToList(),
         };
 
@@ -82,9 +89,16 @@ public class WorkoutTemplatesController : ControllerBase
                 {
                     Id = exercise.Id,
                     ExerciseName = exercise.ExerciseName,
-                    Sets = exercise.Sets,
-                    Reps = exercise.Reps,
-                    WeightKg = exercise.WeightKg,
+                    Sets = exercise.Sets
+                        .OrderBy(set => set.Order)
+                        .Select(set => new ExerciseSetResponse
+                        {
+                            Id = set.Id,
+                            Order = set.Order,
+                            Reps = set.Reps,
+                            WeightKg = set.WeightKg,
+                        })
+                        .ToList(),
                 })
                 .ToList(),
         };

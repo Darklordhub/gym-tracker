@@ -1,9 +1,19 @@
+export type ExerciseSet = {
+  id: number
+  order: number
+  reps: number
+  weightKg: number
+}
+
+export type ExerciseSetPayload = {
+  reps: number
+  weightKg: number
+}
+
 export type ExerciseEntry = {
   id: number
   exerciseName: string
-  sets: number
-  reps: number
-  weightKg: number
+  sets: ExerciseSet[]
   isPersonalRecord: boolean
   personalRecordWeightKg: number
 }
@@ -17,9 +27,7 @@ export type Workout = {
 
 export type ExerciseEntryPayload = {
   exerciseName: string
-  sets: number
-  reps: number
-  weightKg: number
+  sets: ExerciseSetPayload[]
 }
 
 export type WorkoutPayload = {
@@ -31,9 +39,7 @@ export type WorkoutPayload = {
 export type WorkoutTemplateExerciseEntry = {
   id: number
   exerciseName: string
-  sets: number
-  reps: number
-  weightKg: number
+  sets: ExerciseSet[]
 }
 
 export type WorkoutTemplate = {
@@ -45,9 +51,7 @@ export type WorkoutTemplate = {
 
 export type WorkoutTemplateExerciseEntryPayload = {
   exerciseName: string
-  sets: number
-  reps: number
-  weightKg: number
+  sets: ExerciseSetPayload[]
 }
 
 export type WorkoutTemplatePayload = {
@@ -59,9 +63,7 @@ export type WorkoutTemplatePayload = {
 export type ActiveWorkoutSessionExerciseEntry = {
   id: number
   exerciseName: string
-  sets: number
-  reps: number
-  weightKg: number
+  sets: ExerciseSet[]
 }
 
 export type ActiveWorkoutSession = {

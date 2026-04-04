@@ -11,7 +11,7 @@ type ExerciseHistoryEntry = {
   exerciseId: number
   exerciseName: string
   date: string
-  sets: number
+  setOrder: number
   reps: number
   weightKg: number
   notes: string
@@ -67,20 +67,27 @@ export function ExerciseProgressPage() {
             (exercise) =>
               exercise.exerciseName.trim().toUpperCase() === selectedExercise.trim().toUpperCase(),
           )
-          .map((exercise) => ({
-            workoutId: workout.id,
-            exerciseId: exercise.id,
-            exerciseName: exercise.exerciseName,
-            date: workout.date,
-            sets: exercise.sets,
-            reps: exercise.reps,
-            weightKg: exercise.weightKg,
-            notes: workout.notes,
-            isPersonalRecord: exercise.isPersonalRecord,
-            personalRecordWeightKg: exercise.personalRecordWeightKg,
-          })),
+          .flatMap((exercise) =>
+            exercise.sets.map((set) => ({
+              workoutId: workout.id,
+              exerciseId: exercise.id,
+              exerciseName: exercise.exerciseName,
+              date: workout.date,
+              setOrder: set.order,
+              reps: set.reps,
+              weightKg: set.weightKg,
+              notes: workout.notes,
+              isPersonalRecord: set.weightKg === exercise.personalRecordWeightKg,
+              personalRecordWeightKg: exercise.personalRecordWeightKg,
+            })),
+          ),
       )
-      .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime() || left.exerciseId - right.exerciseId)
+      .sort(
+        (left, right) =>
+          new Date(left.date).getTime() - new Date(right.date).getTime() ||
+          left.exerciseId - right.exerciseId ||
+          left.setOrder - right.setOrder,
+      )
   }, [selectedExercise, workouts])
 
   const filteredHistory = useMemo(() => {
@@ -106,8 +113,7 @@ export function ExerciseProgressPage() {
       latest,
       first,
       heaviest,
-      change:
-        latest && first ? Number((latest.weightKg - first.weightKg).toFixed(1)) : null,
+      change: latest && first ? Number((latest.weightKg - first.weightKg).toFixed(1)) : null,
     }
   }, [filteredHistory])
 
@@ -116,15 +122,15 @@ export function ExerciseProgressPage() {
       return null
     }
 
-    const latest = history.at(-1)
+    const latest = filteredHistory.at(-1) ?? history.at(-1)
 
     return getSuggestedNextWeight(
       workouts,
       selectedExercise,
-      latest?.sets ?? null,
+      latest?.setOrder ?? null,
       latest?.reps ?? null,
     )
-  }, [history, selectedExercise, workouts])
+  }, [filteredHistory, history, selectedExercise, workouts])
 
   async function loadWorkouts() {
     try {
@@ -185,7 +191,7 @@ export function ExerciseProgressPage() {
 
         <div className="stats-grid">
           <article className="stat-card">
-            <span className="stat-label">Entries</span>
+            <span className="stat-label">Sets</span>
             <strong>{stats.totalEntries}</strong>
             <span className="stat-subtext">Logged sets for this exercise</span>
           </article>
@@ -193,14 +199,14 @@ export function ExerciseProgressPage() {
             <span className="stat-label">Latest</span>
             <strong>{stats.latest ? `${stats.latest.weightKg} kg` : 'No data'}</strong>
             <span className="stat-subtext">
-              {stats.latest ? formatDate(stats.latest.date) : 'Select an exercise'}
+              {stats.latest ? `Set ${stats.latest.setOrder} on ${formatDate(stats.latest.date)}` : 'Select an exercise'}
             </span>
           </article>
           <article className="stat-card">
             <span className="stat-label">Heaviest</span>
             <strong>{stats.heaviest ? `${stats.heaviest.weightKg} kg` : 'No data'}</strong>
             <span className="stat-subtext">
-              {stats.change === null ? 'Need at least one entry' : `${stats.change > 0 ? '+' : ''}${stats.change} kg since first log`}
+              {stats.change === null ? 'Need at least one set' : `${stats.change > 0 ? '+' : ''}${stats.change} kg since first log`}
             </span>
           </article>
         </div>
@@ -262,7 +268,7 @@ export function ExerciseProgressPage() {
           <div className="panel-header">
             <div>
               <h2>Exercise history</h2>
-              <p>All recorded entries for the selected exercise.</p>
+              <p>All recorded sets for the selected exercise.</p>
             </div>
           </div>
 
@@ -283,9 +289,14 @@ export function ExerciseProgressPage() {
           ) : (
             <div className="exercise-history-list" role="list">
               {[...filteredHistory]
-                .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime() || right.exerciseId - left.exerciseId)
+                .sort(
+                  (left, right) =>
+                    new Date(right.date).getTime() - new Date(left.date).getTime() ||
+                    right.exerciseId - left.exerciseId ||
+                    right.setOrder - left.setOrder,
+                )
                 .map((entry) => (
-                  <article key={entry.exerciseId} className="exercise-history-card" role="listitem">
+                  <article key={`${entry.exerciseId}-${entry.setOrder}-${entry.date}`} className="exercise-history-card" role="listitem">
                     <div className="workout-card-header">
                       <div>
                         <p className="entry-date">{formatDate(entry.date)}</p>
@@ -299,8 +310,8 @@ export function ExerciseProgressPage() {
 
                     <div className="exercise-history-metrics">
                       <div>
-                        <span className="stat-label">Sets</span>
-                        <strong>{entry.sets}</strong>
+                        <span className="stat-label">Set</span>
+                        <strong>{entry.setOrder}</strong>
                       </div>
                       <div>
                         <span className="stat-label">Reps</span>
@@ -385,7 +396,7 @@ function ExerciseProgressChart({ entries }: { entries: ExerciseHistoryEntry[] })
         <path d={linePath} className="chart-line" />
 
         {points.map((point) => (
-          <g key={point.exerciseId}>
+          <g key={`${point.exerciseId}-${point.setOrder}-${point.date}`}>
             <circle cx={point.x} cy={point.y} r="5" className="chart-point" />
             <text x={point.x} y={height - 16} textAnchor="middle" className="chart-axis-label">
               {point.shortDate}
@@ -408,7 +419,7 @@ function ExerciseProgressChart({ entries }: { entries: ExerciseHistoryEntry[] })
         <div>
           <span className="stat-label">Heaviest</span>
           <strong>{Math.max(...entries.map((entry) => entry.weightKg))} kg</strong>
-          <span className="stat-subtext">Best logged weight</span>
+          <span className="stat-subtext">Best logged set</span>
         </div>
       </div>
     </div>

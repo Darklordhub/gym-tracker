@@ -4,7 +4,5 @@ public class WorkoutTemplateExerciseEntryResponse
 {
     public int Id { get; set; }
     public string ExerciseName { get; set; } = string.Empty;
-    public int Sets { get; set; }
-    public int Reps { get; set; }
-    public decimal WeightKg { get; set; }
+    public List<ExerciseSetResponse> Sets { get; set; } = new();
 }

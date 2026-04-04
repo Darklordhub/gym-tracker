@@ -22,6 +22,7 @@ public class WorkoutsController : ControllerBase
     {
         var workouts = await _dbContext.Workouts
             .Include(workout => workout.ExerciseEntries)
+            .ThenInclude(exercise => exercise.Sets)
             .OrderByDescending(workout => workout.Date)
             .ThenByDescending(workout => workout.Id)
             .ToListAsync();
@@ -36,6 +37,7 @@ public class WorkoutsController : ControllerBase
     {
         var workout = await _dbContext.Workouts
             .Include(currentWorkout => currentWorkout.ExerciseEntries)
+            .ThenInclude(exercise => exercise.Sets)
             .FirstOrDefaultAsync(currentWorkout => currentWorkout.Id == id);
 
         if (workout is null)
@@ -58,9 +60,14 @@ public class WorkoutsController : ControllerBase
             ExerciseEntries = request.ExerciseEntries.Select(exercise => new ExerciseEntry
             {
                 ExerciseName = exercise.ExerciseName.Trim(),
-                Sets = exercise.Sets,
-                Reps = exercise.Reps,
-                WeightKg = decimal.Round(exercise.WeightKg, 1, MidpointRounding.AwayFromZero),
+                Sets = exercise.Sets
+                    .Select((set, index) => new ExerciseSet
+                    {
+                        Order = index + 1,
+                        Reps = set.Reps,
+                        WeightKg = decimal.Round(set.WeightKg, 1, MidpointRounding.AwayFromZero),
+                    })
+                    .ToList(),
             }).ToList(),
         };
 
@@ -90,9 +97,16 @@ public class WorkoutsController : ControllerBase
                 {
                     Id = exercise.Id,
                     ExerciseName = exercise.ExerciseName,
-                    Sets = exercise.Sets,
-                    Reps = exercise.Reps,
-                    WeightKg = exercise.WeightKg,
+                    Sets = exercise.Sets
+                        .OrderBy(set => set.Order)
+                        .Select(set => new ExerciseSetResponse
+                        {
+                            Id = set.Id,
+                            Order = set.Order,
+                            Reps = set.Reps,
+                            WeightKg = set.WeightKg,
+                        })
+                        .ToList(),
                     IsPersonalRecord = IsPersonalRecord(exercise, personalRecords),
                     PersonalRecordWeightKg = GetPersonalRecordWeight(exercise, personalRecords),
                 })
@@ -107,12 +121,12 @@ public class WorkoutsController : ControllerBase
 
     private async Task<IReadOnlyDictionary<string, decimal>> GetPersonalRecordLookupAsync()
     {
-        var exerciseEntries = await _dbContext.ExerciseEntries
+        var exerciseEntries = await _dbContext.ExerciseSets
             .AsNoTracking()
-            .Select(exercise => new
+            .Select(set => new
             {
-                exercise.ExerciseName,
-                exercise.WeightKg,
+                ExerciseName = set.ExerciseEntry!.ExerciseName,
+                set.WeightKg,
             })
             .ToListAsync();
 
@@ -125,8 +139,9 @@ public class WorkoutsController : ControllerBase
     {
         return workouts
             .SelectMany(workout => workout.ExerciseEntries)
+            .Where(exercise => exercise.Sets.Count > 0)
             .GroupBy(exercise => NormalizeExerciseName(exercise.ExerciseName))
-            .ToDictionary(group => group.Key, group => group.Max(exercise => exercise.WeightKg));
+            .ToDictionary(group => group.Key, group => group.Max(exercise => exercise.Sets.Max(set => set.WeightKg)));
     }
 
     private static bool IsPersonalRecord(
@@ -134,7 +149,7 @@ public class WorkoutsController : ControllerBase
         IReadOnlyDictionary<string, decimal> personalRecords)
     {
         return personalRecords.TryGetValue(NormalizeExerciseName(exercise.ExerciseName), out var personalRecord)
-            && exercise.WeightKg == personalRecord;
+            && exercise.Sets.Any(set => set.WeightKg == personalRecord);
     }
 
     private static decimal GetPersonalRecordWeight(
@@ -143,7 +158,7 @@ public class WorkoutsController : ControllerBase
     {
         return personalRecords.TryGetValue(NormalizeExerciseName(exercise.ExerciseName), out var personalRecord)
             ? personalRecord
-            : exercise.WeightKg;
+            : exercise.Sets.Count > 0 ? exercise.Sets.Max(set => set.WeightKg) : 0;
     }
 
     private static string NormalizeExerciseName(string exerciseName)

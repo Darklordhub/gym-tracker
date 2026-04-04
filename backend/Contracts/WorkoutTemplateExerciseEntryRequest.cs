@@ -8,14 +8,7 @@ public class WorkoutTemplateExerciseEntryRequest : IValidatableObject
     [StringLength(120, MinimumLength = 1)]
     public string ExerciseName { get; set; } = string.Empty;
 
-    [Range(1, 20)]
-    public int Sets { get; set; }
-
-    [Range(1, 100)]
-    public int Reps { get; set; }
-
-    [Range(0, 500)]
-    public decimal WeightKg { get; set; }
+    public List<ExerciseSetRequest> Sets { get; set; } = new();
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -24,6 +17,13 @@ public class WorkoutTemplateExerciseEntryRequest : IValidatableObject
             yield return new ValidationResult(
                 "Exercise name is required.",
                 new[] { nameof(ExerciseName) });
+        }
+
+        if (Sets.Count == 0)
+        {
+            yield return new ValidationResult(
+                "Add at least one set.",
+                new[] { nameof(Sets) });
         }
     }
 }

@@ -5,9 +5,9 @@ export type ExerciseSuggestion = {
   reason: string
 }
 
-type ExerciseHistoryItem = {
+export type ExerciseSetHistoryItem = {
   date: string
-  sets: number
+  setOrder: number
   reps: number
   weightKg: number
 }
@@ -16,15 +16,17 @@ export function getExerciseHistory(workouts: Workout[], exerciseName: string) {
   const normalizedExerciseName = normalizeExerciseName(exerciseName)
 
   return workouts
-    .flatMap<ExerciseHistoryItem>((workout) =>
+    .flatMap<ExerciseSetHistoryItem>((workout) =>
       workout.exerciseEntries
         .filter((exercise) => normalizeExerciseName(exercise.exerciseName) === normalizedExerciseName)
-        .map((exercise) => ({
-          date: workout.date,
-          sets: exercise.sets,
-          reps: exercise.reps,
-          weightKg: exercise.weightKg,
-        })),
+        .flatMap((exercise) =>
+          exercise.sets.map((set) => ({
+            date: workout.date,
+            setOrder: set.order,
+            reps: set.reps,
+            weightKg: set.weightKg,
+          })),
+        ),
     )
     .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
 }
@@ -32,7 +34,7 @@ export function getExerciseHistory(workouts: Workout[], exerciseName: string) {
 export function getSuggestedNextWeight(
   workouts: Workout[],
   exerciseName: string,
-  sets: number | null,
+  setOrder: number | null,
   reps: number | null,
 ) {
   const history = getExerciseHistory(workouts, exerciseName)
@@ -43,27 +45,36 @@ export function getSuggestedNextWeight(
 
   const latest = history[0]
 
-  if (sets && reps) {
-    const matchingStructure = history.find((entry) => entry.sets === sets && entry.reps === reps)
+  if (setOrder && reps) {
+    const exactMatch = history.find((entry) => entry.setOrder === setOrder && entry.reps === reps)
 
-    if (matchingStructure) {
-      const suggestedWeightKg = roundToNearestIncrement(
-        matchingStructure.weightKg >= 20
-          ? matchingStructure.weightKg + 2.5
-          : matchingStructure.weightKg + 1,
-      )
-
+    if (exactMatch) {
       return {
-        suggestedWeightKg,
-        reason: `Last ${sets} x ${reps} was ${matchingStructure.weightKg} kg.`,
+        suggestedWeightKg: getSuggestedIncrease(exactMatch.weightKg),
+        reason: `Last set ${setOrder} for ${reps} reps was ${exactMatch.weightKg} kg.`,
+      } satisfies ExerciseSuggestion
+    }
+  }
+
+  if (reps) {
+    const repMatch = history.find((entry) => entry.reps === reps)
+
+    if (repMatch) {
+      return {
+        suggestedWeightKg: getSuggestedIncrease(repMatch.weightKg),
+        reason: `Last ${reps}-rep set was ${repMatch.weightKg} kg.`,
       } satisfies ExerciseSuggestion
     }
   }
 
   return {
     suggestedWeightKg: roundToNearestIncrement(latest.weightKg),
-    reason: `Repeat your latest logged weight of ${latest.weightKg} kg.`,
+    reason: `Repeat your latest logged set at ${latest.weightKg} kg.`,
   } satisfies ExerciseSuggestion
+}
+
+function getSuggestedIncrease(weightKg: number) {
+  return roundToNearestIncrement(weightKg >= 20 ? weightKg + 2.5 : weightKg + 1)
 }
 
 function roundToNearestIncrement(value: number) {

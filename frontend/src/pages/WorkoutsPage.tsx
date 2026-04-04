@@ -20,11 +20,14 @@ import type {
   WorkoutTemplate,
 } from '../types/workout'
 
-type ExerciseFormState = {
-  exerciseName: string
-  sets: string
+type ExerciseSetFormState = {
   reps: string
   weightKg: string
+}
+
+type ExerciseFormState = {
+  exerciseName: string
+  sets: ExerciseSetFormState[]
 }
 
 type WorkoutFormState = {
@@ -33,7 +36,13 @@ type WorkoutFormState = {
   exerciseEntries: ExerciseFormState[]
 }
 
-type ExerciseFieldErrors = Partial<Record<keyof ExerciseFormState, string>>
+type ExerciseSetFieldErrors = Partial<Record<keyof ExerciseSetFormState, string>>
+
+type ExerciseFieldErrors = {
+  exerciseName?: string
+  sets?: string
+  setErrors: ExerciseSetFieldErrors[]
+}
 
 type WorkoutFormErrors = {
   date?: string
@@ -46,11 +55,14 @@ type TemplateFormErrors = {
   name?: string
 }
 
-const createExerciseForm = (): ExerciseFormState => ({
-  exerciseName: '',
-  sets: '',
+const createSetForm = (): ExerciseSetFormState => ({
   reps: '',
   weightKg: '',
+})
+
+const createExerciseForm = (): ExerciseFormState => ({
+  exerciseName: '',
+  sets: [createSetForm()],
 })
 
 const initialQuickLogFormState = (): WorkoutFormState => ({
@@ -72,38 +84,41 @@ function validateWorkoutForm(
   const requireDate = options?.requireDate ?? true
   const requireExercises = options?.requireExercises ?? true
 
-  const exerciseErrors = form.exerciseEntries.map<ExerciseFieldErrors>((exercise) => {
-    const currentErrors: ExerciseFieldErrors = {}
+  const exercises = form.exerciseEntries.map<ExerciseFieldErrors>((exercise) => {
+    const currentErrors: ExerciseFieldErrors = { setErrors: [] }
 
     if (!exercise.exerciseName.trim()) {
       currentErrors.exerciseName = 'Exercise name is required.'
     }
 
-    const sets = Number(exercise.sets)
-    if (!exercise.sets.trim()) {
-      currentErrors.sets = 'Sets are required.'
-    } else if (Number.isNaN(sets) || sets < 1 || sets > 20) {
-      currentErrors.sets = 'Sets must be between 1 and 20.'
+    if (exercise.sets.length === 0) {
+      currentErrors.sets = 'Add at least one set.'
     }
 
-    const reps = Number(exercise.reps)
-    if (!exercise.reps.trim()) {
-      currentErrors.reps = 'Reps are required.'
-    } else if (Number.isNaN(reps) || reps < 1 || reps > 100) {
-      currentErrors.reps = 'Reps must be between 1 and 100.'
-    }
+    currentErrors.setErrors = exercise.sets.map<ExerciseSetFieldErrors>((set) => {
+      const setErrors: ExerciseSetFieldErrors = {}
 
-    const weightKg = Number(exercise.weightKg)
-    if (!exercise.weightKg.trim()) {
-      currentErrors.weightKg = 'Weight is required.'
-    } else if (Number.isNaN(weightKg) || weightKg < 0 || weightKg > 500) {
-      currentErrors.weightKg = 'Weight must be between 0 and 500 kg.'
-    }
+      const reps = Number(set.reps)
+      if (!set.reps.trim()) {
+        setErrors.reps = 'Reps are required.'
+      } else if (Number.isNaN(reps) || reps < 1 || reps > 100) {
+        setErrors.reps = 'Reps must be between 1 and 100.'
+      }
+
+      const weightKg = Number(set.weightKg)
+      if (!set.weightKg.trim()) {
+        setErrors.weightKg = 'Weight is required.'
+      } else if (Number.isNaN(weightKg) || weightKg < 0 || weightKg > 500) {
+        setErrors.weightKg = 'Weight must be between 0 and 500 kg.'
+      }
+
+      return setErrors
+    })
 
     return currentErrors
   })
 
-  const errors: WorkoutFormErrors = { exercises: exerciseErrors }
+  const errors: WorkoutFormErrors = { exercises }
 
   if (requireDate) {
     if (!form.date) {
@@ -129,16 +144,21 @@ function hasWorkoutErrors(errors: WorkoutFormErrors) {
     errors.date ||
       errors.notes ||
       errors.exerciseEntries ||
-      errors.exercises.some((exercise) => Object.keys(exercise).length > 0),
+      errors.exercises.some(
+        (exercise) =>
+          Boolean(exercise.exerciseName || exercise.sets) ||
+          exercise.setErrors.some((setErrors) => Object.keys(setErrors).length > 0),
+      ),
   )
 }
 
 function toExercisePayload(exerciseEntries: ExerciseFormState[]): ExerciseEntryPayload[] {
   return exerciseEntries.map((exercise) => ({
     exerciseName: exercise.exerciseName.trim(),
-    sets: Number(exercise.sets),
-    reps: Number(exercise.reps),
-    weightKg: Number(exercise.weightKg),
+    sets: exercise.sets.map((set) => ({
+      reps: Number(set.reps),
+      weightKg: Number(set.weightKg),
+    })),
   }))
 }
 
@@ -148,9 +168,13 @@ function mapSessionToForm(session: ActiveWorkoutSession): WorkoutFormState {
     notes: session.notes,
     exerciseEntries: session.exerciseEntries.map((exercise) => ({
       exerciseName: exercise.exerciseName,
-      sets: exercise.sets.toString(),
-      reps: exercise.reps.toString(),
-      weightKg: exercise.weightKg.toString(),
+      sets: exercise.sets
+        .slice()
+        .sort((left, right) => left.order - right.order)
+        .map((set) => ({
+          reps: set.reps.toString(),
+          weightKg: set.weightKg.toString(),
+        })),
     })),
   }
 }
@@ -161,9 +185,13 @@ function mapTemplateToForm(template: WorkoutTemplate): WorkoutFormState {
     notes: template.notes,
     exerciseEntries: template.exerciseEntries.map((exercise) => ({
       exerciseName: exercise.exerciseName,
-      sets: exercise.sets.toString(),
-      reps: exercise.reps.toString(),
-      weightKg: exercise.weightKg.toString(),
+      sets: exercise.sets
+        .slice()
+        .sort((left, right) => left.order - right.order)
+        .map((set) => ({
+          reps: set.reps.toString(),
+          weightKg: set.weightKg.toString(),
+        })),
     })),
   }
 }
@@ -200,11 +228,18 @@ export function WorkoutsPage() {
       (count, workout) => count + workout.exerciseEntries.length,
       0,
     )
+    const totalSets = workouts.reduce(
+      (count, workout) =>
+        count +
+        workout.exerciseEntries.reduce((setCount, exercise) => setCount + exercise.sets.length, 0),
+      0,
+    )
 
     return {
       latestWorkout,
       totalWorkouts: workouts.length,
       totalExercises,
+      totalSets,
     }
   }, [workouts])
 
@@ -220,7 +255,7 @@ export function WorkoutsPage() {
         const key = exercise.exerciseName.trim().toUpperCase()
         const current = records.get(key)
 
-        if (!current || exercise.weightKg >= current.weightKg) {
+        if (!current || exercise.personalRecordWeightKg >= current.weightKg) {
           records.set(key, {
             exerciseName: exercise.exerciseName,
             weightKg: exercise.personalRecordWeightKg,
@@ -304,14 +339,7 @@ export function WorkoutsPage() {
 
       const session = await startActiveWorkoutSession({
         notes: template?.notes ?? '',
-        exerciseEntries: template
-          ? template.exerciseEntries.map((exercise) => ({
-              exerciseName: exercise.exerciseName,
-              sets: exercise.sets,
-              reps: exercise.reps,
-              weightKg: exercise.weightKg,
-            }))
-          : [],
+        exerciseEntries: template ? toExercisePayload(mapTemplateToForm(template).exerciseEntries) : [],
       })
 
       setActiveSession(session)
@@ -328,49 +356,87 @@ export function WorkoutsPage() {
     }
   }
 
-  function updateQuickLogExercise(index: number, field: keyof ExerciseFormState, value: string) {
-    setQuickLogForm((current) => ({
+  function updateExercise(
+    kind: 'quick' | 'active',
+    exerciseIndex: number,
+    field: keyof ExerciseFormState,
+    value: string,
+  ) {
+    const setter = kind === 'quick' ? setQuickLogForm : setActiveForm
+
+    setter((current) => ({
       ...current,
       exerciseEntries: current.exerciseEntries.map((exercise, currentIndex) =>
-        currentIndex === index ? { ...exercise, [field]: value } : exercise,
+        currentIndex === exerciseIndex ? { ...exercise, [field]: value } : exercise,
       ),
     }))
   }
 
-  function updateActiveExercise(index: number, field: keyof ExerciseFormState, value: string) {
-    setActiveForm((current) => ({
+  function updateSet(
+    kind: 'quick' | 'active',
+    exerciseIndex: number,
+    setIndex: number,
+    field: keyof ExerciseSetFormState,
+    value: string,
+  ) {
+    const setter = kind === 'quick' ? setQuickLogForm : setActiveForm
+
+    setter((current) => ({
       ...current,
-      exerciseEntries: current.exerciseEntries.map((exercise, currentIndex) =>
-        currentIndex === index ? { ...exercise, [field]: value } : exercise,
+      exerciseEntries: current.exerciseEntries.map((exercise, currentExerciseIndex) =>
+        currentExerciseIndex === exerciseIndex
+          ? {
+              ...exercise,
+              sets: exercise.sets.map((set, currentSetIndex) =>
+                currentSetIndex === setIndex ? { ...set, [field]: value } : set,
+              ),
+            }
+          : exercise,
       ),
     }))
   }
 
-  function addQuickLogExercise() {
-    setQuickLogForm((current) => ({
+  function addExercise(kind: 'quick' | 'active') {
+    const setter = kind === 'quick' ? setQuickLogForm : setActiveForm
+
+    setter((current) => ({
       ...current,
       exerciseEntries: [...current.exerciseEntries, createExerciseForm()],
     }))
   }
 
-  function addActiveExercise() {
-    setActiveForm((current) => ({
+  function removeExercise(kind: 'quick' | 'active', exerciseIndex: number) {
+    const setter = kind === 'quick' ? setQuickLogForm : setActiveForm
+
+    setter((current) => ({
       ...current,
-      exerciseEntries: [...current.exerciseEntries, createExerciseForm()],
+      exerciseEntries: current.exerciseEntries.filter((_, currentIndex) => currentIndex !== exerciseIndex),
     }))
   }
 
-  function removeQuickLogExercise(index: number) {
-    setQuickLogForm((current) => ({
+  function addSet(kind: 'quick' | 'active', exerciseIndex: number) {
+    const setter = kind === 'quick' ? setQuickLogForm : setActiveForm
+
+    setter((current) => ({
       ...current,
-      exerciseEntries: current.exerciseEntries.filter((_, currentIndex) => currentIndex !== index),
+      exerciseEntries: current.exerciseEntries.map((exercise, currentIndex) =>
+        currentIndex === exerciseIndex
+          ? { ...exercise, sets: [...exercise.sets, createSetForm()] }
+          : exercise,
+      ),
     }))
   }
 
-  function removeActiveExercise(index: number) {
-    setActiveForm((current) => ({
+  function removeSet(kind: 'quick' | 'active', exerciseIndex: number, setIndex: number) {
+    const setter = kind === 'quick' ? setQuickLogForm : setActiveForm
+
+    setter((current) => ({
       ...current,
-      exerciseEntries: current.exerciseEntries.filter((_, currentIndex) => currentIndex !== index),
+      exerciseEntries: current.exerciseEntries.map((exercise, currentIndex) =>
+        currentIndex === exerciseIndex
+          ? { ...exercise, sets: exercise.sets.filter((_, currentSetIndex) => currentSetIndex !== setIndex) }
+          : exercise,
+      ),
     }))
   }
 
@@ -522,7 +588,7 @@ export function WorkoutsPage() {
           <span className="eyebrow">Gym Tracker</span>
           <h1>Workouts</h1>
           <p className="hero-text">
-            Run an active workout session, quick-log completed sessions, reuse templates, and keep the full history intact.
+            Run an active workout session, quick-log completed sessions, reuse templates, and track every set inside each exercise.
           </p>
         </div>
 
@@ -544,7 +610,12 @@ export function WorkoutsPage() {
           <article className="stat-card">
             <span className="stat-label">Exercises</span>
             <strong>{stats.totalExercises}</strong>
-            <span className="stat-subtext">Entries across all workouts</span>
+            <span className="stat-subtext">Exercise entries across all workouts</span>
+          </article>
+          <article className="stat-card">
+            <span className="stat-label">Sets</span>
+            <strong>{stats.totalSets}</strong>
+            <span className="stat-subtext">Logged working sets</span>
           </article>
           <article className="stat-card">
             <span className="stat-label">Active Session</span>
@@ -603,7 +674,7 @@ export function WorkoutsPage() {
                       <h3>Session exercises</h3>
                       <p>Add movements as you work through the session.</p>
                     </div>
-                    <button type="button" className="ghost-button" onClick={addActiveExercise}>
+                    <button type="button" className="ghost-button" onClick={() => addExercise('active')}>
                       Add exercise
                     </button>
                   </div>
@@ -615,23 +686,26 @@ export function WorkoutsPage() {
                   {activeForm.exerciseEntries.length === 0 ? (
                     <StateCard
                       title="No exercises yet"
-                      description="Add your first exercise to start building this active session."
+                      description="Add your first exercise, then log each set as you work through the session."
                     />
                   ) : (
                     <div className="exercise-list">
-                      {activeForm.exerciseEntries.map((exercise, index) => (
+                      {activeForm.exerciseEntries.map((exercise, exerciseIndex) => (
                         <ExerciseEditorCard
-                          key={`active-${index}`}
-                          title={`Exercise ${index + 1}`}
+                          key={`active-${exerciseIndex}`}
+                          title={`Exercise ${exerciseIndex + 1}`}
                           exercise={exercise}
-                          errors={activeErrors.exercises[index]}
+                          errors={activeErrors.exercises[exerciseIndex]}
                           workouts={workouts}
-                          onChange={(field, value) => updateActiveExercise(index, field, value)}
-                          onRemove={
-                            activeForm.exerciseEntries.length > 0
-                              ? () => removeActiveExercise(index)
-                              : undefined
+                          onExerciseChange={(field, value) =>
+                            updateExercise('active', exerciseIndex, field, value)
                           }
+                          onSetChange={(setIndex, field, value) =>
+                            updateSet('active', exerciseIndex, setIndex, field, value)
+                          }
+                          onAddSet={() => addSet('active', exerciseIndex)}
+                          onRemoveSet={(setIndex) => removeSet('active', exerciseIndex, setIndex)}
+                          onRemoveExercise={() => removeExercise('active', exerciseIndex)}
                         />
                       ))}
                     </div>
@@ -712,9 +786,7 @@ export function WorkoutsPage() {
                       <div key={exercise.id} className="exercise-summary-item">
                         <div className="exercise-summary-copy">
                           <strong>{exercise.exerciseName}</strong>
-                          <span>
-                            {exercise.sets} x {exercise.reps} at {exercise.weightKg} kg
-                          </span>
+                          <span>{describeSets(exercise.sets)}</span>
                         </div>
                       </div>
                     ))}
@@ -812,7 +884,7 @@ export function WorkoutsPage() {
                   <h3>Exercises</h3>
                   <p>Add each movement in the order you performed it.</p>
                 </div>
-                <button type="button" className="ghost-button" onClick={addQuickLogExercise}>
+                <button type="button" className="ghost-button" onClick={() => addExercise('quick')}>
                   Add exercise
                 </button>
               </div>
@@ -822,17 +894,24 @@ export function WorkoutsPage() {
               ) : null}
 
               <div className="exercise-list">
-                {quickLogForm.exerciseEntries.map((exercise, index) => (
+                {quickLogForm.exerciseEntries.map((exercise, exerciseIndex) => (
                   <ExerciseEditorCard
-                    key={`quick-log-${index}`}
-                    title={`Exercise ${index + 1}`}
+                    key={`quick-${exerciseIndex}`}
+                    title={`Exercise ${exerciseIndex + 1}`}
                     exercise={exercise}
-                    errors={quickLogErrors.exercises[index]}
+                    errors={quickLogErrors.exercises[exerciseIndex]}
                     workouts={workouts}
-                    onChange={(field, value) => updateQuickLogExercise(index, field, value)}
-                    onRemove={
+                    onExerciseChange={(field, value) =>
+                      updateExercise('quick', exerciseIndex, field, value)
+                    }
+                    onSetChange={(setIndex, field, value) =>
+                      updateSet('quick', exerciseIndex, setIndex, field, value)
+                    }
+                    onAddSet={() => addSet('quick', exerciseIndex)}
+                    onRemoveSet={(setIndex) => removeSet('quick', exerciseIndex, setIndex)}
+                    onRemoveExercise={
                       quickLogForm.exerciseEntries.length > 1
-                        ? () => removeQuickLogExercise(index)
+                        ? () => removeExercise('quick', exerciseIndex)
                         : undefined
                     }
                   />
@@ -850,7 +929,7 @@ export function WorkoutsPage() {
           <div className="panel-header">
             <div>
               <h2>Personal records</h2>
-              <p>Highest recorded working weight for each exercise.</p>
+              <p>Heaviest logged set for each exercise.</p>
             </div>
           </div>
 
@@ -944,9 +1023,7 @@ export function WorkoutsPage() {
                       <div key={exercise.id} className="exercise-summary-item">
                         <div className="exercise-summary-copy">
                           <strong>{exercise.exerciseName}</strong>
-                          <span>
-                            {exercise.sets} x {exercise.reps} at {exercise.weightKg} kg
-                          </span>
+                          <span>{describeSets(exercise.sets)}</span>
                         </div>
                         <div className="exercise-summary-meta">
                           {exercise.isPersonalRecord ? <span className="pr-badge">PR</span> : null}
@@ -969,93 +1046,135 @@ function compareWorkouts(left: Workout, right: Workout) {
   return new Date(right.date).getTime() - new Date(left.date).getTime() || right.id - left.id
 }
 
+function describeSets(
+  sets: Array<{
+    order: number
+    reps: number
+    weightKg: number
+  }>,
+) {
+  return sets
+    .slice()
+    .sort((left, right) => left.order - right.order)
+    .map((set) => `Set ${set.order}: ${set.reps} reps at ${set.weightKg} kg`)
+    .join(' • ')
+}
+
 function ExerciseEditorCard({
   title,
   exercise,
   errors,
   workouts,
-  onChange,
-  onRemove,
+  onExerciseChange,
+  onSetChange,
+  onAddSet,
+  onRemoveSet,
+  onRemoveExercise,
 }: {
   title: string
   exercise: ExerciseFormState
   errors?: ExerciseFieldErrors
   workouts: Workout[]
-  onChange: (field: keyof ExerciseFormState, value: string) => void
-  onRemove?: () => void
+  onExerciseChange: (field: keyof ExerciseFormState, value: string) => void
+  onSetChange: (setIndex: number, field: keyof ExerciseSetFormState, value: string) => void
+  onAddSet: () => void
+  onRemoveSet: (setIndex: number) => void
+  onRemoveExercise?: () => void
 }) {
-  const sets = !exercise.sets.trim() || Number.isNaN(Number(exercise.sets)) ? null : Number(exercise.sets)
-  const reps = !exercise.reps.trim() || Number.isNaN(Number(exercise.reps)) ? null : Number(exercise.reps)
-
   return (
     <div className="exercise-card">
       <div className="exercise-card-header">
         <h3>{title}</h3>
-        {onRemove ? (
-          <button type="button" className="danger-button" onClick={onRemove}>
-            Remove
+        {onRemoveExercise ? (
+          <button type="button" className="danger-button" onClick={onRemoveExercise}>
+            Remove exercise
           </button>
         ) : null}
       </div>
 
-      {exercise.exerciseName.trim() ? (
-        <ExerciseSuggestionNotice
-          suggestion={getSuggestedNextWeight(workouts, exercise.exerciseName, sets, reps)}
+      <label className="field">
+        <span>Name</span>
+        <input
+          type="text"
+          placeholder="Bench Press"
+          value={exercise.exerciseName}
+          onChange={(event) => onExerciseChange('exerciseName', event.target.value)}
+          aria-invalid={Boolean(errors?.exerciseName)}
         />
-      ) : null}
+        {errors?.exerciseName ? <small className="field-error">{errors.exerciseName}</small> : null}
+      </label>
 
-      <div className="exercise-fields">
-        <label className="field field-span-2">
-          <span>Name</span>
-          <input
-            type="text"
-            placeholder="Bench Press"
-            value={exercise.exerciseName}
-            onChange={(event) => onChange('exerciseName', event.target.value)}
-            aria-invalid={Boolean(errors?.exerciseName)}
-          />
-          {errors?.exerciseName ? <small className="field-error">{errors.exerciseName}</small> : null}
-        </label>
+      <div className="section-title-row compact-row">
+        <div>
+          <h3>Sets</h3>
+          <p>Track reps and load for each working set.</p>
+        </div>
+        <button type="button" className="ghost-button" onClick={onAddSet}>
+          Add set
+        </button>
+      </div>
 
-        <label className="field">
-          <span>Sets</span>
-          <input
-            type="number"
-            min="1"
-            max="20"
-            value={exercise.sets}
-            onChange={(event) => onChange('sets', event.target.value)}
-            aria-invalid={Boolean(errors?.sets)}
-          />
-          {errors?.sets ? <small className="field-error">{errors.sets}</small> : null}
-        </label>
+      {errors?.sets ? <small className="field-error">{errors.sets}</small> : null}
 
-        <label className="field">
-          <span>Reps</span>
-          <input
-            type="number"
-            min="1"
-            max="100"
-            value={exercise.reps}
-            onChange={(event) => onChange('reps', event.target.value)}
-            aria-invalid={Boolean(errors?.reps)}
-          />
-          {errors?.reps ? <small className="field-error">{errors.reps}</small> : null}
-        </label>
+      <div className="set-list">
+        {exercise.sets.map((set, setIndex) => (
+          <div key={setIndex} className="set-card">
+            <div className="set-card-header">
+              <div>
+                <strong>Set {setIndex + 1}</strong>
+              </div>
+              {exercise.sets.length > 1 ? (
+                <button type="button" className="danger-button" onClick={() => onRemoveSet(setIndex)}>
+                  Remove set
+                </button>
+              ) : null}
+            </div>
 
-        <label className="field">
-          <span>Weight (kg)</span>
-          <input
-            type="number"
-            min="0"
-            max="500"
-            step="0.1"
-            value={exercise.weightKg}
-            onChange={(event) => onChange('weightKg', event.target.value)}
-            aria-invalid={Boolean(errors?.weightKg)}
-          />
-          {errors?.weightKg ? <small className="field-error">{errors.weightKg}</small> : null}
-        </label>
+            {exercise.exerciseName.trim() ? (
+              <ExerciseSuggestionNotice
+                suggestion={getSuggestedNextWeight(
+                  workouts,
+                  exercise.exerciseName,
+                  setIndex + 1,
+                  !set.reps.trim() || Number.isNaN(Number(set.reps)) ? null : Number(set.reps),
+                )}
+              />
+            ) : null}
+
+            <div className="exercise-fields">
+              <label className="field">
+                <span>Reps</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={set.reps}
+                  onChange={(event) => onSetChange(setIndex, 'reps', event.target.value)}
+                  aria-invalid={Boolean(errors?.setErrors[setIndex]?.reps)}
+                />
+                {errors?.setErrors[setIndex]?.reps ? (
+                  <small className="field-error">{errors.setErrors[setIndex]?.reps}</small>
+                ) : null}
+              </label>
+
+              <label className="field">
+                <span>Weight (kg)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="500"
+                  step="0.1"
+                  value={set.weightKg}
+                  onChange={(event) => onSetChange(setIndex, 'weightKg', event.target.value)}
+                  aria-invalid={Boolean(errors?.setErrors[setIndex]?.weightKg)}
+                />
+                {errors?.setErrors[setIndex]?.weightKg ? (
+                  <small className="field-error">{errors.setErrors[setIndex]?.weightKg}</small>
+                ) : null}
+              </label>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

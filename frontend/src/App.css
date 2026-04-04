@@ -565,12 +565,44 @@
   margin-top: 16px;
 }
 
+.compact-row {
+  align-items: center;
+}
+
 .field-span-2 {
   grid-column: span 2;
 }
 
 .workout-notes {
   margin: 14px 0;
+}
+
+.set-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.set-card {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(15, 88, 79, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(247, 244, 237, 0.9)),
+    var(--surface-muted);
+}
+
+.set-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.set-card-header strong {
+  color: var(--text-strong);
 }
 
 .exercise-summary-item {
