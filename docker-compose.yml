@@ -17,6 +17,28 @@ services:
     networks:
       - gym-tracker-net
 
+  gym-tracker-db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      gym-tracker-db:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gymtrackerdb}
+      POSTGRES_USER: ${POSTGRES_USER:-gymuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      PGHOST: gym-tracker-db
+      PGPORT: 5432
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_COUNT: ${POSTGRES_BACKUP_RETENTION_COUNT:-7}
+      BACKUP_INTERVAL_SECONDS: ${POSTGRES_BACKUP_INTERVAL_SECONDS:-86400}
+    entrypoint: ["/bin/sh", "/scripts/postgres-backup.sh"]
+    volumes:
+      - ./scripts/postgres-backup.sh:/scripts/postgres-backup.sh:ro
+      - gym-tracker-postgres-backups:/backups
+    networks:
+      - gym-tracker-net
+
   gym-tracker-api:
     build:
       context: .
@@ -60,6 +82,8 @@ services:
 volumes:
   gym-tracker-postgres-data:
     name: ${POSTGRES_VOLUME_NAME:-gym-tracker_gym-tracker-postgres-data}
+  gym-tracker-postgres-backups:
+    name: ${POSTGRES_BACKUP_VOLUME_NAME:-gym-tracker_gym-tracker-postgres-backups}
 
 networks:
   gym-tracker-net:
