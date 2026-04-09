@@ -13,6 +13,14 @@
   margin-bottom: 8px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .brand-kicker {
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -56,6 +64,62 @@
 .nav-link-active {
   background: var(--accent-strong);
   color: #fffaf4;
+}
+
+.account-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: rgba(255, 249, 242, 0.8);
+  box-shadow: var(--shadow-soft);
+}
+
+.account-chip span {
+  max-width: 240px;
+  padding-left: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.auth-shell {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.auth-card {
+  width: min(100%, 520px);
+  display: grid;
+  gap: 24px;
+  padding: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(220, 104, 57, 0.18), transparent 26%),
+    radial-gradient(circle at left center, rgba(15, 88, 79, 0.16), transparent 30%),
+    var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.auth-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-footer {
+  color: var(--muted);
+}
+
+.auth-footer a {
+  color: var(--accent-strong);
+  font-weight: 700;
 }
 
 .page-shell {
@@ -518,6 +582,27 @@
   border: 1px solid var(--border);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.56);
+}
+
+@media (max-width: 900px) {
+  .app-header {
+    padding: 0 20px 20px;
+  }
+
+  .page-shell {
+    padding: 20px;
+  }
+
+  .content-grid,
+  .dashboard-grid,
+  .workout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 .exercise-filter-card {

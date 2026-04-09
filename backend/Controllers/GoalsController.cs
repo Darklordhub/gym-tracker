@@ -1,12 +1,15 @@
 using backend.Contracts;
 using backend.Data;
+using backend.Extensions;
 using backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class GoalsController : ControllerBase
 {
@@ -20,9 +23,10 @@ public class GoalsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<GoalSettingsResponse>> GetGoals()
     {
+        var userId = User.GetRequiredUserId();
         var goals = await _dbContext.GoalSettings
             .AsNoTracking()
-            .OrderByDescending(goalSettings => goalSettings.Id)
+            .Where(goalSettings => goalSettings.UserId == userId)
             .FirstOrDefaultAsync();
         return Ok(MapGoals(goals));
     }
@@ -30,13 +34,17 @@ public class GoalsController : ControllerBase
     [HttpPut]
     public async Task<ActionResult<GoalSettingsResponse>> UpsertGoals(GoalSettingsRequest request)
     {
+        var userId = User.GetRequiredUserId();
         var goals = await _dbContext.GoalSettings
-            .OrderByDescending(goalSettings => goalSettings.Id)
+            .Where(goalSettings => goalSettings.UserId == userId)
             .FirstOrDefaultAsync();
 
         if (goals is null)
         {
-            goals = new GoalSettings();
+            goals = new GoalSettings
+            {
+                UserId = userId,
+            };
             _dbContext.GoalSettings.Add(goals);
         }
 

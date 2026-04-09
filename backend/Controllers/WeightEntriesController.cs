@@ -1,12 +1,15 @@
 using backend.Contracts;
 using backend.Data;
+using backend.Extensions;
 using backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class WeightEntriesController : ControllerBase
 {
@@ -20,7 +23,10 @@ public class WeightEntriesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<WeightEntryResponse>>> GetWeightEntries()
     {
+        var userId = User.GetRequiredUserId();
+
         var weightEntries = await _dbContext.WeightEntries
+            .Where(entry => entry.UserId == userId)
             .OrderByDescending(entry => entry.Date)
             .ThenByDescending(entry => entry.Id)
             .ToListAsync();
@@ -31,8 +37,11 @@ public class WeightEntriesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<WeightEntryResponse>> CreateWeightEntry(WeightEntryRequest request)
     {
+        var userId = User.GetRequiredUserId();
+
         var weightEntry = new WeightEntry
         {
+            UserId = userId,
             Date = NormalizeDate(request.Date),
             WeightKg = decimal.Round(request.WeightKg, 1, MidpointRounding.AwayFromZero),
         };
@@ -46,7 +55,9 @@ public class WeightEntriesController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<WeightEntryResponse>> GetWeightEntry(int id)
     {
-        var weightEntry = await _dbContext.WeightEntries.FindAsync(id);
+        var userId = User.GetRequiredUserId();
+        var weightEntry = await _dbContext.WeightEntries
+            .FirstOrDefaultAsync(entry => entry.Id == id && entry.UserId == userId);
 
         if (weightEntry is null)
         {
@@ -59,7 +70,9 @@ public class WeightEntriesController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<WeightEntryResponse>> UpdateWeightEntry(int id, WeightEntryRequest request)
     {
-        var weightEntry = await _dbContext.WeightEntries.FindAsync(id);
+        var userId = User.GetRequiredUserId();
+        var weightEntry = await _dbContext.WeightEntries
+            .FirstOrDefaultAsync(entry => entry.Id == id && entry.UserId == userId);
 
         if (weightEntry is null)
         {
@@ -77,7 +90,9 @@ public class WeightEntriesController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteWeightEntry(int id)
     {
-        var weightEntry = await _dbContext.WeightEntries.FindAsync(id);
+        var userId = User.GetRequiredUserId();
+        var weightEntry = await _dbContext.WeightEntries
+            .FirstOrDefaultAsync(entry => entry.Id == id && entry.UserId == userId);
 
         if (weightEntry is null)
         {

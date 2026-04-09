@@ -1,12 +1,15 @@
 using backend.Contracts;
 using backend.Data;
+using backend.Extensions;
 using backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class WorkoutTemplatesController : ControllerBase
 {
@@ -20,7 +23,9 @@ public class WorkoutTemplatesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<WorkoutTemplateResponse>>> GetWorkoutTemplates()
     {
+        var userId = User.GetRequiredUserId();
         var templates = await _dbContext.WorkoutTemplates
+            .Where(template => template.UserId == userId)
             .Include(template => template.ExerciseEntries)
             .ThenInclude(exercise => exercise.Sets)
             .OrderBy(template => template.Name)
@@ -33,10 +38,11 @@ public class WorkoutTemplatesController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<WorkoutTemplateResponse>> GetWorkoutTemplate(int id)
     {
+        var userId = User.GetRequiredUserId();
         var template = await _dbContext.WorkoutTemplates
             .Include(currentTemplate => currentTemplate.ExerciseEntries)
             .ThenInclude(exercise => exercise.Sets)
-            .FirstOrDefaultAsync(currentTemplate => currentTemplate.Id == id);
+            .FirstOrDefaultAsync(currentTemplate => currentTemplate.Id == id && currentTemplate.UserId == userId);
 
         if (template is null)
         {
@@ -49,8 +55,10 @@ public class WorkoutTemplatesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<WorkoutTemplateResponse>> CreateWorkoutTemplate(WorkoutTemplateRequest request)
     {
+        var userId = User.GetRequiredUserId();
         var template = new WorkoutTemplate
         {
+            UserId = userId,
             Name = request.Name.Trim(),
             Notes = request.Notes.Trim(),
             ExerciseEntries = request.ExerciseEntries.Select(exercise => new WorkoutTemplateExerciseEntry

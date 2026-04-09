@@ -1,12 +1,15 @@
 using backend.Contracts;
 using backend.Data;
+using backend.Extensions;
 using backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class WorkoutsController : ControllerBase
 {
@@ -20,7 +23,9 @@ public class WorkoutsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<WorkoutResponse>>> GetWorkouts()
     {
+        var userId = User.GetRequiredUserId();
         var workouts = await _dbContext.Workouts
+            .Where(workout => workout.UserId == userId)
             .Include(workout => workout.ExerciseEntries)
             .ThenInclude(exercise => exercise.Sets)
             .OrderByDescending(workout => workout.Date)
@@ -35,17 +40,18 @@ public class WorkoutsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<WorkoutResponse>> GetWorkout(int id)
     {
+        var userId = User.GetRequiredUserId();
         var workout = await _dbContext.Workouts
             .Include(currentWorkout => currentWorkout.ExerciseEntries)
             .ThenInclude(exercise => exercise.Sets)
-            .FirstOrDefaultAsync(currentWorkout => currentWorkout.Id == id);
+            .FirstOrDefaultAsync(currentWorkout => currentWorkout.Id == id && currentWorkout.UserId == userId);
 
         if (workout is null)
         {
             return NotFound();
         }
 
-        var personalRecords = await GetPersonalRecordLookupAsync();
+        var personalRecords = await GetPersonalRecordLookupAsync(userId);
 
         return Ok(MapWorkout(workout, personalRecords));
     }
@@ -53,8 +59,10 @@ public class WorkoutsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<WorkoutResponse>> CreateWorkout(WorkoutRequest request)
     {
+        var userId = User.GetRequiredUserId();
         var workout = new Workout
         {
+            UserId = userId,
             Date = NormalizeDate(request.Date),
             Notes = request.Notes.Trim(),
             ExerciseEntries = request.ExerciseEntries.Select(exercise => new ExerciseEntry
@@ -74,7 +82,7 @@ public class WorkoutsController : ControllerBase
         _dbContext.Workouts.Add(workout);
         await _dbContext.SaveChangesAsync();
 
-        var personalRecords = await GetPersonalRecordLookupAsync();
+        var personalRecords = await GetPersonalRecordLookupAsync(userId);
 
         return CreatedAtAction(
             nameof(GetWorkout),
@@ -119,10 +127,11 @@ public class WorkoutsController : ControllerBase
         return DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
     }
 
-    private async Task<IReadOnlyDictionary<string, decimal>> GetPersonalRecordLookupAsync()
+    private async Task<IReadOnlyDictionary<string, decimal>> GetPersonalRecordLookupAsync(int userId)
     {
         var exerciseEntries = await _dbContext.ExerciseSets
             .AsNoTracking()
+            .Where(set => set.ExerciseEntry != null && set.ExerciseEntry.Workout != null && set.ExerciseEntry.Workout.UserId == userId)
             .Select(set => new
             {
                 ExerciseName = set.ExerciseEntry!.ExerciseName,

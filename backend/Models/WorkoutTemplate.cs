@@ -3,6 +3,8 @@ namespace backend.Models;
 public class WorkoutTemplate
 {
     public int Id { get; set; }
+    public int? UserId { get; set; }
+    public AppUser? User { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
 

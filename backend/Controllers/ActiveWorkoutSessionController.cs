@@ -1,12 +1,15 @@
 using backend.Contracts;
 using backend.Data;
+using backend.Extensions;
 using backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class ActiveWorkoutSessionController : ControllerBase
 {
@@ -20,7 +23,7 @@ public class ActiveWorkoutSessionController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ActiveWorkoutSessionResponse>> GetCurrentActiveWorkoutSession()
     {
-        var session = await GetCurrentSessionQuery().FirstOrDefaultAsync();
+        var session = await GetCurrentSessionQuery(User.GetRequiredUserId()).FirstOrDefaultAsync();
 
         if (session is null)
         {
@@ -34,7 +37,8 @@ public class ActiveWorkoutSessionController : ControllerBase
     public async Task<ActionResult<ActiveWorkoutSessionResponse>> StartActiveWorkoutSession(
         ActiveWorkoutSessionRequest request)
     {
-        var existingSession = await GetCurrentSessionQuery().FirstOrDefaultAsync();
+        var userId = User.GetRequiredUserId();
+        var existingSession = await GetCurrentSessionQuery(userId).FirstOrDefaultAsync();
 
         if (existingSession is not null)
         {
@@ -42,6 +46,7 @@ public class ActiveWorkoutSessionController : ControllerBase
         }
 
         var session = BuildSession(request);
+        session.UserId = userId;
         session.StartedAtUtc = DateTime.UtcNow;
 
         _dbContext.ActiveWorkoutSessions.Add(session);
@@ -54,7 +59,7 @@ public class ActiveWorkoutSessionController : ControllerBase
     public async Task<ActionResult<ActiveWorkoutSessionResponse>> UpdateActiveWorkoutSession(
         ActiveWorkoutSessionRequest request)
     {
-        var session = await GetCurrentSessionQuery().FirstOrDefaultAsync();
+        var session = await GetCurrentSessionQuery(User.GetRequiredUserId()).FirstOrDefaultAsync();
 
         if (session is null)
         {
@@ -75,7 +80,8 @@ public class ActiveWorkoutSessionController : ControllerBase
     [HttpPost("complete")]
     public async Task<ActionResult<WorkoutResponse>> CompleteActiveWorkoutSession()
     {
-        var session = await GetCurrentSessionQuery().FirstOrDefaultAsync();
+        var userId = User.GetRequiredUserId();
+        var session = await GetCurrentSessionQuery(userId).FirstOrDefaultAsync();
 
         if (session is null)
         {
@@ -93,6 +99,7 @@ public class ActiveWorkoutSessionController : ControllerBase
 
         var workout = new Workout
         {
+            UserId = userId,
             Date = DateTime.SpecifyKind(session.StartedAtUtc.Date, DateTimeKind.Utc),
             Notes = session.Notes,
             ExerciseEntries = session.ExerciseEntries.Select(exercise => new ExerciseEntry
@@ -118,6 +125,7 @@ public class ActiveWorkoutSessionController : ControllerBase
 
         var personalRecords = await _dbContext.ExerciseSets
             .AsNoTracking()
+            .Where(set => set.ExerciseEntry != null && set.ExerciseEntry.Workout != null && set.ExerciseEntry.Workout.UserId == userId)
             .Select(set => new
             {
                 ExerciseName = set.ExerciseEntry!.ExerciseName,
@@ -136,9 +144,10 @@ public class ActiveWorkoutSessionController : ControllerBase
             MapWorkout(completedWorkout, personalRecordLookup));
     }
 
-    private IQueryable<ActiveWorkoutSession> GetCurrentSessionQuery()
+    private IQueryable<ActiveWorkoutSession> GetCurrentSessionQuery(int userId)
     {
         return _dbContext.ActiveWorkoutSessions
+            .Where(session => session.UserId == userId)
             .Include(session => session.ExerciseEntries)
             .ThenInclude(exercise => exercise.Sets)
             .OrderByDescending(session => session.StartedAtUtc)

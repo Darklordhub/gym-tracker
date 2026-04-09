@@ -1,11 +1,64 @@
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { type ReactNode } from 'react'
+import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
+import { useAuth } from './auth/AuthContext'
 import { DashboardPage } from './pages/DashboardPage'
 import { ExerciseProgressPage } from './pages/ExerciseProgressPage'
+import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
 import { WeightPage } from './pages/WeightPage'
 import { WorkoutsPage } from './pages/WorkoutsPage'
 
 function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+      <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route element={<AppLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/weight" element={<WeightPage />} />
+          <Route path="/workouts" element={<WorkoutsPage />} />
+          <Route path="/exercise-progress" element={<ExerciseProgressPage />} />
+        </Route>
+      </Route>
+    </Routes>
+  )
+}
+
+function ProtectedRoute() {
+  const { isAuthenticated, isInitializing } = useAuth()
+  const location = useLocation()
+
+  if (isInitializing) {
+    return <main className="auth-shell"><section className="auth-card"><p>Loading account...</p></section></main>
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+
+  return <Outlet />
+}
+
+function PublicOnlyRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isInitializing } = useAuth()
+
+  if (isInitializing) {
+    return <main className="auth-shell"><section className="auth-card"><p>Loading account...</p></section></main>
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return children
+}
+
+function AppLayout() {
+  const { authState, logout } = useAuth()
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -15,41 +68,44 @@ function App() {
           <p className="brand-subtitle">Weight, workouts, progress, and planning in one place.</p>
         </div>
 
-        <nav className="main-nav" aria-label="Primary">
-          <NavLink
-            to="/dashboard"
-            className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
-          >
-            Dashboard
-          </NavLink>
-          <NavLink
-            to="/weight"
-            className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
-          >
-            Weight
-          </NavLink>
-          <NavLink
-            to="/workouts"
-            className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
-          >
-            Workouts
-          </NavLink>
-          <NavLink
-            to="/exercise-progress"
-            className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
-          >
-            Exercise Progress
-          </NavLink>
-        </nav>
+        <div className="header-actions">
+          <nav className="main-nav" aria-label="Primary">
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
+            >
+              Dashboard
+            </NavLink>
+            <NavLink
+              to="/weight"
+              className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
+            >
+              Weight
+            </NavLink>
+            <NavLink
+              to="/workouts"
+              className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
+            >
+              Workouts
+            </NavLink>
+            <NavLink
+              to="/exercise-progress"
+              className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
+            >
+              Exercise Progress
+            </NavLink>
+          </nav>
+
+          <div className="account-chip">
+            <span>{authState?.user.email}</span>
+            <button type="button" className="ghost-button" onClick={logout}>
+              Log out
+            </button>
+          </div>
+        </div>
       </header>
 
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/weight" element={<WeightPage />} />
-        <Route path="/workouts" element={<WorkoutsPage />} />
-        <Route path="/exercise-progress" element={<ExerciseProgressPage />} />
-      </Routes>
+      <Outlet />
     </div>
   )
 }

@@ -50,6 +50,12 @@ services:
       Http__UseHttpsRedirection: "false"
       ConnectionStrings__DefaultConnection: Host=gym-tracker-db;Port=5432;Database=${POSTGRES_DB:-gymtrackerdb};Username=${POSTGRES_USER:-gymuser};Password=${POSTGRES_PASSWORD:-change-me}
       Cors__AllowedOrigins__0: ${APP_BASE_URL:-http://localhost:8080}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY must be set to a random string at least 32 characters long}
+      Jwt__Issuer: ${JWT_ISSUER:-gym-tracker-api}
+      Jwt__Audience: ${JWT_AUDIENCE:-gym-tracker-app}
+      Jwt__ExpirationHours: ${JWT_EXPIRATION_HOURS:-24}
+      LegacyUser__Email: ${LEGACY_USER_EMAIL:-}
+      LegacyUser__Password: ${LEGACY_USER_PASSWORD:-}
     depends_on:
       - gym-tracker-db
     healthcheck:
