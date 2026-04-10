@@ -124,12 +124,16 @@ export function AdminPage() {
           {isLoading ? (
             <StateCard title="Loading users" description="Fetching current user accounts." loading />
           ) : users.length === 0 ? (
-            <div className="empty-state">
-              <p>No users found.</p>
-            </div>
+            <StateCard
+              title="No users found"
+              description="User accounts will appear here once people start registering."
+            />
           ) : (
             <div className="admin-table-shell">
               <table className="admin-table">
+                <caption className="sr-only">
+                  User administration table with role selection and account status controls.
+                </caption>
                 <thead>
                   <tr>
                     <th>Email</th>

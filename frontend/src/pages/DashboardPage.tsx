@@ -158,17 +158,33 @@ export function DashboardPage() {
 
   return (
     <main className="page-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <span className="eyebrow">Gym Tracker</span>
-          <h1>Dashboard</h1>
-          <p className="hero-text">
-            Weekly activity, recent body-weight trend, and a simple consistency check in one place.
-          </p>
+      <section className="hero-panel dashboard-hero-panel">
+        <div className="dashboard-hero-header">
+          <div className="hero-copy">
+            <span className="eyebrow">Gym Tracker</span>
+            <h1>Dashboard</h1>
+            <p className="hero-text">
+              Your weekly training snapshot, current goals, and recent body-weight progress in one place.
+            </p>
+          </div>
+
+          <div className="dashboard-highlight-card">
+            <span className="stat-label">Focus this week</span>
+            <strong>
+              {goals.weeklyWorkoutTarget === null
+                ? 'Set a target'
+                : `${metrics.workoutsThisWeek}/${goals.weeklyWorkoutTarget} workouts`}
+            </strong>
+            <span className="stat-subtext">
+              {goals.weeklyWorkoutTarget === null
+                ? 'Add a weekly workout goal to measure consistency.'
+                : metrics.weeklyWorkoutGoalProgress.message}
+            </span>
+          </div>
         </div>
 
-        <div className="stats-grid">
-          <article className="stat-card">
+        <div className="stats-grid dashboard-stats-grid">
+          <article className="stat-card stat-card-emphasis">
             <span className="stat-label">This Week</span>
             <strong>{metrics.workoutsThisWeek}</strong>
             <span className="stat-subtext">Workouts logged this week</span>
@@ -196,7 +212,7 @@ export function DashboardPage() {
           <div className="panel-header">
             <div>
               <h2>Goals</h2>
-              <p>Set simple weekly targets and body-weight direction.</p>
+              <p>Set simple targets, then use the progress cards to see whether the week is on track.</p>
             </div>
           </div>
 
@@ -207,6 +223,10 @@ export function DashboardPage() {
           ) : (
             <div className="goals-grid">
               <form className="goal-form" onSubmit={handleGoalSubmit}>
+                <p className="section-note">
+                  Keep this lightweight. A target weight and weekly workout count are enough to anchor the dashboard.
+                </p>
+
                 <label className="field">
                   <span>Target body weight (kg)</span>
                   <input
@@ -320,7 +340,7 @@ export function DashboardPage() {
           <div className="panel-header">
             <div>
               <h2>Weekly stats</h2>
-              <p>Current week snapshot.</p>
+              <p>Current week snapshot with the most useful totals first.</p>
             </div>
           </div>
 
@@ -333,14 +353,17 @@ export function DashboardPage() {
               <div className="dashboard-metric-card">
                 <span className="stat-label">Workout count</span>
                 <strong>{metrics.workoutsThisWeek}</strong>
+                <span className="stat-subtext">Completed sessions logged this week</span>
               </div>
               <div className="dashboard-metric-card">
                 <span className="stat-label">Exercises logged</span>
                 <strong>{metrics.exercisesThisWeek}</strong>
+                <span className="stat-subtext">Total exercise entries across this week</span>
               </div>
               <div className="dashboard-metric-card">
                 <span className="stat-label">Weigh-ins</span>
                 <strong>{metrics.weighInsThisWeek}</strong>
+                <span className="stat-subtext">Entries captured during the current week</span>
               </div>
               <div className="dashboard-metric-card">
                 <span className="stat-label">Weekly avg body weight</span>
@@ -349,6 +372,7 @@ export function DashboardPage() {
                     ? 'No data'
                     : `${metrics.averageBodyWeightThisWeek} kg`}
                 </strong>
+                <span className="stat-subtext">Average of this week&apos;s weigh-ins</span>
               </div>
             </div>
           )}
@@ -358,7 +382,7 @@ export function DashboardPage() {
           <div className="panel-header">
             <div>
               <h2>Overview</h2>
-              <p>Simple totals and latest activity.</p>
+              <p>Recent activity and all-time context for quick reference.</p>
             </div>
           </div>
 
@@ -371,10 +395,12 @@ export function DashboardPage() {
               <div className="dashboard-metric-card">
                 <span className="stat-label">Total workouts</span>
                 <strong>{metrics.totalWorkouts}</strong>
+                <span className="stat-subtext">All recorded sessions</span>
               </div>
               <div className="dashboard-metric-card">
                 <span className="stat-label">Latest workout</span>
                 <strong>{metrics.latestWorkout ? formatDate(metrics.latestWorkout.date) : 'No data'}</strong>
+                <span className="stat-subtext">Most recent logged training day</span>
               </div>
               <div className="dashboard-metric-card">
                 <span className="stat-label">Latest weigh-in</span>
@@ -383,12 +409,14 @@ export function DashboardPage() {
                     ? `${metrics.latestWeightEntry.weightKg} kg`
                     : 'No data'}
                 </strong>
+                <span className="stat-subtext">Latest recorded body weight</span>
               </div>
               <div className="dashboard-metric-card">
                 <span className="stat-label">Last weigh-in date</span>
                 <strong>
                   {metrics.latestWeightEntry ? formatDate(metrics.latestWeightEntry.date) : 'No data'}
                 </strong>
+                <span className="stat-subtext">Most recent date in weight history</span>
               </div>
             </div>
           )}

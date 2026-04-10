@@ -262,34 +262,38 @@ export function WeightPage() {
           </div>
 
           <form className="weight-form" onSubmit={handleSubmit} noValidate>
-            <label className="field">
-              <span>Date</span>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
-                aria-invalid={Boolean(errors.date)}
-              />
-              {errors.date ? <small className="field-error">{errors.date}</small> : null}
-            </label>
+            <div className="form-grid">
+              <label className="field">
+                <span>Date</span>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
+                  aria-invalid={Boolean(errors.date)}
+                />
+                <small>Use the actual weigh-in date so trends stay accurate.</small>
+                {errors.date ? <small className="field-error">{errors.date}</small> : null}
+              </label>
 
-            <label className="field">
-              <span>Weight (kg)</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min="20"
-                max="500"
-                step="0.1"
-                placeholder="82.4"
-                value={form.weightKg}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, weightKg: event.target.value }))
-                }
-                aria-invalid={Boolean(errors.weightKg)}
-              />
-              {errors.weightKg ? <small className="field-error">{errors.weightKg}</small> : null}
-            </label>
+              <label className="field">
+                <span>Weight (kg)</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="20"
+                  max="500"
+                  step="0.1"
+                  placeholder="82.4"
+                  value={form.weightKg}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, weightKg: event.target.value }))
+                  }
+                  aria-invalid={Boolean(errors.weightKg)}
+                />
+                <small>One decimal place is enough for most check-ins.</small>
+                {errors.weightKg ? <small className="field-error">{errors.weightKg}</small> : null}
+              </label>
+            </div>
 
             <button type="submit" className="primary-button" disabled={isSaving}>
               {isSaving ? 'Saving...' : editingId === null ? 'Add entry' : 'Save changes'}
@@ -371,7 +375,7 @@ export function WeightPage() {
           <div className="panel-header">
             <div>
               <h2>History</h2>
-              <p>Newest entries first.</p>
+              <p>Newest entries first. Edit or remove any incorrect weigh-in from here.</p>
             </div>
           </div>
 

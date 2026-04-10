@@ -2,9 +2,11 @@
   --page-bg: #f5efe6;
   --surface: rgba(255, 249, 242, 0.84);
   --surface-strong: #fff6ee;
+  --surface-muted: rgba(255, 248, 240, 0.72);
   --card-bg: rgba(255, 255, 255, 0.78);
   --input-bg: rgba(255, 255, 255, 0.95);
   --border: rgba(89, 72, 52, 0.14);
+  --border-strong: rgba(89, 72, 52, 0.2);
   --text: #54463a;
   --text-strong: #20160f;
   --muted: #7d6b5b;
@@ -16,18 +18,92 @@
   --success-soft: rgba(13, 107, 69, 0.12);
   --focus-ring: rgba(15, 88, 79, 0.24);
   --shadow: 0 20px 60px rgba(48, 34, 22, 0.08);
+  --shadow-soft: 0 12px 28px rgba(48, 34, 22, 0.08);
+  --page-glow-warm: rgba(219, 118, 61, 0.18);
+  --page-glow-cool: rgba(15, 88, 79, 0.18);
+  --hero-glow-warm: rgba(220, 104, 57, 0.18);
+  --hero-glow-cool: rgba(15, 88, 79, 0.16);
+  --header-bg: rgba(255, 249, 242, 0.76);
+  --header-border: rgba(89, 72, 52, 0.08);
+  --nav-scrollbar-thumb: rgba(89, 72, 52, 0.18);
+  --surface-overlay-subtle: rgba(255, 255, 255, 0.44);
+  --surface-overlay-muted: rgba(255, 255, 255, 0.56);
+  --surface-overlay: rgba(255, 255, 255, 0.62);
+  --surface-overlay-strong: rgba(255, 255, 255, 0.68);
+  --surface-overlay-emphasis: rgba(255, 255, 255, 0.72);
+  --overlay-border-light: rgba(255, 255, 255, 0.7);
+  --accent-surface: rgba(15, 88, 79, 0.08);
+  --accent-surface-strong: rgba(15, 88, 79, 0.12);
+  --danger-surface-strong: rgba(164, 63, 42, 0.12);
+  --success-border: rgba(13, 107, 69, 0.16);
+  --danger-border: rgba(164, 63, 42, 0.16);
+  --progress-accent-end: #dc6839;
+  --chart-point-fill: #fffaf4;
+  --set-card-border: rgba(15, 88, 79, 0.14);
+  --set-card-gradient-start: rgba(255, 255, 255, 0.76);
+  --set-card-gradient-end: rgba(247, 244, 237, 0.9);
+  --text-on-accent: #fffaf4;
+  --button-shadow-accent: 0 12px 28px rgba(15, 88, 79, 0.18);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(219, 118, 61, 0.18), transparent 22%),
-    radial-gradient(circle at bottom right, rgba(15, 88, 79, 0.18), transparent 24%),
+    radial-gradient(circle at top left, var(--page-glow-warm), transparent 22%),
+    radial-gradient(circle at bottom right, var(--page-glow-cool), transparent 24%),
     var(--page-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme='dark'] {
+  --page-bg: #0f1519;
+  --surface: rgba(22, 30, 36, 0.9);
+  --surface-strong: #182127;
+  --surface-muted: rgba(24, 33, 40, 0.92);
+  --card-bg: rgba(30, 40, 48, 0.84);
+  --input-bg: rgba(15, 21, 25, 0.96);
+  --border: rgba(204, 219, 230, 0.12);
+  --border-strong: rgba(204, 219, 230, 0.2);
+  --text: #d5dde4;
+  --text-strong: #f4f8fb;
+  --muted: #9cabb7;
+  --accent-strong: #57b4a7;
+  --accent-soft: rgba(87, 180, 167, 0.16);
+  --danger: #ff9a7a;
+  --danger-soft: rgba(255, 154, 122, 0.16);
+  --success: #67d4a2;
+  --success-soft: rgba(103, 212, 162, 0.16);
+  --focus-ring: rgba(87, 180, 167, 0.28);
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  --shadow-soft: 0 14px 30px rgba(0, 0, 0, 0.24);
+  --page-glow-warm: rgba(220, 104, 57, 0.12);
+  --page-glow-cool: rgba(87, 180, 167, 0.12);
+  --hero-glow-warm: rgba(220, 104, 57, 0.14);
+  --hero-glow-cool: rgba(87, 180, 167, 0.12);
+  --header-bg: rgba(24, 33, 40, 0.82);
+  --header-border: rgba(204, 219, 230, 0.1);
+  --nav-scrollbar-thumb: rgba(204, 219, 230, 0.22);
+  --surface-overlay-subtle: rgba(24, 33, 40, 0.68);
+  --surface-overlay-muted: rgba(30, 40, 48, 0.8);
+  --surface-overlay: rgba(30, 40, 48, 0.86);
+  --surface-overlay-strong: rgba(34, 45, 54, 0.9);
+  --surface-overlay-emphasis: rgba(37, 50, 60, 0.92);
+  --overlay-border-light: rgba(204, 219, 230, 0.08);
+  --accent-surface: rgba(87, 180, 167, 0.12);
+  --accent-surface-strong: rgba(87, 180, 167, 0.18);
+  --danger-surface-strong: rgba(255, 154, 122, 0.18);
+  --success-border: rgba(103, 212, 162, 0.24);
+  --danger-border: rgba(255, 154, 122, 0.24);
+  --progress-accent-end: #f29a63;
+  --chart-point-fill: #11171b;
+  --set-card-border: rgba(87, 180, 167, 0.18);
+  --set-card-gradient-start: rgba(37, 49, 58, 0.94);
+  --set-card-gradient-end: rgba(24, 33, 40, 0.96);
+  --text-on-accent: #08110f;
+  --button-shadow-accent: 0 14px 28px rgba(87, 180, 167, 0.16);
 }
 
 * {
@@ -43,6 +119,12 @@ body,
 body {
   margin: 0;
   min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, var(--page-glow-warm), transparent 22%),
+    radial-gradient(circle at bottom right, var(--page-glow-cool), transparent 24%),
+    var(--page-bg);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #root {
@@ -76,4 +158,15 @@ h2 {
 button,
 input {
   font: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  color: inherit;
+}
+
+a {
+  color: inherit;
 }

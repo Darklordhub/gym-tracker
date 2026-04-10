@@ -18,6 +18,7 @@ export function LoginPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const isSubmitDisabled = isSubmitting || form.email.trim() === '' || form.password === ''
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -51,22 +52,34 @@ export function LoginPage() {
       <section className="auth-card">
         <div className="auth-copy">
           <span className="eyebrow">Gym Tracker</span>
-          <h1>Log in</h1>
+          <h1>Welcome back</h1>
           <p className="hero-text">
-            Sign in to access your own workouts, weight history, goals, and active session.
+            Sign in to continue with your workouts, weight history, goals, and active session.
+          </p>
+          <p className="auth-supporting-text">
+            Use the email and password linked to your account.
           </p>
         </div>
 
-        <form className="weight-form" onSubmit={handleSubmit}>
+        <form className="weight-form auth-form" onSubmit={handleSubmit} noValidate>
           <label className="field">
-            <span>Email</span>
+            <span>Email address</span>
             <input
               type="email"
               autoComplete="email"
+              inputMode="email"
               value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+              onChange={(event) => {
+                setForm((current) => ({ ...current, email: event.target.value }))
+                if (errorMessage) {
+                  setErrorMessage(null)
+                }
+              }}
+              placeholder="you@example.com"
+              aria-invalid={Boolean(errorMessage)}
               required
             />
+            <small>Use the same email you registered with.</small>
           </label>
 
           <label className="field">
@@ -75,18 +88,30 @@ export function LoginPage() {
               type="password"
               autoComplete="current-password"
               value={form.password}
-              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+              onChange={(event) => {
+                setForm((current) => ({ ...current, password: event.target.value }))
+                if (errorMessage) {
+                  setErrorMessage(null)
+                }
+              }}
               minLength={8}
+              placeholder="Enter your password"
+              aria-invalid={Boolean(errorMessage)}
               required
             />
+            <small>Passwords are case-sensitive.</small>
           </label>
 
-          <button type="submit" className="primary-button" disabled={isSubmitting}>
-            {isSubmitting ? 'Logging in...' : 'Log in'}
+          <button type="submit" className="primary-button auth-submit-button" disabled={isSubmitDisabled}>
+            {isSubmitting ? 'Signing you in...' : 'Log in'}
           </button>
         </form>
 
-        {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
+        {errorMessage ? (
+          <p className="feedback error auth-feedback" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
 
         <p className="auth-footer">
           Need an account? <Link to="/register">Register</Link>

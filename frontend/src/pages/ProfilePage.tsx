@@ -197,76 +197,80 @@ export function ProfilePage() {
             </div>
 
             <form className="weight-form" onSubmit={handleProfileSubmit}>
-              <label className="field">
-                <span>Email</span>
-                <input type="email" value={profile?.email ?? ''} readOnly disabled />
-              </label>
+              <div className="form-grid">
+                <label className="field field-span-2">
+                  <span>Email</span>
+                  <input type="email" value={profile?.email ?? ''} readOnly disabled />
+                  <small>Sign-in email is managed separately and cannot be edited here.</small>
+                </label>
 
-              <label className="field">
-                <span>Full name</span>
-                <input
-                  type="text"
-                  value={profileForm.fullName}
-                  maxLength={120}
-                  onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, fullName: event.target.value }))
-                  }
-                  required
-                />
-              </label>
+                <label className="field">
+                  <span>Full name</span>
+                  <input
+                    type="text"
+                    value={profileForm.fullName}
+                    maxLength={120}
+                    onChange={(event) =>
+                      setProfileForm((current) => ({ ...current, fullName: event.target.value }))
+                    }
+                    required
+                  />
+                </label>
 
-              <label className="field">
-                <span>Display name</span>
-                <input
-                  type="text"
-                  value={profileForm.displayName}
-                  maxLength={80}
-                  onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, displayName: event.target.value }))
-                  }
-                  placeholder="Optional"
-                />
-              </label>
+                <label className="field">
+                  <span>Display name</span>
+                  <input
+                    type="text"
+                    value={profileForm.displayName}
+                    maxLength={80}
+                    onChange={(event) =>
+                      setProfileForm((current) => ({ ...current, displayName: event.target.value }))
+                    }
+                    placeholder="Optional"
+                  />
+                  <small>Shown across the app when available.</small>
+                </label>
 
-              <label className="field">
-                <span>Date of birth</span>
-                <input
-                  type="date"
-                  value={profileForm.dateOfBirth}
-                  max={new Date().toISOString().slice(0, 10)}
-                  onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, dateOfBirth: event.target.value }))
-                  }
-                />
-              </label>
+                <label className="field">
+                  <span>Date of birth</span>
+                  <input
+                    type="date"
+                    value={profileForm.dateOfBirth}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(event) =>
+                      setProfileForm((current) => ({ ...current, dateOfBirth: event.target.value }))
+                    }
+                  />
+                </label>
 
-              <label className="field">
-                <span>Height (cm)</span>
-                <input
-                  type="number"
-                  min="50"
-                  max="300"
-                  step="1"
-                  value={profileForm.heightCm}
-                  onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, heightCm: event.target.value }))
-                  }
-                  placeholder="Optional"
-                />
-              </label>
+                <label className="field">
+                  <span>Height (cm)</span>
+                  <input
+                    type="number"
+                    min="50"
+                    max="300"
+                    step="1"
+                    value={profileForm.heightCm}
+                    onChange={(event) =>
+                      setProfileForm((current) => ({ ...current, heightCm: event.target.value }))
+                    }
+                    placeholder="Optional"
+                  />
+                </label>
 
-              <label className="field">
-                <span>Gender</span>
-                <input
-                  type="text"
-                  value={profileForm.gender}
-                  maxLength={50}
-                  onChange={(event) =>
-                    setProfileForm((current) => ({ ...current, gender: event.target.value }))
-                  }
-                  placeholder="Optional"
-                />
-              </label>
+                <label className="field field-span-2">
+                  <span>Gender</span>
+                  <input
+                    type="text"
+                    value={profileForm.gender}
+                    maxLength={50}
+                    onChange={(event) =>
+                      setProfileForm((current) => ({ ...current, gender: event.target.value }))
+                    }
+                    placeholder="Optional"
+                  />
+                </label>
+              </div>
 
               <div className="action-row">
                 <button type="submit" className="primary-button" disabled={isSavingProfile}>
@@ -341,7 +345,9 @@ export function ProfilePage() {
                 />
               </label>
 
-              <p className="muted-note">Use at least 8 characters. Your email stays unchanged on this page.</p>
+              <p className="muted-note">
+                Use at least 8 characters. Your email stays unchanged on this page.
+              </p>
 
               <div className="action-row">
                 <button type="submit" className="primary-button" disabled={isChangingPassword}>

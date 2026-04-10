@@ -288,6 +288,16 @@ export function WorkoutsPage() {
     })
   }, [workoutDateFrom, workoutDateTo, workoutSearch, workouts])
 
+  const activeSessionStats = useMemo(() => {
+    const exerciseCount = activeForm.exerciseEntries.length
+    const setCount = activeForm.exerciseEntries.reduce((count, exercise) => count + exercise.sets.length, 0)
+
+    return {
+      exerciseCount,
+      setCount,
+    }
+  }, [activeForm.exerciseEntries])
+
   async function loadData() {
     try {
       setIsLoading(true)
@@ -647,8 +657,18 @@ export function WorkoutsPage() {
           ) : activeSession ? (
             <>
               <div className="session-banner">
-                <span className="pr-badge">In Progress</span>
-                <span className="record-hint">Started on {formatDate(activeSession.startedAtUtc)}</span>
+                <div className="session-banner-copy">
+                  <span className="pr-badge">In Progress</span>
+                  <span className="record-hint">Started on {formatDate(activeSession.startedAtUtc)}</span>
+                </div>
+                <div className="session-banner-metrics" aria-label="Active session summary">
+                  <span className="info-pill">
+                    {activeSessionStats.exerciseCount} exercise{activeSessionStats.exerciseCount === 1 ? '' : 's'}
+                  </span>
+                  <span className="info-pill">
+                    {activeSessionStats.setCount} set{activeSessionStats.setCount === 1 ? '' : 's'}
+                  </span>
+                </div>
               </div>
 
               <div className="weight-form">
@@ -672,7 +692,7 @@ export function WorkoutsPage() {
                   <div className="section-title-row">
                     <div>
                       <h3>Session exercises</h3>
-                      <p>Add movements as you work through the session.</p>
+                      <p>Add movements as you work through the session, then save progress between sets if needed.</p>
                     </div>
                     <button type="button" className="ghost-button" onClick={() => addExercise('active')}>
                       Add exercise
@@ -846,6 +866,10 @@ export function WorkoutsPage() {
             >
               {isSavingTemplate ? 'Saving...' : 'Save as template'}
             </button>
+
+            <button type="button" className="ghost-button" onClick={resetQuickLogForm} disabled={isSaving}>
+              Clear form
+            </button>
           </div>
 
           <form className="weight-form" onSubmit={handleQuickLogSubmit} noValidate>
@@ -882,7 +906,7 @@ export function WorkoutsPage() {
               <div className="section-title-row">
                 <div>
                   <h3>Exercises</h3>
-                  <p>Add each movement in the order you performed it.</p>
+                  <p>Add each movement in the order you performed it. Keep exercise names consistent for cleaner history and PR tracking.</p>
                 </div>
                 <button type="button" className="ghost-button" onClick={() => addExercise('quick')}>
                   Add exercise
@@ -993,6 +1017,10 @@ export function WorkoutsPage() {
             </label>
           </div>
 
+          <p className="section-note">
+            Showing {filteredWorkouts.length} of {workouts.length} workout{workouts.length === 1 ? '' : 's'}.
+          </p>
+
           {isLoading ? (
             <StateCard title="Loading workouts" description="Pulling recent sessions and exercise details." loading />
           ) : workouts.length === 0 ? (
@@ -1093,7 +1121,7 @@ function ExerciseEditorCard({
       </div>
 
       <label className="field">
-        <span>Name</span>
+        <span>Exercise name</span>
         <input
           type="text"
           placeholder="Bench Press"
@@ -1101,6 +1129,7 @@ function ExerciseEditorCard({
           onChange={(event) => onExerciseChange('exerciseName', event.target.value)}
           aria-invalid={Boolean(errors?.exerciseName)}
         />
+        <small>Use the same naming each time to improve progress suggestions and records.</small>
         {errors?.exerciseName ? <small className="field-error">{errors.exerciseName}</small> : null}
       </label>
 
