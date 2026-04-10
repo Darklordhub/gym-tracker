@@ -131,6 +131,18 @@ function AppLayout({
             <p className="brand-subtitle">Weight, workouts, progress, and planning in one place.</p>
           </div>
 
+          <div className="mobile-topbar-actions">
+            <button
+              type="button"
+              className="ghost-button mobile-nav-toggle"
+              aria-expanded={isMobileNavOpen}
+              aria-controls="primary-navigation"
+              onClick={() => setIsMobileNavOpen((current) => !current)}
+            >
+              {isMobileNavOpen ? 'Close menu' : 'Menu'}
+            </button>
+          </div>
+
           <div className="account-chip">
             <button
               type="button"
@@ -152,16 +164,6 @@ function AppLayout({
         </div>
 
         <div className="header-actions">
-          <button
-            type="button"
-            className="ghost-button mobile-nav-toggle"
-            aria-expanded={isMobileNavOpen}
-            aria-controls="primary-navigation"
-            onClick={() => setIsMobileNavOpen((current) => !current)}
-          >
-            {isMobileNavOpen ? 'Close menu' : 'Open menu'}
-          </button>
-
           <nav className="main-nav-shell" aria-label="Primary">
             <div
               id="primary-navigation"
@@ -176,6 +178,27 @@ function AppLayout({
                   {item.label}
                 </NavLink>
               ))}
+
+              <div className="mobile-menu-secondary">
+                <div className="mobile-account-copy">
+                  <span title={authState?.user.email}>{accountLabel}</span>
+                  <small>{authState?.user.role ?? 'User'} account</small>
+                </div>
+                <div className="mobile-menu-actions">
+                  <button
+                    type="button"
+                    className="ghost-button mobile-menu-action"
+                    onClick={onToggleTheme}
+                    aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                    title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                  >
+                    {theme === 'light' ? 'Dark mode' : 'Light mode'}
+                  </button>
+                  <button type="button" className="ghost-button mobile-menu-action" onClick={logout}>
+                    Log out
+                  </button>
+                </div>
+              </div>
             </div>
           </nav>
         </div>

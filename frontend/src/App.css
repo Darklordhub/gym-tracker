@@ -32,6 +32,7 @@
   min-width: 0;
 }
 
+.mobile-topbar-actions,
 .mobile-nav-toggle {
   display: none;
 }
@@ -136,6 +137,10 @@
 
 .account-copy small {
   color: var(--muted);
+}
+
+.mobile-menu-secondary {
+  display: none;
 }
 
 .app-content {
@@ -1503,20 +1508,33 @@
   }
 
   .app-header {
-    gap: 14px;
-    padding: 14px 14px 12px;
-    border-radius: 22px;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 20px;
+  }
+
+  .app-header-top {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .brand-kicker,
+  .brand-subtitle {
+    display: none;
   }
 
   .brand-name {
-    font-size: 1.35rem;
+    font-size: 1.1rem;
+    line-height: 1.1;
   }
 
-  .brand-subtitle,
-  .hero-text,
-  .panel-header p,
-  .state-card-copy p {
-    max-width: none;
+  .mobile-topbar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 0 0 auto;
   }
 
   .main-nav-shell {
@@ -1530,11 +1548,12 @@
     display: none;
     width: 100%;
     min-width: 0;
-    padding: 12px;
-    gap: 10px;
-    border-radius: 20px;
-    background: var(--surface-overlay-emphasis);
-    box-shadow: var(--shadow-soft);
+    padding: 4px 0 0;
+    gap: 6px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .main-nav-shell .main-nav-mobile-open {
@@ -1543,48 +1562,79 @@
 
   .nav-link {
     width: 100%;
-    padding: 12px 14px;
+    padding: 11px 12px;
     min-height: 46px;
-    font-size: 0.95rem;
+    font-size: 0.94rem;
     justify-content: flex-start;
+    border-radius: 14px;
   }
 
   .nav-link-active {
-    box-shadow: var(--shadow-soft);
+    box-shadow: none;
   }
 
   .mobile-nav-toggle {
     display: inline-flex;
-    width: 100%;
+    width: auto;
+    min-width: 102px;
     min-height: 46px;
     justify-content: center;
-    margin-bottom: 10px;
+    margin-bottom: 0;
+    padding-inline: 14px;
   }
 
   .account-chip {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: stretch;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 20px;
+    display: none;
   }
 
-  .account-copy {
-    grid-column: 1 / -1;
+  .mobile-menu-secondary {
+    display: grid;
+    gap: 10px;
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+
+  .mobile-account-copy {
+    display: grid;
+    gap: 2px;
     width: 100%;
     min-width: 0;
+    color: var(--muted);
   }
 
-  .theme-toggle-button,
-  .account-chip .ghost-button {
+  .mobile-account-copy span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-strong);
+    font-weight: 700;
+  }
+
+  .mobile-account-copy small {
+    color: var(--muted);
+  }
+
+  .mobile-menu-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mobile-menu-action {
     width: 100%;
     min-height: 46px;
   }
 
+  .hero-text,
+  .panel-header p,
+  .state-card-copy p {
+    max-width: none;
+  }
+
   .page-shell {
-    gap: 16px;
-    padding: 12px 4px 20px;
+    gap: 14px;
+    padding: 8px 4px 20px;
   }
 
   .auth-card,
