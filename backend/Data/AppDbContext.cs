@@ -46,6 +46,14 @@ public class AppDbContext : DbContext
             .Property(user => user.Gender)
             .HasMaxLength(50);
 
+        modelBuilder.Entity<AppUser>()
+            .Property(user => user.Role)
+            .HasMaxLength(20);
+
+        modelBuilder.Entity<AppUser>()
+            .Property(user => user.IsActive)
+            .HasDefaultValue(true);
+
         modelBuilder.Entity<WeightEntry>()
             .HasOne(weightEntry => weightEntry.User)
             .WithMany(user => user.WeightEntries)

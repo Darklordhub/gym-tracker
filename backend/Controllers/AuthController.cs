@@ -65,6 +65,11 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Invalid email or password." });
         }
 
+        if (!user.IsActive)
+        {
+            return Unauthorized(new { message = "This account is inactive." });
+        }
+
         var verificationResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
         if (verificationResult == PasswordVerificationResult.Failed)
         {

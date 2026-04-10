@@ -1,4 +1,5 @@
 using System.Text;
+using backend.Authorization;
 using backend.Configuration;
 using backend.Data;
 using backend.Models;
@@ -46,7 +47,7 @@ builder.Services.AddScoped<LegacyDataMigrationService>();
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>
-        policy.RequireRole("Admin"));
+        policy.RequireRole(AppRoles.Admin));
 });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

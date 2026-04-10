@@ -1,3 +1,5 @@
+using backend.Authorization;
+
 namespace backend.Models;
 
 public class AppUser
@@ -17,5 +19,6 @@ public class AppUser
     public List<WorkoutTemplate> WorkoutTemplates { get; set; } = new();
     public List<ActiveWorkoutSession> ActiveWorkoutSessions { get; set; } = new();
     public List<GoalSettings> GoalSettings { get; set; } = new();
-    public string Role { get; set; } = "User";
+    public string Role { get; set; } = AppRoles.User;
+    public bool IsActive { get; set; } = true;
 }
