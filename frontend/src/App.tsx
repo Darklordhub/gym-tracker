@@ -5,6 +5,7 @@ import { useAuth } from './auth/AuthContext'
 import { DashboardPage } from './pages/DashboardPage'
 import { ExerciseProgressPage } from './pages/ExerciseProgressPage'
 import { LoginPage } from './pages/LoginPage'
+import { ProfilePage } from './pages/ProfilePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { WeightPage } from './pages/WeightPage'
 import { WorkoutsPage } from './pages/WorkoutsPage'
@@ -21,6 +22,7 @@ function App() {
           <Route path="/weight" element={<WeightPage />} />
           <Route path="/workouts" element={<WorkoutsPage />} />
           <Route path="/exercise-progress" element={<ExerciseProgressPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>
     </Routes>
@@ -58,6 +60,7 @@ function PublicOnlyRoute({ children }: { children: ReactNode }) {
 
 function AppLayout() {
   const { authState, logout } = useAuth()
+  const accountLabel = authState?.user.displayName || authState?.user.fullName || authState?.user.email
 
   return (
     <div className="app-shell">
@@ -94,10 +97,16 @@ function AppLayout() {
             >
               Exercise Progress
             </NavLink>
+            <NavLink
+              to="/profile"
+              className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
+            >
+              Profile
+            </NavLink>
           </nav>
 
           <div className="account-chip">
-            <span>{authState?.user.email}</span>
+            <span title={authState?.user.email}>{accountLabel}</span>
             <button type="button" className="ghost-button" onClick={logout}>
               Log out
             </button>

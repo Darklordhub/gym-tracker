@@ -101,6 +101,11 @@ public class AuthController : ControllerBase
         {
             Id = user.Id,
             Email = user.Email,
+            FullName = user.FullName,
+            DisplayName = user.DisplayName,
+            DateOfBirth = user.DateOfBirth,
+            HeightCm = user.HeightCm,
+            Gender = user.Gender,
             CreatedAt = user.CreatedAt,
         };
     }

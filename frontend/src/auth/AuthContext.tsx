@@ -22,6 +22,7 @@ type AuthContextValue = {
   isInitializing: boolean
   login: (payload: LoginPayload) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
+  setCurrentUser: (user: AuthUser) => void
   logout: () => void
 }
 
@@ -42,7 +43,10 @@ function readStoredAuthState(): StoredAuthState | null {
       return null
     }
 
-    return parsedValue
+    return {
+      ...parsedValue,
+      user: normalizeAuthUser(parsedValue.user),
+    }
   } catch {
     return null
   }
@@ -61,7 +65,18 @@ function toStoredAuthState(response: AuthResponse): StoredAuthState {
   return {
     token: response.token,
     expiresAtUtc: response.expiresAtUtc,
-    user: response.user,
+    user: normalizeAuthUser(response.user),
+  }
+}
+
+function normalizeAuthUser(user: AuthUser): AuthUser {
+  return {
+    ...user,
+    fullName: user.fullName ?? '',
+    displayName: user.displayName ?? null,
+    dateOfBirth: user.dateOfBirth ?? null,
+    heightCm: user.heightCm ?? null,
+    gender: user.gender ?? null,
   }
 }
 
@@ -105,7 +120,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const nextAuthState: StoredAuthState = {
           token: storedAuthState.token,
           expiresAtUtc: storedAuthState.expiresAtUtc,
-          user: currentUser,
+          user: normalizeAuthUser(currentUser),
         }
 
         setAuthState(nextAuthState)
@@ -143,6 +158,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
     persistAuthState(null)
   }
 
+  function setCurrentUser(user: AuthUser) {
+    setAuthState((current) => {
+      if (!current) {
+        return current
+      }
+
+      const nextAuthState: StoredAuthState = {
+        ...current,
+        user: normalizeAuthUser(user),
+      }
+
+      persistAuthState(nextAuthState)
+      return nextAuthState
+    })
+  }
+
   const value = useMemo<AuthContextValue>(
     () => ({
       authState,
@@ -154,6 +185,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       register: async (payload) => {
         await handleAuthResponse(registerRequest(payload))
       },
+      setCurrentUser,
       logout,
     }),
     [authState, isInitializing],

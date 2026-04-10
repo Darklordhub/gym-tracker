@@ -30,6 +30,22 @@ public class AppDbContext : DbContext
             .HasIndex(user => user.Email)
             .IsUnique();
 
+        modelBuilder.Entity<AppUser>()
+            .Property(user => user.Email)
+            .HasMaxLength(320);
+
+        modelBuilder.Entity<AppUser>()
+            .Property(user => user.FullName)
+            .HasMaxLength(120);
+
+        modelBuilder.Entity<AppUser>()
+            .Property(user => user.DisplayName)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<AppUser>()
+            .Property(user => user.Gender)
+            .HasMaxLength(50);
+
         modelBuilder.Entity<WeightEntry>()
             .HasOne(weightEntry => weightEntry.User)
             .WithMany(user => user.WeightEntries)

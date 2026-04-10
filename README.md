@@ -41,6 +41,7 @@ Example values are provided in [`/.env.example`](./.env.example).
 
 - New users can create an account on `/register` and then log in on `/login`.
 - The API uses JWT bearer authentication and the frontend stores the issued token in browser local storage for this app.
+- Authenticated users can open `/profile` to update their personal details and change their password.
 - After login, all weight entries, workouts, workout templates, active sessions, and goals are filtered by the authenticated user on the server side.
 - Logging out clears the stored token from the browser.
 
