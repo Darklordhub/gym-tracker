@@ -20,9 +20,9 @@ export function StateCard({
             ? 'state-card error-state'
             : 'state-card'
       }
-    >
+      >
       <div className="state-card-badge" aria-hidden="true">
-        {loading ? '...' : tone === 'error' ? '!' : '0'}
+        {loading ? '...' : tone === 'error' ? '!' : 'i'}
       </div>
       <div className="state-card-copy">
         <strong>{title}</strong>

@@ -19,6 +19,11 @@ export function RegisterPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const isSubmitDisabled =
+    isSubmitting ||
+    form.email.trim() === '' ||
+    form.password === '' ||
+    form.confirmPassword === ''
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -48,22 +53,34 @@ export function RegisterPage() {
       <section className="auth-card">
         <div className="auth-copy">
           <span className="eyebrow">Gym Tracker</span>
-          <h1>Register</h1>
+          <h1>Create account</h1>
           <p className="hero-text">
-            Create a personal account. Each account only sees its own data after sign-in.
+            Create your personal account to track workouts, body weight, and progress in one place.
+          </p>
+          <p className="auth-supporting-text">
+            After sign-in, each account only sees its own data.
           </p>
         </div>
 
-        <form className="weight-form" onSubmit={handleSubmit}>
+        <form className="weight-form auth-form" onSubmit={handleSubmit} noValidate>
           <label className="field">
-            <span>Email</span>
+            <span>Email address</span>
             <input
               type="email"
               autoComplete="email"
+              inputMode="email"
               value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+              onChange={(event) => {
+                setForm((current) => ({ ...current, email: event.target.value }))
+                if (errorMessage) {
+                  setErrorMessage(null)
+                }
+              }}
+              placeholder="you@example.com"
+              aria-invalid={Boolean(errorMessage)}
               required
             />
+            <small>This email will be used to sign in.</small>
           </label>
 
           <label className="field">
@@ -72,10 +89,18 @@ export function RegisterPage() {
               type="password"
               autoComplete="new-password"
               value={form.password}
-              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+              onChange={(event) => {
+                setForm((current) => ({ ...current, password: event.target.value }))
+                if (errorMessage) {
+                  setErrorMessage(null)
+                }
+              }}
               minLength={8}
+              placeholder="Create a password"
+              aria-invalid={Boolean(errorMessage)}
               required
             />
+            <small>Use at least 8 characters.</small>
           </label>
 
           <label className="field">
@@ -84,20 +109,26 @@ export function RegisterPage() {
               type="password"
               autoComplete="new-password"
               value={form.confirmPassword}
-              onChange={(event) =>
+              onChange={(event) => {
                 setForm((current) => ({ ...current, confirmPassword: event.target.value }))
-              }
+                if (errorMessage) {
+                  setErrorMessage(null)
+                }
+              }}
               minLength={8}
+              placeholder="Repeat your password"
+              aria-invalid={Boolean(errorMessage)}
               required
             />
+            <small>Enter the same password again to confirm it.</small>
           </label>
 
-          <button type="submit" className="primary-button" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating account...' : 'Register'}
+          <button type="submit" className="primary-button auth-submit-button" disabled={isSubmitDisabled}>
+            {isSubmitting ? 'Creating account...' : 'Create account'}
           </button>
         </form>
 
-        {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
+        {errorMessage ? <p className="feedback error auth-feedback">{errorMessage}</p> : null}
 
         <p className="auth-footer">
           Already have an account? <Link to="/login">Log in</Link>

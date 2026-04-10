@@ -559,11 +559,43 @@
   gap: 18px;
 }
 
+.workout-empty-state {
+  gap: 20px;
+}
+
 .action-row {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+
+.action-row-prominent {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.action-row-inline {
+  justify-content: stretch;
+}
+
+.action-row-inline button {
+  flex: 1 1 160px;
+}
+
+.compact-button {
+  padding: 10px 14px;
+  border-radius: 12px;
+}
+
+.subtle-danger-button {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+}
+
+.subtle-danger-button:hover {
+  background: var(--danger-soft);
 }
 
 .template-toolbar {
@@ -577,8 +609,21 @@
   background: var(--surface-overlay-subtle);
 }
 
+.template-toolbar-workout,
+.filter-toolbar-workouts {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-overlay-subtle);
+}
+
 .template-name-field {
   flex: 1 1 auto;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .filter-toolbar {
@@ -619,6 +664,15 @@
   box-shadow: var(--shadow-soft);
 }
 
+.weekly-average-card-weight {
+  border-radius: 22px;
+}
+
+.weekly-average-copy {
+  display: grid;
+  gap: 6px;
+}
+
 .weekly-average-meta {
   display: grid;
   gap: 6px;
@@ -641,6 +695,17 @@
   grid-template-columns: minmax(360px, 540px) minmax(0, 1fr);
 }
 
+.workout-flow-stack {
+  gap: 24px;
+}
+
+.weight-form-panel {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface-overlay-subtle);
+}
+
 .admin-grid {
   grid-template-columns: 1fr;
 }
@@ -656,6 +721,18 @@
   width: 100%;
   border-collapse: collapse;
   min-width: 900px;
+}
+
+.admin-row {
+  transition: background-color 0.16s ease;
+}
+
+.admin-row:hover {
+  background: var(--surface-overlay-subtle);
+}
+
+.admin-row-updating {
+  opacity: 0.78;
 }
 
 .admin-table th,
@@ -683,9 +760,28 @@
   font-weight: 700;
 }
 
+.admin-user-cell {
+  display: grid;
+  gap: 4px;
+}
+
 .admin-select-label {
   display: block;
   min-width: 120px;
+}
+
+.admin-field-hint {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-select {
+  min-width: 136px;
 }
 
 .status-pill {
@@ -697,16 +793,19 @@
   border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 700;
+  border: 1px solid transparent;
 }
 
 .status-pill-active {
   background: var(--success-soft);
   color: var(--success);
+  border-color: var(--success-border);
 }
 
 .status-pill-inactive {
   background: var(--danger-soft);
   color: var(--danger);
+  border-color: var(--danger-border);
 }
 
 .sr-only {
@@ -741,6 +840,13 @@
   background: var(--surface-overlay-muted);
 }
 
+.profile-form-panel {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface-overlay-subtle);
+}
+
 .muted-note {
   color: var(--muted);
 }
@@ -770,6 +876,15 @@
 .entry-actions {
   display: flex;
   gap: 10px;
+}
+
+.entry-card-weight {
+  border-radius: 22px;
+}
+
+.entry-primary {
+  display: grid;
+  gap: 6px;
 }
 
 .empty-state {
@@ -855,12 +970,25 @@
 }
 
 .exercise-filter-card {
+  display: grid;
+  gap: 16px;
   max-width: 360px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface-overlay-subtle);
 }
 
 .exercise-builder {
   display: grid;
   gap: 16px;
+}
+
+.exercise-builder-emphasis {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface-overlay-subtle);
 }
 
 .section-title-row,
@@ -903,6 +1031,29 @@
   box-shadow: var(--shadow-soft);
 }
 
+.exercise-card {
+  display: grid;
+  gap: 18px;
+  background:
+    linear-gradient(180deg, var(--surface-overlay-subtle), transparent),
+    var(--card-bg);
+}
+
+.exercise-card-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.exercise-card-footer {
+  display: flex;
+  justify-content: flex-start;
+  padding-top: 4px;
+}
+
+.add-set-footer-button {
+  min-width: 160px;
+}
+
 .exercise-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -931,23 +1082,25 @@
 
 .workout-notes {
   margin: 14px 0;
+  color: var(--text);
 }
 
 .set-list {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   margin-top: 14px;
 }
 
 .set-card {
   display: grid;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: 12px;
+  padding: 13px 14px;
   border: 1px solid var(--set-card-border);
   border-radius: 18px;
   background:
     linear-gradient(180deg, var(--set-card-gradient-start), var(--set-card-gradient-end)),
     var(--surface-muted);
+  box-shadow: inset 0 1px 0 var(--overlay-border-light);
 }
 
 .set-card-header {
@@ -957,8 +1110,28 @@
   gap: 12px;
 }
 
+.set-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .set-card-header strong {
   color: var(--text-strong);
+  font-size: 0.98rem;
+}
+
+.set-index-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--accent-surface-strong);
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .exercise-summary-item {
@@ -969,6 +1142,7 @@
   padding: 12px 14px;
   border-radius: 14px;
   background: var(--surface-overlay-strong);
+  border: 1px solid var(--border);
 }
 
 .exercise-summary-copy,
@@ -1214,6 +1388,7 @@
   .panel-header,
   .template-toolbar,
   .filter-toolbar,
+  .toolbar-actions,
   .section-title-row,
   .exercise-card-header,
   .workout-card-header,
@@ -1244,8 +1419,20 @@
     flex: 1 1 0;
   }
 
+  .toolbar-actions button {
+    flex: 1 1 0;
+  }
+
   .entry-actions {
     width: 100%;
+  }
+
+  .profile-form-panel {
+    padding: 16px;
+  }
+
+  .weight-form-panel {
+    padding: 16px;
   }
 
   .entry-actions button {

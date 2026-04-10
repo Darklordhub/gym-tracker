@@ -656,7 +656,7 @@ export function WorkoutsPage() {
             <StateCard title="Loading active workout" description="Checking whether you already have a session in progress." loading />
           ) : activeSession ? (
             <>
-              <div className="session-banner">
+              <div className="session-banner session-banner-prominent">
                 <div className="session-banner-copy">
                   <span className="pr-badge">In Progress</span>
                   <span className="record-hint">Started on {formatDate(activeSession.startedAtUtc)}</span>
@@ -671,7 +671,7 @@ export function WorkoutsPage() {
                 </div>
               </div>
 
-              <div className="weight-form">
+              <div className="weight-form workout-flow-stack">
                 <label className="field">
                   <span>Notes</span>
                   <textarea
@@ -685,10 +685,11 @@ export function WorkoutsPage() {
                     }
                     aria-invalid={Boolean(activeErrors.notes)}
                   />
+                  <small>Use notes for cues like tempo, intensity, or anything you want to remember before saving.</small>
                   {activeErrors.notes ? <small className="field-error">{activeErrors.notes}</small> : null}
                 </label>
 
-                <div className="exercise-builder">
+                <div className="exercise-builder exercise-builder-emphasis">
                   <div className="section-title-row">
                     <div>
                       <h3>Session exercises</h3>
@@ -714,6 +715,7 @@ export function WorkoutsPage() {
                         <ExerciseEditorCard
                           key={`active-${exerciseIndex}`}
                           title={`Exercise ${exerciseIndex + 1}`}
+                          sectionLabel="Active session"
                           exercise={exercise}
                           errors={activeErrors.exercises[exerciseIndex]}
                           workouts={workouts}
@@ -732,7 +734,7 @@ export function WorkoutsPage() {
                   )}
                 </div>
 
-                <div className="action-row">
+                <div className="action-row action-row-prominent">
                   <button
                     type="button"
                     className="ghost-button"
@@ -753,7 +755,7 @@ export function WorkoutsPage() {
               </div>
             </>
           ) : (
-            <div className="start-workout-stack">
+            <div className="start-workout-stack workout-empty-state">
               <StateCard
                 title="No active workout"
                 description="Start from scratch here, or start from one of your saved templates."
@@ -812,7 +814,7 @@ export function WorkoutsPage() {
                     ))}
                   </div>
 
-                  <div className="action-row">
+                  <div className="action-row action-row-inline">
                     <button
                       type="button"
                       className="ghost-button"
@@ -845,7 +847,7 @@ export function WorkoutsPage() {
             </div>
           </div>
 
-          <div className="template-toolbar">
+          <div className="template-toolbar template-toolbar-workout">
             <label className="field template-name-field">
               <span>Save current structure as template</span>
               <input
@@ -858,21 +860,23 @@ export function WorkoutsPage() {
               {templateErrors.name ? <small className="field-error">{templateErrors.name}</small> : null}
             </label>
 
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => void handleSaveTemplate()}
-              disabled={isSavingTemplate}
-            >
-              {isSavingTemplate ? 'Saving...' : 'Save as template'}
-            </button>
+            <div className="toolbar-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => void handleSaveTemplate()}
+                disabled={isSavingTemplate}
+              >
+                {isSavingTemplate ? 'Saving...' : 'Save as template'}
+              </button>
 
-            <button type="button" className="ghost-button" onClick={resetQuickLogForm} disabled={isSaving}>
-              Clear form
-            </button>
+              <button type="button" className="ghost-button" onClick={resetQuickLogForm} disabled={isSaving}>
+                Clear form
+              </button>
+            </div>
           </div>
 
-          <form className="weight-form" onSubmit={handleQuickLogSubmit} noValidate>
+          <form className="weight-form workout-flow-stack" onSubmit={handleQuickLogSubmit} noValidate>
             <label className="field">
               <span>Date</span>
               <input
@@ -899,6 +903,7 @@ export function WorkoutsPage() {
                 }
                 aria-invalid={Boolean(quickLogErrors.notes)}
               />
+              <small>Optional notes help add context before this workout goes into history.</small>
               {quickLogErrors.notes ? <small className="field-error">{quickLogErrors.notes}</small> : null}
             </label>
 
@@ -922,6 +927,7 @@ export function WorkoutsPage() {
                   <ExerciseEditorCard
                     key={`quick-${exerciseIndex}`}
                     title={`Exercise ${exerciseIndex + 1}`}
+                    sectionLabel="Quick log"
                     exercise={exercise}
                     errors={quickLogErrors.exercises[exerciseIndex]}
                     workouts={workouts}
@@ -943,9 +949,11 @@ export function WorkoutsPage() {
               </div>
             </div>
 
-            <button type="submit" className="primary-button" disabled={isSaving}>
-              {isSaving ? 'Saving...' : 'Save workout'}
-            </button>
+            <div className="action-row action-row-prominent">
+              <button type="submit" className="primary-button" disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save workout'}
+              </button>
+            </div>
           </form>
         </div>
 
@@ -989,7 +997,7 @@ export function WorkoutsPage() {
             </div>
           </div>
 
-          <div className="filter-toolbar">
+          <div className="filter-toolbar filter-toolbar-workouts">
             <label className="field filter-field search-field">
               <span>Search exercises or notes</span>
               <input
@@ -1090,6 +1098,7 @@ function describeSets(
 
 function ExerciseEditorCard({
   title,
+  sectionLabel,
   exercise,
   errors,
   workouts,
@@ -1100,6 +1109,7 @@ function ExerciseEditorCard({
   onRemoveExercise,
 }: {
   title: string
+  sectionLabel: string
   exercise: ExerciseFormState
   errors?: ExerciseFieldErrors
   workouts: Workout[]
@@ -1112,9 +1122,12 @@ function ExerciseEditorCard({
   return (
     <div className="exercise-card">
       <div className="exercise-card-header">
-        <h3>{title}</h3>
+        <div className="exercise-card-heading">
+          <span className="stat-label">{sectionLabel}</span>
+          <h3>{title}</h3>
+        </div>
         {onRemoveExercise ? (
-          <button type="button" className="danger-button" onClick={onRemoveExercise}>
+          <button type="button" className="ghost-button subtle-danger-button compact-button" onClick={onRemoveExercise}>
             Remove exercise
           </button>
         ) : null}
@@ -1136,9 +1149,9 @@ function ExerciseEditorCard({
       <div className="section-title-row compact-row">
         <div>
           <h3>Sets</h3>
-          <p>Track reps and load for each working set.</p>
+          <p>Track reps and load, then keep moving with quick add.</p>
         </div>
-        <button type="button" className="ghost-button" onClick={onAddSet}>
+        <button type="button" className="ghost-button compact-button" onClick={onAddSet}>
           Add set
         </button>
       </div>
@@ -1149,12 +1162,17 @@ function ExerciseEditorCard({
         {exercise.sets.map((set, setIndex) => (
           <div key={setIndex} className="set-card">
             <div className="set-card-header">
-              <div>
+              <div className="set-card-title">
+                <span className="set-index-badge">{setIndex + 1}</span>
                 <strong>Set {setIndex + 1}</strong>
               </div>
               {exercise.sets.length > 1 ? (
-                <button type="button" className="danger-button" onClick={() => onRemoveSet(setIndex)}>
-                  Remove set
+                <button
+                  type="button"
+                  className="ghost-button subtle-danger-button compact-button"
+                  onClick={() => onRemoveSet(setIndex)}
+                >
+                  Remove
                 </button>
               ) : null}
             </div>
@@ -1204,6 +1222,12 @@ function ExerciseEditorCard({
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="exercise-card-footer">
+        <button type="button" className="ghost-button compact-button add-set-footer-button" onClick={onAddSet}>
+          Add another set
+        </button>
       </div>
     </div>
   )

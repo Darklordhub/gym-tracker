@@ -81,7 +81,7 @@ export function AdminPage() {
           <span className="eyebrow">Admin</span>
           <h1>User Management</h1>
           <p className="hero-text">
-            Review user accounts, manage roles, and activate or deactivate access.
+            Review user accounts, confirm access levels, and activate or deactivate access from one place.
           </p>
         </div>
 
@@ -114,12 +114,16 @@ export function AdminPage() {
           <div className="panel-header">
             <div>
               <h2>Users</h2>
-              <p>Basic user administration with role and account status controls.</p>
+              <p>Manage account role and access status while keeping the current admin safeguards intact.</p>
             </div>
           </div>
 
-          {successMessage ? <p className="feedback success">{successMessage}</p> : null}
-          {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
+          {successMessage || errorMessage ? (
+            <div className="feedback-stack">
+              {successMessage ? <p className="feedback success">{successMessage}</p> : null}
+              {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
+            </div>
+          ) : null}
 
           {isLoading ? (
             <StateCard title="Loading users" description="Fetching current user accounts." loading />
@@ -152,15 +156,21 @@ export function AdminPage() {
                     const isUpdating = isRoleUpdating || isStatusUpdating
 
                     return (
-                      <tr key={user.id}>
-                        <td className="admin-cell-strong">{user.email}</td>
+                      <tr key={user.id} className={isUpdating ? 'admin-row admin-row-updating' : 'admin-row'}>
+                        <td className="admin-cell-strong">
+                          <div className="admin-user-cell">
+                            <strong>{user.email}</strong>
+                            <span className="record-hint">Created {formatDate(user.createdAt)}</span>
+                          </div>
+                        </td>
                         <td>{user.fullName || 'Not set'}</td>
                         <td>{user.displayName || 'Not set'}</td>
                         <td>
                           <label className="admin-select-label">
                             <span className="sr-only">Role for {user.email}</span>
+                            <span className="admin-field-hint">Role</span>
                             <select
-                              className="select-input"
+                              className="select-input admin-select"
                               value={user.role}
                               disabled={isUpdating}
                               onChange={(event) =>
@@ -177,11 +187,11 @@ export function AdminPage() {
                             {user.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td>{formatDate(user.createdAt)}</td>
+                        <td className="record-hint">{formatDate(user.createdAt)}</td>
                         <td>
                           <button
                             type="button"
-                            className={user.isActive ? 'danger-button' : 'ghost-button'}
+                            className={user.isActive ? 'ghost-button subtle-danger-button' : 'ghost-button'}
                             disabled={isUpdating}
                             onClick={() => void handleStatusToggle(user.id, !user.isActive)}
                           >

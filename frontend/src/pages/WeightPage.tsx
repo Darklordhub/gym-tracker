@@ -252,7 +252,11 @@ export function WeightPage() {
           <div className="panel-header">
             <div>
               <h2>{editingId === null ? 'Add entry' : 'Edit entry'}</h2>
-              <p>{editingId === null ? 'Save a new weigh-in.' : 'Update the selected weigh-in.'}</p>
+              <p>
+                {editingId === null
+                  ? 'Save a new weigh-in with the exact date and body weight.'
+                  : 'Update the selected weigh-in and keep your trend accurate.'}
+              </p>
             </div>
             {editingId !== null ? (
               <button type="button" className="ghost-button" onClick={resetForm}>
@@ -261,7 +265,7 @@ export function WeightPage() {
             ) : null}
           </div>
 
-          <form className="weight-form" onSubmit={handleSubmit} noValidate>
+          <form className="weight-form weight-form-panel" onSubmit={handleSubmit} noValidate>
             <div className="form-grid">
               <label className="field">
                 <span>Date</span>
@@ -295,20 +299,26 @@ export function WeightPage() {
               </label>
             </div>
 
-            <button type="submit" className="primary-button" disabled={isSaving}>
-              {isSaving ? 'Saving...' : editingId === null ? 'Add entry' : 'Save changes'}
-            </button>
+            <div className="action-row action-row-prominent">
+              <button type="submit" className="primary-button" disabled={isSaving}>
+                {isSaving ? 'Saving...' : editingId === null ? 'Add entry' : 'Save changes'}
+              </button>
+            </div>
           </form>
 
-          {feedback ? <p className="feedback success">{feedback}</p> : null}
-          {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
+          {feedback || errorMessage ? (
+            <div className="feedback-stack">
+              {feedback ? <p className="feedback success">{feedback}</p> : null}
+              {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="panel">
           <div className="panel-header">
             <div>
               <h2>Progress</h2>
-              <p>Body weight over time.</p>
+              <p>Body weight over time with a quick start, current point, and net change summary.</p>
             </div>
           </div>
 
@@ -330,7 +340,7 @@ export function WeightPage() {
           <div className="panel-header">
             <div>
               <h2>Weekly averages</h2>
-              <p>Average body weight grouped by week.</p>
+              <p>Average body weight grouped by week so short-term fluctuations are easier to read.</p>
             </div>
           </div>
 
@@ -351,8 +361,8 @@ export function WeightPage() {
                     : null
 
                 return (
-                  <article key={week.weekKey} className="weekly-average-card" role="listitem">
-                    <div>
+                  <article key={week.weekKey} className="weekly-average-card weekly-average-card-weight" role="listitem">
+                    <div className="weekly-average-copy">
                       <p className="entry-date">{week.label}</p>
                       <strong className="entry-weight">{week.averageWeightKg} kg</strong>
                     </div>
@@ -375,7 +385,7 @@ export function WeightPage() {
           <div className="panel-header">
             <div>
               <h2>History</h2>
-              <p>Newest entries first. Edit or remove any incorrect weigh-in from here.</p>
+              <p>Newest entries first. Review, edit, or remove incorrect weigh-ins from here.</p>
             </div>
           </div>
 
@@ -389,8 +399,8 @@ export function WeightPage() {
           ) : (
             <div className="entry-list" role="list">
               {entries.map((entry) => (
-                <article key={entry.id} className="entry-card" role="listitem">
-                  <div>
+                <article key={entry.id} className="entry-card entry-card-weight" role="listitem">
+                  <div className="entry-primary">
                     <p className="entry-date">{formatDate(entry.date)}</p>
                     <strong className="entry-weight">{entry.weightKg} kg</strong>
                   </div>
@@ -398,7 +408,7 @@ export function WeightPage() {
                     <button type="button" className="ghost-button" onClick={() => startEdit(entry)}>
                       Edit
                     </button>
-                    <button type="button" className="danger-button" onClick={() => handleDelete(entry)}>
+                    <button type="button" className="ghost-button subtle-danger-button" onClick={() => handleDelete(entry)}>
                       Delete
                     </button>
                   </div>

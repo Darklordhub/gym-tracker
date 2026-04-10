@@ -151,7 +151,7 @@ export function ProfilePage() {
           <span className="eyebrow">Account</span>
           <h1>Profile</h1>
           <p className="hero-text">
-            Review your account details, keep your personal profile current, and manage your password.
+            Keep your personal details current, confirm what the app shows about you, and manage your password in one place.
           </p>
         </div>
 
@@ -192,11 +192,15 @@ export function ProfilePage() {
             <div className="panel-header">
               <div>
                 <h2>Personal Details</h2>
-                <p>Update the profile information tied to your account.</p>
+                <p>Update the personal information tied to your account. Sign-in email stays read-only.</p>
               </div>
             </div>
 
-            <form className="weight-form" onSubmit={handleProfileSubmit}>
+            <form className="weight-form profile-form-panel" onSubmit={handleProfileSubmit}>
+              <p className="section-note">
+                Full name is required. Everything else here is optional and can be updated later.
+              </p>
+
               <div className="form-grid">
                 <label className="field field-span-2">
                   <span>Email</span>
@@ -215,6 +219,7 @@ export function ProfilePage() {
                     }
                     required
                   />
+                  <small>Used as your primary account identity.</small>
                 </label>
 
                 <label className="field">
@@ -279,15 +284,19 @@ export function ProfilePage() {
               </div>
             </form>
 
-            {profileMessage ? <p className="feedback success">{profileMessage}</p> : null}
-            {profileError ? <p className="feedback error">{profileError}</p> : null}
+            {profileMessage || profileError ? (
+              <div className="feedback-stack">
+                {profileMessage ? <p className="feedback success">{profileMessage}</p> : null}
+                {profileError ? <p className="feedback error">{profileError}</p> : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="panel">
             <div className="panel-header">
               <div>
                 <h2>Security</h2>
-                <p>Change your password without affecting the rest of the app.</p>
+                <p>Change your password here without affecting the rest of your profile information.</p>
               </div>
             </div>
 
@@ -302,7 +311,11 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <form className="weight-form" onSubmit={handlePasswordSubmit}>
+            <form className="weight-form profile-form-panel" onSubmit={handlePasswordSubmit}>
+              <p className="section-note">
+                Use a password you do not reuse elsewhere and confirm it before saving.
+              </p>
+
               <label className="field">
                 <span>Current password</span>
                 <input
@@ -315,6 +328,7 @@ export function ProfilePage() {
                   minLength={8}
                   required
                 />
+                <small>Enter your current password before choosing a new one.</small>
               </label>
 
               <label className="field">
@@ -329,6 +343,7 @@ export function ProfilePage() {
                   minLength={8}
                   required
                 />
+                <small>Choose at least 8 characters.</small>
               </label>
 
               <label className="field">
@@ -356,8 +371,12 @@ export function ProfilePage() {
               </div>
             </form>
 
-            {passwordMessage ? <p className="feedback success">{passwordMessage}</p> : null}
-            {passwordError ? <p className="feedback error">{passwordError}</p> : null}
+            {passwordMessage || passwordError ? (
+              <div className="feedback-stack">
+                {passwordMessage ? <p className="feedback success">{passwordMessage}</p> : null}
+                {passwordError ? <p className="feedback error">{passwordError}</p> : null}
+              </div>
+            ) : null}
           </div>
         </section>
       )}
