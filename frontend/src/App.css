@@ -32,6 +32,10 @@
   min-width: 0;
 }
 
+.mobile-nav-toggle {
+  display: none;
+}
+
 .brand-kicker {
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -1479,6 +1483,10 @@
     width: 100%;
   }
 
+  .mobile-nav-toggle {
+    display: none;
+  }
+
   .main-nav-shell {
     width: 100%;
   }
@@ -1512,27 +1520,45 @@
   }
 
   .main-nav-shell {
-    width: calc(100% + 4px);
-    margin: 0 -2px;
-    padding: 0 2px 6px;
-    scroll-snap-type: x proximity;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
   }
 
   .main-nav-shell .main-nav {
-    padding: 6px;
-    gap: 8px;
-    border-radius: 18px;
+    display: none;
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+    gap: 10px;
+    border-radius: 20px;
+    background: var(--surface-overlay-emphasis);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .main-nav-shell .main-nav-mobile-open {
+    display: grid;
   }
 
   .nav-link {
-    padding: 10px 14px;
+    width: 100%;
+    padding: 12px 14px;
     min-height: 46px;
     font-size: 0.95rem;
-    scroll-snap-align: start;
+    justify-content: flex-start;
   }
 
   .nav-link-active {
     box-shadow: var(--shadow-soft);
+  }
+
+  .mobile-nav-toggle {
+    display: inline-flex;
+    width: 100%;
+    min-height: 46px;
+    justify-content: center;
+    margin-bottom: 10px;
   }
 
   .account-chip {

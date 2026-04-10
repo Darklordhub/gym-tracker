@@ -111,9 +111,15 @@ function AppLayout({
   onToggleTheme: () => void
 }) {
   const { authState, logout } = useAuth()
+  const location = useLocation()
   const accountLabel = authState?.user.displayName || authState?.user.fullName || authState?.user.email
   const isAdmin = authState?.user.role === 'Admin'
   const navItems = isAdmin ? [...primaryNavItems, { to: '/admin', label: 'Admin' as const }] : primaryNavItems
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
+
+  useEffect(() => {
+    setIsMobileNavOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="app-shell">
@@ -146,8 +152,21 @@ function AppLayout({
         </div>
 
         <div className="header-actions">
+          <button
+            type="button"
+            className="ghost-button mobile-nav-toggle"
+            aria-expanded={isMobileNavOpen}
+            aria-controls="primary-navigation"
+            onClick={() => setIsMobileNavOpen((current) => !current)}
+          >
+            {isMobileNavOpen ? 'Close menu' : 'Open menu'}
+          </button>
+
           <nav className="main-nav-shell" aria-label="Primary">
-            <div className="main-nav">
+            <div
+              id="primary-navigation"
+              className={isMobileNavOpen ? 'main-nav main-nav-mobile-open' : 'main-nav'}
+            >
               {navItems.map((item) => (
                 <NavLink
                   key={item.to}
