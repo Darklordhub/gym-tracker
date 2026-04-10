@@ -539,6 +539,74 @@
   margin-top: 0;
 }
 
+.assistant-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.assistant-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-soft);
+}
+
+.assistant-card-highlight {
+  background:
+    linear-gradient(180deg, var(--surface-overlay-subtle), transparent),
+    var(--surface-overlay);
+}
+
+.assistant-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.assistant-card p {
+  margin: 0;
+  color: var(--text);
+}
+
+.assistant-list {
+  display: grid;
+  gap: 10px;
+}
+
+.assistant-list-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-overlay-muted);
+}
+
+.assistant-list-item strong {
+  color: var(--text-strong);
+}
+
+.assistant-list-item span {
+  color: var(--muted);
+}
+
+.workout-assistant-card {
+  margin-bottom: 20px;
+}
+
+.suggestion-callout {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
 .session-banner {
   display: flex;
   justify-content: space-between;
@@ -1440,11 +1508,16 @@
     grid-template-columns: 1fr;
   }
 
+  .assistant-grid {
+    grid-template-columns: 1fr;
+  }
+
   .entry-card,
   .weekly-average-card,
   .state-card,
   .session-banner,
   .panel-header,
+  .assistant-card-header,
   .template-toolbar,
   .filter-toolbar,
   .toolbar-actions,
@@ -1696,6 +1769,7 @@
   .stat-card,
   .dashboard-highlight-card,
   .dashboard-metric-card,
+  .assistant-card,
   .goal-progress-card,
   .exercise-card,
   .workout-card,

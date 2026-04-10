@@ -3,6 +3,7 @@ import { fetchGoals, updateGoals } from '../api/goals'
 import { fetchWeightEntries } from '../api/weightEntries'
 import { fetchWorkouts } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
+import { getWorkoutAssistantInsight } from '../lib/exerciseSuggestions'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { GoalSettings, GoalSettingsPayload } from '../types/goals'
@@ -97,6 +98,11 @@ export function DashboardPage() {
       weeklyWorkoutGoalProgress,
     }
   }, [goals, weightEntries, workouts])
+
+  const assistantInsight = useMemo(
+    () => getWorkoutAssistantInsight(workouts, goals),
+    [goals, workouts],
+  )
 
   async function loadDashboard() {
     try {
@@ -374,6 +380,74 @@ export function DashboardPage() {
                 </strong>
                 <span className="stat-subtext">Average of this week&apos;s weigh-ins</span>
               </div>
+            </div>
+          )}
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Workout assistant</h2>
+              <p>Simple coaching cues based on your logged history and weekly goal.</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <StateCard
+              title="Loading suggestions"
+              description="Reviewing recent training patterns and weekly progress."
+              loading
+            />
+          ) : errorMessage ? (
+            <StateCard title="Suggestions unavailable" description={errorMessage} tone="error" />
+          ) : (
+            <div className="assistant-grid">
+              <article className="assistant-card assistant-card-highlight">
+                <span className="stat-label">Consistency nudge</span>
+                <strong>Weekly focus</strong>
+                <p>{assistantInsight.weeklyNudge}</p>
+                <span className="record-hint">Based on your current weekly workout target.</span>
+              </article>
+
+              <article className="assistant-card">
+                <span className="stat-label">PR opportunity</span>
+                <strong>
+                  {assistantInsight.prOpportunity
+                    ? assistantInsight.prOpportunity.exerciseName
+                    : 'No clear push today'}
+                </strong>
+                <p>
+                  {assistantInsight.prOpportunity
+                    ? assistantInsight.prOpportunity.message
+                    : 'Build another few sessions before pushing for a heavier top set.'}
+                </p>
+                <span className="record-hint">
+                  {assistantInsight.prOpportunity?.targetWeightKg
+                    ? `Suggested target: ${assistantInsight.prOpportunity.targetWeightKg} kg`
+                    : 'Suggestions use recent logged sets rather than fixed programming.'}
+                </span>
+              </article>
+
+              <article className="assistant-card">
+                <span className="stat-label">Revisit next</span>
+                <strong>
+                  {assistantInsight.revisitSuggestions.length === 0
+                    ? 'No overdue exercises'
+                    : `${assistantInsight.revisitSuggestions.length} exercise suggestions`}
+                </strong>
+                {assistantInsight.revisitSuggestions.length === 0 ? (
+                  <p>You have touched your recent exercise rotation enough to avoid obvious gaps.</p>
+                ) : (
+                  <div className="assistant-list">
+                    {assistantInsight.revisitSuggestions.map((suggestion) => (
+                      <div key={`${suggestion.exerciseName}-${suggestion.lastTrainedAt}`} className="assistant-list-item">
+                        <strong>{suggestion.exerciseName}</strong>
+                        <span>{suggestion.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
             </div>
           )}
         </div>

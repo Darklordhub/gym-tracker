@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { fetchGoals } from '../api/goals'
 import {
   completeActiveWorkoutSession,
   createWorkout,
@@ -10,9 +11,10 @@ import {
   updateActiveWorkoutSession,
 } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
+import { getWorkoutAssistantInsight, getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { formatDate, getTodayDateValue } from '../lib/format'
-import { getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { getRequestErrorMessage } from '../lib/http'
+import type { GoalSettings } from '../types/goals'
 import type {
   ActiveWorkoutSession,
   ExerciseEntryPayload,
@@ -199,6 +201,7 @@ function mapTemplateToForm(template: WorkoutTemplate): WorkoutFormState {
 export function WorkoutsPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
+  const [goals, setGoals] = useState<GoalSettings | null>(null)
   const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null)
   const [activeForm, setActiveForm] = useState<WorkoutFormState>(initialActiveFormState)
   const [activeErrors, setActiveErrors] = useState<WorkoutFormErrors>({ exercises: [] })
@@ -298,19 +301,26 @@ export function WorkoutsPage() {
     }
   }, [activeForm.exerciseEntries])
 
+  const assistantInsight = useMemo(
+    () => getWorkoutAssistantInsight(workouts, goals),
+    [goals, workouts],
+  )
+
   async function loadData() {
     try {
       setIsLoading(true)
       setErrorMessage(null)
 
-      const [workoutData, templateData, currentActiveSession] = await Promise.all([
+      const [workoutData, templateData, currentActiveSession, goalData] = await Promise.all([
         fetchWorkouts(),
         fetchWorkoutTemplates(),
         fetchActiveWorkoutSession(),
+        fetchGoals().catch(() => null),
       ])
 
       setWorkouts(workoutData)
       setTemplates(templateData)
+      setGoals(goalData)
       setActiveSession(currentActiveSession)
       setActiveForm(currentActiveSession ? mapSessionToForm(currentActiveSession) : initialActiveFormState())
     } catch (error) {
@@ -783,6 +793,48 @@ export function WorkoutsPage() {
             </div>
           </div>
 
+          {!isLoading && !errorMessage ? (
+            <div className="assistant-card workout-assistant-card">
+              <div className="assistant-card-header">
+                <div>
+                  <span className="stat-label">Workout assistant</span>
+                  <strong>What to focus on next</strong>
+                </div>
+                <span className="record-hint">Heuristic guidance</span>
+              </div>
+
+              <div className="assistant-list">
+                <div className="assistant-list-item">
+                  <strong>Weekly consistency</strong>
+                  <span>{assistantInsight.weeklyNudge}</span>
+                </div>
+
+                <div className="assistant-list-item">
+                  <strong>
+                    {assistantInsight.prOpportunity
+                      ? `${assistantInsight.prOpportunity.exerciseName} PR window`
+                      : 'No immediate PR push'}
+                  </strong>
+                  <span>
+                    {assistantInsight.prOpportunity
+                      ? `${assistantInsight.prOpportunity.message}${assistantInsight.prOpportunity.targetWeightKg ? ` Target ${assistantInsight.prOpportunity.targetWeightKg} kg.` : ''}`
+                      : 'Let the next few sessions confirm momentum before pushing heavier sets.'}
+                  </span>
+                </div>
+
+                <div className="assistant-list-item">
+                  <strong>
+                    {assistantInsight.revisitSuggestions[0]?.exerciseName ?? 'Exercise rotation looks current'}
+                  </strong>
+                  <span>
+                    {assistantInsight.revisitSuggestions[0]?.message ??
+                      'Nothing stands out as overdue from your recent history.'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {isLoading ? (
             <StateCard title="Loading templates" description="Fetching your saved workout structures." loading />
           ) : templates.length === 0 ? (
@@ -1253,6 +1305,20 @@ function ExerciseSuggestionNotice({
       <span className="stat-label">Next Weight Suggestion</span>
       <strong>{suggestion.suggestedWeightKg} kg</strong>
       <span className="stat-subtext">{suggestion.reason}</span>
+      {suggestion.confidenceLabel ? (
+        <span className="record-hint">Confidence: {suggestion.confidenceLabel}</span>
+      ) : null}
+      {suggestion.prOpportunity ? (
+        <div className="suggestion-callout">
+          <span className="pr-badge">PR window</span>
+          <span className="stat-subtext">
+            {suggestion.prOpportunity.message}
+            {suggestion.prOpportunity.targetWeightKg
+              ? ` Target ${suggestion.prOpportunity.targetWeightKg} kg.`
+              : ''}
+          </span>
+        </div>
+      ) : null}
     </div>
   )
 }
