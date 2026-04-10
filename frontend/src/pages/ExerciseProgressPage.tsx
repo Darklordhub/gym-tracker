@@ -100,22 +100,51 @@ export function ExerciseProgressPage() {
     })
   }, [history, historyDateFrom, historyDateTo])
 
-  const stats = useMemo(() => {
-    const latest = filteredHistory.at(-1)
-    const first = filteredHistory[0]
-    const heaviest = filteredHistory.reduce<ExerciseHistoryEntry | null>(
-      (current, entry) => (!current || entry.weightKg > current.weightKg ? entry : current),
+  const exerciseSummary = useMemo(() => {
+    const source = filteredHistory.length > 0 ? filteredHistory : history
+    const latest = source.at(-1) ?? null
+    const best = source.reduce<ExerciseHistoryEntry | null>(
+      (current, entry) =>
+        !current ||
+        entry.weightKg > current.weightKg ||
+        (entry.weightKg === current.weightKg && entry.reps > current.reps)
+          ? entry
+          : current,
       null,
     )
+    const sessionCount = new Set(source.map((entry) => entry.workoutId)).size
+    const recentWindow = source.slice(-4)
+    const previousWindow = source.slice(-8, -4)
+    const recentAverage =
+      recentWindow.length > 0
+        ? Number(
+            (
+              recentWindow.reduce((sum, entry) => sum + entry.weightKg, 0) / recentWindow.length
+            ).toFixed(1),
+          )
+        : null
+    const previousAverage =
+      previousWindow.length > 0
+        ? Number(
+            (
+              previousWindow.reduce((sum, entry) => sum + entry.weightKg, 0) / previousWindow.length
+            ).toFixed(1),
+          )
+        : null
 
     return {
-      totalEntries: filteredHistory.length,
       latest,
-      first,
-      heaviest,
-      change: latest && first ? Number((latest.weightKg - first.weightKg).toFixed(1)) : null,
+      best,
+      sessionCount,
+      totalSets: source.length,
+      firstLoggedAt: source[0]?.date ?? null,
+      recentAverage,
+      recentTrendDelta:
+        recentAverage !== null && previousAverage !== null
+          ? Number((recentAverage - previousAverage).toFixed(1))
+          : null,
     }
-  }, [filteredHistory])
+  }, [filteredHistory, history])
 
   const suggestion = useMemo(() => {
     if (!selectedExercise) {
@@ -152,11 +181,15 @@ export function ExerciseProgressPage() {
           <span className="eyebrow">Gym Tracker</span>
           <h1>Exercise Progress</h1>
           <p className="hero-text">
-            Pick one exercise and inspect every logged set across time, including your best lift and trend line.
+            Pick an exercise and review recent performance, best lift, trend direction, and set history in one place.
           </p>
         </div>
 
         <div className="exercise-filter-card">
+          <p className="section-note">
+            Search first if your list is long, then select one movement to focus the chart and history below.
+          </p>
+
           <label className="field">
             <span>Search exercise</span>
             <input
@@ -191,32 +224,83 @@ export function ExerciseProgressPage() {
 
         <div className="stats-grid">
           <article className="stat-card">
-            <span className="stat-label">Sets</span>
-            <strong>{stats.totalEntries}</strong>
-            <span className="stat-subtext">Logged sets for this exercise</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Latest</span>
-            <strong>{stats.latest ? `${stats.latest.weightKg} kg` : 'No data'}</strong>
+            <span className="stat-label">Selected Exercise</span>
+            <strong>{selectedExercise || 'None selected'}</strong>
             <span className="stat-subtext">
-              {stats.latest ? `Set ${stats.latest.setOrder} on ${formatDate(stats.latest.date)}` : 'Select an exercise'}
+              {selectedExercise
+                ? `${exerciseSummary.sessionCount} logged session${exerciseSummary.sessionCount === 1 ? '' : 's'}`
+                : 'Choose an exercise to begin'}
             </span>
           </article>
           <article className="stat-card">
-            <span className="stat-label">Heaviest</span>
-            <strong>{stats.heaviest ? `${stats.heaviest.weightKg} kg` : 'No data'}</strong>
+            <span className="stat-label">Last Logged Weight</span>
+            <strong>{exerciseSummary.latest ? `${exerciseSummary.latest.weightKg} kg` : 'No data'}</strong>
             <span className="stat-subtext">
-              {stats.change === null ? 'Need at least one set' : `${stats.change > 0 ? '+' : ''}${stats.change} kg since first log`}
+              {exerciseSummary.latest
+                ? `Set ${exerciseSummary.latest.setOrder} on ${formatDate(exerciseSummary.latest.date)}`
+                : 'Select an exercise'}
+            </span>
+          </article>
+          <article className="stat-card">
+            <span className="stat-label">Personal Best</span>
+            <strong>{exerciseSummary.best ? `${exerciseSummary.best.weightKg} kg` : 'No data'}</strong>
+            <span className="stat-subtext">
+              {exerciseSummary.best
+                ? `${exerciseSummary.best.reps} reps on ${formatDate(exerciseSummary.best.date)}`
+                : 'Need at least one set'}
+            </span>
+          </article>
+          <article className="stat-card">
+            <span className="stat-label">Recent Trend</span>
+            <strong className={getTrendClassName(exerciseSummary.recentTrendDelta)}>
+              {formatTrendLabel(exerciseSummary.recentTrendDelta)}
+            </strong>
+            <span className="stat-subtext">
+              {exerciseSummary.recentTrendDelta === null
+                ? 'Need more recent logs to compare windows'
+                : `${exerciseSummary.recentTrendDelta > 0 ? '+' : ''}${exerciseSummary.recentTrendDelta} kg vs previous recent average`}
             </span>
           </article>
         </div>
 
-        <div className="suggestion-card hero-suggestion-card">
-          <span className="stat-label">Suggested Next Weight</span>
-          <strong>{suggestion ? `${suggestion.suggestedWeightKg} kg` : 'No suggestion yet'}</strong>
-          <span className="stat-subtext">
-            {suggestion ? suggestion.reason : 'Log this exercise to generate a recommendation.'}
-          </span>
+        <div className="exercise-progress-hero-grid">
+          <div className="exercise-summary-card">
+            <div className="goal-progress-header">
+              <span className="stat-label">Exercise Summary</span>
+              <strong>{selectedExercise || 'No exercise selected'}</strong>
+            </div>
+
+            <div className="exercise-progress-summary-grid">
+              <div>
+                <span className="stat-label">Sessions</span>
+                <strong>{exerciseSummary.sessionCount}</strong>
+                <span className="stat-subtext">Distinct workout sessions</span>
+              </div>
+              <div>
+                <span className="stat-label">Sets</span>
+                <strong>{exerciseSummary.totalSets}</strong>
+                <span className="stat-subtext">Total logged sets</span>
+              </div>
+              <div>
+                <span className="stat-label">Recent Average</span>
+                <strong>{exerciseSummary.recentAverage === null ? 'No data' : `${exerciseSummary.recentAverage} kg`}</strong>
+                <span className="stat-subtext">Average of last 4 logged sets</span>
+              </div>
+              <div>
+                <span className="stat-label">First Logged</span>
+                <strong>{exerciseSummary.firstLoggedAt ? formatDate(exerciseSummary.firstLoggedAt) : 'No data'}</strong>
+                <span className="stat-subtext">Earliest entry in current view</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="suggestion-card hero-suggestion-card">
+            <span className="stat-label">Suggested Next Weight</span>
+            <strong>{suggestion ? `${suggestion.suggestedWeightKg} kg` : 'No suggestion yet'}</strong>
+            <span className="stat-subtext">
+              {suggestion ? suggestion.reason : 'Log this exercise to generate a recommendation.'}
+            </span>
+          </div>
         </div>
       </section>
 
@@ -225,7 +309,7 @@ export function ExerciseProgressPage() {
           <div className="panel-header">
             <div>
               <h2>Progress chart</h2>
-              <p>Weight lifted over time for the selected exercise.</p>
+              <p>Weight lifted over time for the selected exercise, with a quick summary below the chart.</p>
             </div>
           </div>
 
@@ -258,7 +342,7 @@ export function ExerciseProgressPage() {
               description="Log this exercise at least twice to unlock the chart."
             />
           ) : (
-            <ExerciseProgressChart entries={filteredHistory} />
+            <ExerciseProgressChart entries={filteredHistory} selectedExercise={selectedExercise} />
           )}
         </div>
       </section>
@@ -268,7 +352,7 @@ export function ExerciseProgressPage() {
           <div className="panel-header">
             <div>
               <h2>Exercise history</h2>
-              <p>All recorded sets for the selected exercise.</p>
+              <p>Most recent sets first, with reps, weight, and any saved workout notes.</p>
             </div>
           </div>
 
@@ -317,6 +401,16 @@ export function ExerciseProgressPage() {
                         <span className="stat-label">Reps</span>
                         <strong>{entry.reps}</strong>
                       </div>
+                      <div>
+                        <span className="stat-label">Workout</span>
+                        <strong>{formatDate(entry.date)}</strong>
+                      </div>
+                      <div>
+                        <span className="stat-label">Delta vs latest</span>
+                        <strong className={getTrendClassName(entry.weightKg - (exerciseSummary.latest?.weightKg ?? entry.weightKg))}>
+                          {formatDelta(entry.weightKg - (exerciseSummary.latest?.weightKg ?? entry.weightKg))}
+                        </strong>
+                      </div>
                     </div>
 
                     {entry.notes ? <p className="workout-notes">{entry.notes}</p> : null}
@@ -330,7 +424,13 @@ export function ExerciseProgressPage() {
   )
 }
 
-function ExerciseProgressChart({ entries }: { entries: ExerciseHistoryEntry[] }) {
+function ExerciseProgressChart({
+  entries,
+  selectedExercise,
+}: {
+  entries: ExerciseHistoryEntry[]
+  selectedExercise: string
+}) {
   const width = 900
   const height = 300
   const padding = { top: 20, right: 24, bottom: 44, left: 52 }
@@ -369,7 +469,12 @@ function ExerciseProgressChart({ entries }: { entries: ExerciseHistoryEntry[] })
 
   return (
     <div className="chart-card">
-      <svg viewBox={`0 0 ${width} ${height}`} className="progress-chart" role="img" aria-label="Exercise progress chart">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="progress-chart"
+        role="img"
+        aria-label={`${selectedExercise} progress chart`}
+      >
         <defs>
           <linearGradient id="exercise-area" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--accent-strong)" stopOpacity="0.28" />
@@ -424,4 +529,25 @@ function ExerciseProgressChart({ entries }: { entries: ExerciseHistoryEntry[] })
       </div>
     </div>
   )
+}
+
+function formatTrendLabel(change: number | null) {
+  if (change === null || change === 0) {
+    return 'Stable'
+  }
+
+  return change > 0 ? 'Improving' : 'Cooling off'
+}
+
+function formatDelta(change: number) {
+  const rounded = Number(change.toFixed(1))
+  return `${rounded > 0 ? '+' : ''}${rounded} kg`
+}
+
+function getTrendClassName(change: number | null) {
+  if (change === null || change === 0) {
+    return 'trend-neutral'
+  }
+
+  return change > 0 ? 'trend-up' : 'trend-down'
 }

@@ -1187,6 +1187,42 @@
   grid-template-columns: 1fr;
 }
 
+.exercise-progress-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 16px;
+  align-items: start;
+}
+
+.exercise-summary-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-soft);
+}
+
+.exercise-summary-card strong {
+  color: var(--text-strong);
+}
+
+.exercise-progress-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.exercise-progress-summary-grid > div {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-overlay-muted);
+}
+
 .exercise-history-list {
   display: grid;
   gap: 14px;
@@ -1390,6 +1426,7 @@
   .profile-grid,
   .goals-grid,
   .dashboard-hero-header,
+  .exercise-progress-hero-grid,
   .exercise-progress-grid,
   .exercise-fields,
   .chart-summary,
@@ -1721,6 +1758,7 @@
   }
 
   .exercise-fields,
+  .exercise-progress-summary-grid,
   .exercise-history-metrics,
   .chart-summary {
     gap: 12px;
