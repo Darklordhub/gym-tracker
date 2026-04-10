@@ -65,6 +65,10 @@ export function isNotFoundError(error: unknown) {
   return axios.isAxiosError(error) && error.response?.status === 404
 }
 
+export function isForbiddenError(error: unknown) {
+  return axios.isAxiosError(error) && error.response?.status === 403
+}
+
 export function getRequestErrorMessage(error: unknown, fallbackMessage: string) {
   if (axios.isAxiosError(error)) {
     const apiMessage = error.response?.data?.message

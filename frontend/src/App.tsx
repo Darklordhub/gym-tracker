@@ -3,6 +3,7 @@ import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-rou
 import './App.css'
 import { useAuth } from './auth/AuthContext'
 import { DashboardPage } from './pages/DashboardPage'
+import { AdminPage } from './pages/AdminPage'
 import { ExerciseProgressPage } from './pages/ExerciseProgressPage'
 import { LoginPage } from './pages/LoginPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -23,6 +24,9 @@ function App() {
           <Route path="/workouts" element={<WorkoutsPage />} />
           <Route path="/exercise-progress" element={<ExerciseProgressPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminPage />} />
+          </Route>
         </Route>
       </Route>
     </Routes>
@@ -61,6 +65,7 @@ function PublicOnlyRoute({ children }: { children: ReactNode }) {
 function AppLayout() {
   const { authState, logout } = useAuth()
   const accountLabel = authState?.user.displayName || authState?.user.fullName || authState?.user.email
+  const isAdmin = authState?.user.role === 'Admin'
 
   return (
     <div className="app-shell">
@@ -103,6 +108,14 @@ function AppLayout() {
             >
               Profile
             </NavLink>
+            {isAdmin ? (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) => (isActive ? 'nav-link nav-link-active' : 'nav-link')}
+              >
+                Admin
+              </NavLink>
+            ) : null}
           </nav>
 
           <div className="account-chip">
@@ -117,6 +130,16 @@ function AppLayout() {
       <Outlet />
     </div>
   )
+}
+
+function AdminRoute() {
+  const { authState } = useAuth()
+
+  if (authState?.user.role !== 'Admin') {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return <Outlet />
 }
 
 export default App

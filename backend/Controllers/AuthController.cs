@@ -111,6 +111,8 @@ public class AuthController : ControllerBase
             DateOfBirth = user.DateOfBirth,
             HeightCm = user.HeightCm,
             Gender = user.Gender,
+            Role = user.Role,
+            IsActive = user.IsActive,
             CreatedAt = user.CreatedAt,
         };
     }

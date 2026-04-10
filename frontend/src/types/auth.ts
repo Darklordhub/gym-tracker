@@ -6,6 +6,8 @@ export type AuthUser = {
   dateOfBirth: string | null
   heightCm: number | null
   gender: string | null
+  role: string
+  isActive: boolean
   createdAt: string
 }
 

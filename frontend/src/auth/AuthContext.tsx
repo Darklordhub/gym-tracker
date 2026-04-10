@@ -77,6 +77,8 @@ function normalizeAuthUser(user: AuthUser): AuthUser {
     dateOfBirth: user.dateOfBirth ?? null,
     heightCm: user.heightCm ?? null,
     gender: user.gender ?? null,
+    role: user.role ?? 'User',
+    isActive: user.isActive ?? true,
   }
 }
 
