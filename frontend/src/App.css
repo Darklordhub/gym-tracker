@@ -1350,6 +1350,17 @@
     var(--card-bg);
 }
 
+.workout-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+  margin-bottom: 8px;
+}
+
+.workout-card-actions button {
+  flex: 0 0 auto;
+}
+
 .exercise-card-heading {
   display: grid;
   gap: 4px;
@@ -1804,7 +1815,8 @@
   .template-toolbar,
   .filter-toolbar,
   .toolbar-actions,
-  .entry-actions {
+  .entry-actions,
+  .workout-card-actions {
     width: 100%;
   }
 
@@ -1824,6 +1836,10 @@
   }
 
   .entry-actions button {
+    flex: 1 1 0;
+  }
+
+  .workout-card-actions button {
     flex: 1 1 0;
   }
 
@@ -2105,7 +2121,8 @@
   .session-banner-metrics,
   .action-row,
   .toolbar-actions,
-  .entry-actions {
+  .entry-actions,
+  .workout-card-actions {
     width: 100%;
   }
 

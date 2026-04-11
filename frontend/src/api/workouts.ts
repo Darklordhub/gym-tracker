@@ -18,6 +18,10 @@ export async function createWorkout(payload: WorkoutPayload) {
   return response.data
 }
 
+export async function deleteWorkout(id: number) {
+  await apiClient.delete(`/Workouts/${id}`)
+}
+
 export async function fetchWorkoutTemplates() {
   const response = await apiClient.get<WorkoutTemplate[]>('/WorkoutTemplates')
   return response.data

@@ -5,6 +5,7 @@ import {
   completeActiveWorkoutSession,
   createWorkout,
   createWorkoutTemplate,
+  deleteWorkout,
   fetchActiveWorkoutSession,
   fetchWorkoutTemplates,
   fetchWorkouts,
@@ -253,6 +254,7 @@ export function WorkoutsPage() {
   const [isStartingSession, setIsStartingSession] = useState(false)
   const [isSavingSession, setIsSavingSession] = useState(false)
   const [isCompletingSession, setIsCompletingSession] = useState(false)
+  const [deletingWorkoutId, setDeletingWorkoutId] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -540,6 +542,26 @@ export function WorkoutsPage() {
       setErrorMessage(getRequestErrorMessage(error, 'Unable to save this cardio session.'))
     } finally {
       setIsSavingCardio(false)
+    }
+  }
+
+  async function handleDeleteWorkout(workout: Workout) {
+    const confirmed = window.confirm('Are you sure you want to delete this workout? This cannot be undone.')
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setDeletingWorkoutId(workout.id)
+      setFeedback(null)
+      setErrorMessage(null)
+      await deleteWorkout(workout.id)
+      setWorkouts((current) => current.filter((currentWorkout) => currentWorkout.id !== workout.id))
+      setFeedback('Workout deleted.')
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to delete this workout.'))
+    } finally {
+      setDeletingWorkoutId(null)
     }
   }
 
@@ -1294,6 +1316,17 @@ export function WorkoutsPage() {
                     >
                       {workout.workoutType === 'cardio' ? 'Cardio' : 'Strength'}
                     </span>
+                  </div>
+
+                  <div className="workout-card-actions">
+                    <button
+                      type="button"
+                      className="ghost-button subtle-danger-button compact-button"
+                      onClick={() => void handleDeleteWorkout(workout)}
+                      disabled={deletingWorkoutId === workout.id}
+                    >
+                      {deletingWorkoutId === workout.id ? 'Deleting...' : 'Delete workout'}
+                    </button>
                   </div>
 
                   {workout.notes ? <p className="workout-notes">{workout.notes}</p> : null}

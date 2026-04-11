@@ -100,6 +100,24 @@ public class WorkoutsController : ControllerBase
             MapWorkout(workout, personalRecords));
     }
 
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteWorkout(int id)
+    {
+        var userId = User.GetRequiredUserId();
+        var workout = await _dbContext.Workouts
+            .FirstOrDefaultAsync(currentWorkout => currentWorkout.Id == id && currentWorkout.UserId == userId);
+
+        if (workout is null)
+        {
+            return NotFound();
+        }
+
+        _dbContext.Workouts.Remove(workout);
+        await _dbContext.SaveChangesAsync();
+
+        return NoContent();
+    }
+
     private static WorkoutResponse MapWorkout(
         Workout workout,
         IReadOnlyDictionary<string, decimal> personalRecords)
