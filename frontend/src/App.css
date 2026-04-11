@@ -1086,6 +1086,10 @@
   grid-template-columns: minmax(320px, 1fr) minmax(0, 1fr);
 }
 
+.cycle-page-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .cycle-history-section {
   display: grid;
   gap: 18px;
@@ -1094,6 +1098,20 @@
 
 .cycle-guidance-card {
   height: 100%;
+}
+
+.cycle-guidance-overview-grid,
+.cycle-overview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cycle-insight-list {
+  margin-top: 18px;
+}
+
+.cycle-toggle-panel {
+  display: grid;
+  gap: 18px;
 }
 
 .toggle-row {
@@ -1141,6 +1159,12 @@
 .entry-date {
   margin-bottom: 6px;
   color: var(--muted);
+}
+
+.entry-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
 
 .entry-weight {
@@ -1694,7 +1718,10 @@
   .profile-meta-grid,
   .form-grid,
   .cycle-grid,
-  .cycle-history-grid {
+  .cycle-history-grid,
+  .cycle-page-grid,
+  .cycle-guidance-overview-grid,
+  .cycle-overview-grid {
     grid-template-columns: 1fr;
   }
 

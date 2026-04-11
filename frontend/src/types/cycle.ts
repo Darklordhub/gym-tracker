@@ -35,6 +35,31 @@ export type CycleEntryPayload = {
   notes: string | null
 }
 
+export type CycleSymptomLog = {
+  id: number
+  date: string
+  fatigueLevel: number
+  crampsLevel: number
+  mood: string
+  bloatingLevel: number
+  sleepQuality: number
+  recoveryFeeling: number
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type CycleSymptomLogPayload = {
+  date: string
+  fatigueLevel: number
+  crampsLevel: number
+  mood: string
+  bloatingLevel: number
+  sleepQuality: number
+  recoveryFeeling: number
+  notes: string | null
+}
+
 export type CycleGuidance = {
   isEnabled: boolean
   currentCycleDay: number | null
@@ -48,4 +73,11 @@ export type CycleGuidance = {
   recentSetCount: number
   recentTrainingLoad: number
   isHigherFatiguePhase: boolean
+  latestSymptomLogDate: string | null
+  symptomLoadLabel: string
+  recentFatigueLevel: number | null
+  recentCrampsLevel: number | null
+  recentSleepQuality: number | null
+  recentRecoveryFeeling: number | null
+  insights: string[]
 }

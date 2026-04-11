@@ -14,4 +14,11 @@ public class CycleGuidanceResponse
     public int RecentSetCount { get; set; }
     public decimal RecentTrainingLoad { get; set; }
     public bool IsHigherFatiguePhase { get; set; }
+    public DateOnly? LatestSymptomLogDate { get; set; }
+    public string SymptomLoadLabel { get; set; } = "Unknown";
+    public int? RecentFatigueLevel { get; set; }
+    public int? RecentCrampsLevel { get; set; }
+    public int? RecentSleepQuality { get; set; }
+    public int? RecentRecoveryFeeling { get; set; }
+    public List<string> Insights { get; set; } = new();
 }

@@ -151,6 +151,101 @@ public class CycleController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("symptoms")]
+    public async Task<ActionResult<List<CycleSymptomLogResponse>>> GetSymptomLogs()
+    {
+        var userId = User.GetRequiredUserId();
+        var logs = await _dbContext.UserCycleSymptomLogs
+            .AsNoTracking()
+            .Where(log => log.UserId == userId)
+            .OrderByDescending(log => log.Date)
+            .ThenByDescending(log => log.UpdatedAt)
+            .ToListAsync();
+
+        return Ok(logs.Select(MapSymptomLog));
+    }
+
+    [HttpPost("symptoms")]
+    public async Task<ActionResult<CycleSymptomLogResponse>> CreateSymptomLog(CycleSymptomLogRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var userId = User.GetRequiredUserId();
+        var now = DateTime.UtcNow;
+        var log = new UserCycleSymptomLog
+        {
+            UserId = userId,
+            Date = request.Date,
+            FatigueLevel = request.FatigueLevel,
+            CrampsLevel = request.CrampsLevel,
+            Mood = NormalizeMood(request.Mood),
+            BloatingLevel = request.BloatingLevel,
+            SleepQuality = request.SleepQuality,
+            RecoveryFeeling = request.RecoveryFeeling,
+            Notes = NormalizeOptionalText(request.Notes),
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+
+        _dbContext.UserCycleSymptomLogs.Add(log);
+        await _dbContext.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetSymptomLogs), MapSymptomLog(log));
+    }
+
+    [HttpPut("symptoms/{logId:int}")]
+    public async Task<ActionResult<CycleSymptomLogResponse>> UpdateSymptomLog(int logId, CycleSymptomLogRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var userId = User.GetRequiredUserId();
+        var log = await _dbContext.UserCycleSymptomLogs
+            .FirstOrDefaultAsync(item => item.Id == logId && item.UserId == userId);
+
+        if (log is null)
+        {
+            return NotFound();
+        }
+
+        log.Date = request.Date;
+        log.FatigueLevel = request.FatigueLevel;
+        log.CrampsLevel = request.CrampsLevel;
+        log.Mood = NormalizeMood(request.Mood);
+        log.BloatingLevel = request.BloatingLevel;
+        log.SleepQuality = request.SleepQuality;
+        log.RecoveryFeeling = request.RecoveryFeeling;
+        log.Notes = NormalizeOptionalText(request.Notes);
+        log.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(MapSymptomLog(log));
+    }
+
+    [HttpDelete("symptoms/{logId:int}")]
+    public async Task<IActionResult> DeleteSymptomLog(int logId)
+    {
+        var userId = User.GetRequiredUserId();
+        var log = await _dbContext.UserCycleSymptomLogs
+            .FirstOrDefaultAsync(item => item.Id == logId && item.UserId == userId);
+
+        if (log is null)
+        {
+            return NotFound();
+        }
+
+        _dbContext.UserCycleSymptomLogs.Remove(log);
+        await _dbContext.SaveChangesAsync();
+
+        return NoContent();
+    }
+
     [HttpGet("guidance")]
     public async Task<ActionResult<CycleGuidanceResponse>> GetGuidance()
     {
@@ -173,8 +268,14 @@ public class CycleController : ControllerBase
             .OrderByDescending(workout => workout.Date)
             .Take(12)
             .ToListAsync();
+        var symptomLogs = await _dbContext.UserCycleSymptomLogs
+            .AsNoTracking()
+            .Where(log => log.UserId == userId)
+            .OrderByDescending(log => log.Date)
+            .Take(20)
+            .ToListAsync();
 
-        return Ok(CycleGuidanceService.Build(settings, entries, workouts));
+        return Ok(CycleGuidanceService.Build(settings, entries, symptomLogs, workouts));
     }
 
     private static CycleSettingsResponse MapSettings(UserCycleSettings? settings)
@@ -204,7 +305,30 @@ public class CycleController : ControllerBase
         };
     }
 
+    private static CycleSymptomLogResponse MapSymptomLog(UserCycleSymptomLog log)
+    {
+        return new CycleSymptomLogResponse
+        {
+            Id = log.Id,
+            Date = log.Date,
+            FatigueLevel = log.FatigueLevel,
+            CrampsLevel = log.CrampsLevel,
+            Mood = log.Mood,
+            BloatingLevel = log.BloatingLevel,
+            SleepQuality = log.SleepQuality,
+            RecoveryFeeling = log.RecoveryFeeling,
+            Notes = log.Notes,
+            CreatedAt = log.CreatedAt,
+            UpdatedAt = log.UpdatedAt,
+        };
+    }
+
     private static string NormalizeRegularity(string value)
+    {
+        return value.Trim().ToLowerInvariant();
+    }
+
+    private static string NormalizeMood(string value)
     {
         return value.Trim().ToLowerInvariant();
     }

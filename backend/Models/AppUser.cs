@@ -21,6 +21,7 @@ public class AppUser
     public List<GoalSettings> GoalSettings { get; set; } = new();
     public List<UserCycleSettings> CycleSettings { get; set; } = new();
     public List<UserCycleEntry> CycleEntries { get; set; } = new();
+    public List<UserCycleSymptomLog> CycleSymptomLogs { get; set; } = new();
     public string Role { get; set; } = AppRoles.User;
     public bool IsActive { get; set; } = true;
 }

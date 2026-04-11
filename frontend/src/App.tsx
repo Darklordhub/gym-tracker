@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import { useAuth } from './auth/AuthContext'
+import { fetchCycleSettings } from './api/cycle'
 import { fetchGoals } from './api/goals'
 import { fetchWorkouts } from './api/workouts'
 import { DashboardPage } from './pages/DashboardPage'
 import { AdminPage } from './pages/AdminPage'
+import { CyclePage } from './pages/CyclePage'
 import { ExerciseProgressPage } from './pages/ExerciseProgressPage'
 import { LoginPage } from './pages/LoginPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -20,6 +22,7 @@ const primaryNavItems = [
   { to: '/weight', label: 'Weight' },
   { to: '/workouts', label: 'Workouts' },
   { to: '/exercise-progress', label: 'Exercise Progress' },
+  { to: '/cycle', label: 'Cycle' },
   { to: '/profile', label: 'Profile' },
 ] as const
 
@@ -69,6 +72,7 @@ function App() {
           <Route path="/weight" element={<WeightPage />} />
           <Route path="/workouts" element={<WorkoutsPage />} />
           <Route path="/exercise-progress" element={<ExerciseProgressPage />} />
+          <Route path="/cycle" element={<CyclePage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminPage />} />
@@ -119,7 +123,9 @@ function AppLayout({
   const location = useLocation()
   const accountLabel = authState?.user.displayName || authState?.user.fullName || authState?.user.email
   const isAdmin = authState?.user.role === 'Admin'
-  const navItems = isAdmin ? [...primaryNavItems, { to: '/admin', label: 'Admin' as const }] : primaryNavItems
+  const [isCycleEnabled, setIsCycleEnabled] = useState(false)
+  const navItems = (isAdmin ? [...primaryNavItems, { to: '/admin', label: 'Admin' as const }] : primaryNavItems)
+    .filter((item) => item.to !== '/cycle' || isCycleEnabled)
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => getStoredReadNotificationIds())
@@ -136,6 +142,10 @@ function AppLayout({
   }, [location.pathname])
 
   useEffect(() => {
+    void loadCycleVisibility()
+  }, [])
+
+  useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
       if (!notificationCenterRef.current?.contains(event.target as Node)) {
         setIsNotificationsOpen(false)
@@ -144,6 +154,16 @@ function AppLayout({
 
     document.addEventListener('mousedown', handlePointerDown)
     return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [])
+
+  useEffect(() => {
+    function handleCycleSettingsUpdated(event: Event) {
+      const customEvent = event as CustomEvent<{ isEnabled?: boolean }>
+      setIsCycleEnabled(Boolean(customEvent.detail?.isEnabled))
+    }
+
+    window.addEventListener('cycle-settings-updated', handleCycleSettingsUpdated as EventListener)
+    return () => window.removeEventListener('cycle-settings-updated', handleCycleSettingsUpdated as EventListener)
   }, [])
 
   useEffect(() => {
@@ -168,6 +188,15 @@ function AppLayout({
       setNotifications(generateNotifications(workoutData, goalData))
     } catch {
       setNotifications([])
+    }
+  }
+
+  async function loadCycleVisibility() {
+    try {
+      const settings = await fetchCycleSettings()
+      setIsCycleEnabled(settings.isEnabled)
+    } catch {
+      setIsCycleEnabled(false)
     }
   }
 

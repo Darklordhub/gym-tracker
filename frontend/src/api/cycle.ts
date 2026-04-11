@@ -5,6 +5,8 @@ import type {
   CycleGuidance,
   CycleSettings,
   CycleSettingsPayload,
+  CycleSymptomLog,
+  CycleSymptomLogPayload,
 } from '../types/cycle'
 
 export async function fetchCycleSettings() {
@@ -34,6 +36,25 @@ export async function updateCycleEntry(entryId: number, payload: CycleEntryPaylo
 
 export async function deleteCycleEntry(entryId: number) {
   await apiClient.delete(`/cycle/history/${entryId}`)
+}
+
+export async function fetchCycleSymptomLogs() {
+  const response = await apiClient.get<CycleSymptomLog[]>('/cycle/symptoms')
+  return response.data
+}
+
+export async function createCycleSymptomLog(payload: CycleSymptomLogPayload) {
+  const response = await apiClient.post<CycleSymptomLog>('/cycle/symptoms', payload)
+  return response.data
+}
+
+export async function updateCycleSymptomLog(logId: number, payload: CycleSymptomLogPayload) {
+  const response = await apiClient.put<CycleSymptomLog>(`/cycle/symptoms/${logId}`, payload)
+  return response.data
+}
+
+export async function deleteCycleSymptomLog(logId: number) {
+  await apiClient.delete(`/cycle/symptoms/${logId}`)
 }
 
 export async function fetchCycleGuidance() {

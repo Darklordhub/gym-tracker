@@ -1,23 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import {
-  changePassword,
-  fetchProfile,
-  updateProfile,
-} from '../api/profile'
-import {
-  createCycleEntry,
-  deleteCycleEntry,
-  fetchCycleGuidance,
-  fetchCycleHistory,
-  fetchCycleSettings,
-  updateCycleEntry,
-  updateCycleSettings,
-} from '../api/cycle'
+import { Link } from 'react-router-dom'
+import { changePassword, fetchProfile, updateProfile } from '../api/profile'
+import { fetchCycleGuidance, fetchCycleSettings, updateCycleSettings } from '../api/cycle'
 import { useAuth } from '../auth/AuthContext'
 import { StateCard } from '../components/StateCard'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
-import type { CycleEntry, CycleGuidance, CycleRegularity, CycleSettings } from '../types/cycle'
+import type { CycleGuidance, CycleSettings } from '../types/cycle'
 import type { UserProfile } from '../types/profile'
 
 type ProfileFormState = {
@@ -34,22 +23,6 @@ type PasswordFormState = {
   confirmPassword: string
 }
 
-type CycleSettingsFormState = {
-  isEnabled: boolean
-  lastPeriodStartDate: string
-  averageCycleLengthDays: string
-  averagePeriodLengthDays: string
-  cycleRegularity: CycleRegularity
-  usesHormonalContraception: 'yes' | 'no' | 'unknown'
-  isNaturallyCycling: 'yes' | 'no' | 'unknown'
-}
-
-type CycleEntryFormState = {
-  periodStartDate: string
-  periodEndDate: string
-  notes: string
-}
-
 const emptyProfileForm: ProfileFormState = {
   fullName: '',
   displayName: '',
@@ -64,20 +37,15 @@ const emptyPasswordForm: PasswordFormState = {
   confirmPassword: '',
 }
 
-const emptyCycleEntryForm: CycleEntryFormState = {
-  periodStartDate: '',
-  periodEndDate: '',
-  notes: '',
-}
-
-const emptyCycleSettingsForm: CycleSettingsFormState = {
+const emptyCycleSettings: CycleSettings = {
   isEnabled: false,
-  lastPeriodStartDate: '',
-  averageCycleLengthDays: '',
-  averagePeriodLengthDays: '',
+  lastPeriodStartDate: null,
+  averageCycleLengthDays: null,
+  averagePeriodLengthDays: null,
   cycleRegularity: 'regular',
-  usesHormonalContraception: 'unknown',
-  isNaturallyCycling: 'unknown',
+  usesHormonalContraception: null,
+  isNaturallyCycling: null,
+  updatedAt: null,
 }
 
 export function ProfilePage() {
@@ -87,17 +55,12 @@ export function ProfilePage() {
     authState?.user ? mapProfileToForm(authState.user) : emptyProfileForm,
   )
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>(emptyPasswordForm)
-  const [cycleSettingsForm, setCycleSettingsForm] = useState<CycleSettingsFormState>(emptyCycleSettingsForm)
+  const [cycleSettings, setCycleSettings] = useState<CycleSettings>(emptyCycleSettings)
   const [cycleGuidance, setCycleGuidance] = useState<CycleGuidance | null>(null)
-  const [cycleHistory, setCycleHistory] = useState<CycleEntry[]>([])
-  const [cycleEntryForm, setCycleEntryForm] = useState<CycleEntryFormState>(emptyCycleEntryForm)
-  const [editingCycleEntryId, setEditingCycleEntryId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
-  const [isSavingCycleSettings, setIsSavingCycleSettings] = useState(false)
-  const [isSavingCycleEntry, setIsSavingCycleEntry] = useState(false)
-  const [deletingCycleEntryId, setDeletingCycleEntryId] = useState<number | null>(null)
+  const [isSavingCycleToggle, setIsSavingCycleToggle] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
@@ -105,8 +68,6 @@ export function ProfilePage() {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
   const [cycleError, setCycleError] = useState<string | null>(null)
   const [cycleMessage, setCycleMessage] = useState<string | null>(null)
-  const [cycleHistoryError, setCycleHistoryError] = useState<string | null>(null)
-  const [cycleHistoryMessage, setCycleHistoryMessage] = useState<string | null>(null)
 
   useEffect(() => {
     void loadProfile()
@@ -117,37 +78,22 @@ export function ProfilePage() {
       setIsLoading(true)
       setLoadError(null)
 
-      const [currentProfile, currentCycleSettings, currentCycleHistory, currentCycleGuidance] =
-        await Promise.all([
-          fetchProfile(),
-          fetchCycleSettings().catch(() => null),
-          fetchCycleHistory().catch(() => []),
-          fetchCycleGuidance().catch(() => null),
-        ])
+      const [currentProfile, currentCycleSettings, currentCycleGuidance] = await Promise.all([
+        fetchProfile(),
+        fetchCycleSettings().catch(() => emptyCycleSettings),
+        fetchCycleGuidance().catch(() => null),
+      ])
 
       setProfile(currentProfile)
       setProfileForm(mapProfileToForm(currentProfile))
       setCurrentUser(currentProfile)
-      setCycleSettingsForm(currentCycleSettings ? mapCycleSettingsToForm(currentCycleSettings) : emptyCycleSettingsForm)
-      setCycleHistory(currentCycleHistory)
+      setCycleSettings(currentCycleSettings)
       setCycleGuidance(currentCycleGuidance)
     } catch (error) {
       setLoadError(getRequestErrorMessage(error, 'Unable to load your profile.'))
     } finally {
       setIsLoading(false)
     }
-  }
-
-  async function refreshCycleData() {
-    const [currentCycleSettings, currentCycleHistory, currentCycleGuidance] = await Promise.all([
-      fetchCycleSettings(),
-      fetchCycleHistory(),
-      fetchCycleGuidance(),
-    ])
-
-    setCycleSettingsForm(mapCycleSettingsToForm(currentCycleSettings))
-    setCycleHistory(currentCycleHistory)
-    setCycleGuidance(currentCycleGuidance)
   }
 
   async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
@@ -224,109 +170,36 @@ export function ProfilePage() {
     }
   }
 
-  async function handleCycleSettingsSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    const validationMessage = validateCycleSettingsForm(cycleSettingsForm)
-    if (validationMessage) {
-      setCycleError(validationMessage)
-      setCycleMessage(null)
-      return
-    }
-
+  async function handleCycleToggleChange(nextIsEnabled: boolean) {
     try {
-      setIsSavingCycleSettings(true)
+      setIsSavingCycleToggle(true)
       setCycleError(null)
       setCycleMessage(null)
 
-      await updateCycleSettings({
-        isEnabled: cycleSettingsForm.isEnabled,
-        lastPeriodStartDate: toOptionalValue(cycleSettingsForm.lastPeriodStartDate),
-        averageCycleLengthDays: toOptionalNumber(cycleSettingsForm.averageCycleLengthDays),
-        averagePeriodLengthDays: toOptionalNumber(cycleSettingsForm.averagePeriodLengthDays),
-        cycleRegularity: cycleSettingsForm.cycleRegularity,
-        usesHormonalContraception: mapTriStateToBoolean(cycleSettingsForm.usesHormonalContraception),
-        isNaturallyCycling: mapTriStateToBoolean(cycleSettingsForm.isNaturallyCycling),
+      const savedSettings = await updateCycleSettings({
+        ...cycleSettings,
+        isEnabled: nextIsEnabled,
       })
 
-      await refreshCycleData()
-      setCycleMessage('Cycle-aware settings updated.')
-    } catch (error) {
-      setCycleError(getRequestErrorMessage(error, 'Unable to update cycle-aware settings.'))
-    } finally {
-      setIsSavingCycleSettings(false)
-    }
-  }
-
-  async function handleCycleEntrySubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    const validationMessage = validateCycleEntryForm(cycleEntryForm)
-    if (validationMessage) {
-      setCycleHistoryError(validationMessage)
-      setCycleHistoryMessage(null)
-      return
-    }
-
-    try {
-      setIsSavingCycleEntry(true)
-      setCycleHistoryError(null)
-      setCycleHistoryMessage(null)
-
-      const payload = {
-        periodStartDate: cycleEntryForm.periodStartDate,
-        periodEndDate: cycleEntryForm.periodEndDate,
-        notes: toOptionalValue(cycleEntryForm.notes),
-      }
-
-      if (editingCycleEntryId === null) {
-        await createCycleEntry(payload)
-        setCycleHistoryMessage('Cycle history entry added.')
+      setCycleSettings(savedSettings)
+      if (nextIsEnabled) {
+        const nextGuidance = await fetchCycleGuidance().catch(() => null)
+        setCycleGuidance(nextGuidance)
       } else {
-        await updateCycleEntry(editingCycleEntryId, payload)
-        setCycleHistoryMessage('Cycle history entry updated.')
+        setCycleGuidance(null)
       }
 
-      setCycleEntryForm(emptyCycleEntryForm)
-      setEditingCycleEntryId(null)
-      await refreshCycleData()
+      window.dispatchEvent(new CustomEvent('cycle-settings-updated', { detail: { isEnabled: savedSettings.isEnabled } }))
+      setCycleMessage(
+        savedSettings.isEnabled
+          ? 'Cycle-aware guidance enabled. You can manage the full feature from the Cycle page.'
+          : 'Cycle-aware guidance disabled. Cycle-specific guidance and navigation are now hidden.',
+      )
     } catch (error) {
-      setCycleHistoryError(getRequestErrorMessage(error, 'Unable to save this cycle history entry.'))
+      setCycleError(getRequestErrorMessage(error, 'Unable to update cycle-aware guidance.'))
     } finally {
-      setIsSavingCycleEntry(false)
+      setIsSavingCycleToggle(false)
     }
-  }
-
-  async function handleDeleteCycleEntry(entryId: number) {
-    try {
-      setDeletingCycleEntryId(entryId)
-      setCycleHistoryError(null)
-      setCycleHistoryMessage(null)
-
-      await deleteCycleEntry(entryId)
-      if (editingCycleEntryId === entryId) {
-        setEditingCycleEntryId(null)
-        setCycleEntryForm(emptyCycleEntryForm)
-      }
-
-      await refreshCycleData()
-      setCycleHistoryMessage('Cycle history entry removed.')
-    } catch (error) {
-      setCycleHistoryError(getRequestErrorMessage(error, 'Unable to delete this cycle history entry.'))
-    } finally {
-      setDeletingCycleEntryId(null)
-    }
-  }
-
-  function startEditingCycleEntry(entry: CycleEntry) {
-    setEditingCycleEntryId(entry.id)
-    setCycleEntryForm({
-      periodStartDate: entry.periodStartDate,
-      periodEndDate: entry.periodEndDate,
-      notes: entry.notes ?? '',
-    })
-    setCycleHistoryError(null)
-    setCycleHistoryMessage(null)
   }
 
   return (
@@ -336,7 +209,7 @@ export function ProfilePage() {
           <span className="eyebrow">Account</span>
           <h1>Profile</h1>
           <p className="hero-text">
-            Keep your personal details current, manage your password, and optionally add cycle-aware training guidance based on your own history.
+            Keep your personal details current, manage your password, and decide whether optional cycle-aware training guidance should be part of your app experience.
           </p>
         </div>
 
@@ -357,12 +230,12 @@ export function ProfilePage() {
             <span className="stat-subtext">Used as your preferred label inside the app.</span>
           </article>
           <article className="stat-card">
-            <span className="stat-label">Cycle Guidance</span>
-            <strong>{cycleGuidance?.isEnabled ? cycleGuidance.estimatedCurrentPhase ?? 'Enabled' : 'Off'}</strong>
+            <span className="stat-label">Cycle Feature</span>
+            <strong>{cycleSettings.isEnabled ? 'Enabled' : 'Off'}</strong>
             <span className="stat-subtext">
-              {cycleGuidance?.isEnabled
-                ? cycleGuidance.guidanceHeadline
-                : 'Optional training context that stays off until you enable it.'}
+              {cycleSettings.isEnabled
+                ? cycleGuidance?.guidanceHeadline ?? 'Dedicated cycle tracking is available.'
+                : 'Hidden until you choose to turn it on.'}
             </span>
           </article>
         </div>
@@ -408,9 +281,7 @@ export function ProfilePage() {
                     type="text"
                     value={profileForm.fullName}
                     maxLength={120}
-                    onChange={(event) =>
-                      setProfileForm((current) => ({ ...current, fullName: event.target.value }))
-                    }
+                    onChange={(event) => setProfileForm((current) => ({ ...current, fullName: event.target.value }))}
                     required
                   />
                   <small>Used as your primary account identity.</small>
@@ -422,9 +293,7 @@ export function ProfilePage() {
                     type="text"
                     value={profileForm.displayName}
                     maxLength={80}
-                    onChange={(event) =>
-                      setProfileForm((current) => ({ ...current, displayName: event.target.value }))
-                    }
+                    onChange={(event) => setProfileForm((current) => ({ ...current, displayName: event.target.value }))}
                     placeholder="Optional"
                   />
                   <small>Shown across the app when available.</small>
@@ -436,9 +305,7 @@ export function ProfilePage() {
                     type="date"
                     value={profileForm.dateOfBirth}
                     max={new Date().toISOString().slice(0, 10)}
-                    onChange={(event) =>
-                      setProfileForm((current) => ({ ...current, dateOfBirth: event.target.value }))
-                    }
+                    onChange={(event) => setProfileForm((current) => ({ ...current, dateOfBirth: event.target.value }))}
                   />
                 </label>
 
@@ -450,9 +317,7 @@ export function ProfilePage() {
                     max="300"
                     step="1"
                     value={profileForm.heightCm}
-                    onChange={(event) =>
-                      setProfileForm((current) => ({ ...current, heightCm: event.target.value }))
-                    }
+                    onChange={(event) => setProfileForm((current) => ({ ...current, heightCm: event.target.value }))}
                     placeholder="Optional"
                   />
                 </label>
@@ -463,9 +328,7 @@ export function ProfilePage() {
                     type="text"
                     value={profileForm.gender}
                     maxLength={50}
-                    onChange={(event) =>
-                      setProfileForm((current) => ({ ...current, gender: event.target.value }))
-                    }
+                    onChange={(event) => setProfileForm((current) => ({ ...current, gender: event.target.value }))}
                     placeholder="Optional"
                   />
                 </label>
@@ -516,9 +379,7 @@ export function ProfilePage() {
                   type="password"
                   autoComplete="current-password"
                   value={passwordForm.currentPassword}
-                  onChange={(event) =>
-                    setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))
-                  }
+                  onChange={(event) => setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))}
                   minLength={8}
                   required
                 />
@@ -531,9 +392,7 @@ export function ProfilePage() {
                   type="password"
                   autoComplete="new-password"
                   value={passwordForm.newPassword}
-                  onChange={(event) =>
-                    setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))
-                  }
+                  onChange={(event) => setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))}
                   minLength={8}
                   required
                 />
@@ -546,9 +405,7 @@ export function ProfilePage() {
                   type="password"
                   autoComplete="new-password"
                   value={passwordForm.confirmPassword}
-                  onChange={(event) =>
-                    setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))
-                  }
+                  onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))}
                   minLength={8}
                   required
                 />
@@ -577,322 +434,64 @@ export function ProfilePage() {
             <div className="panel-header">
               <div>
                 <h2>Cycle-Aware Training</h2>
-                <p>Optional guidance based on estimated cycle phase, recent training load, and the history you choose to log.</p>
+                <p>Keep this optional. When enabled, the app adds a dedicated Cycle page and surfaces cycle-aware training guidance where it is useful.</p>
               </div>
             </div>
 
-            <div className="goals-grid cycle-grid">
-              <form className="weight-form profile-form-panel" onSubmit={handleCycleSettingsSubmit}>
-                <div className="toggle-row">
-                  <div>
-                    <strong>Enable cycle-aware training guidance</strong>
-                    <p className="muted-note">
-                      Keep this off unless you want prediction and recovery-aware training suggestions.
-                    </p>
-                  </div>
-                  <label className="toggle-control">
-                    <input
-                      type="checkbox"
-                      checked={cycleSettingsForm.isEnabled}
-                      onChange={(event) =>
-                        setCycleSettingsForm((current) => ({ ...current, isEnabled: event.target.checked }))
-                      }
-                    />
-                    <span>{cycleSettingsForm.isEnabled ? 'On' : 'Off'}</span>
-                  </label>
-                </div>
-
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Last period start date</span>
-                    <input
-                      type="date"
-                      value={cycleSettingsForm.lastPeriodStartDate}
-                      max={new Date().toISOString().slice(0, 10)}
-                      onChange={(event) =>
-                        setCycleSettingsForm((current) => ({
-                          ...current,
-                          lastPeriodStartDate: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="field">
-                    <span>Average cycle length (days)</span>
-                    <input
-                      type="number"
-                      min="20"
-                      max="45"
-                      step="1"
-                      value={cycleSettingsForm.averageCycleLengthDays}
-                      onChange={(event) =>
-                        setCycleSettingsForm((current) => ({
-                          ...current,
-                          averageCycleLengthDays: event.target.value,
-                        }))
-                      }
-                      placeholder="e.g. 28"
-                    />
-                  </label>
-
-                  <label className="field">
-                    <span>Average period length (days)</span>
-                    <input
-                      type="number"
-                      min="2"
-                      max="10"
-                      step="1"
-                      value={cycleSettingsForm.averagePeriodLengthDays}
-                      onChange={(event) =>
-                        setCycleSettingsForm((current) => ({
-                          ...current,
-                          averagePeriodLengthDays: event.target.value,
-                        }))
-                      }
-                      placeholder="e.g. 5"
-                    />
-                  </label>
-
-                  <label className="field">
-                    <span>Cycle regularity</span>
-                    <select
-                      className="select-input"
-                      value={cycleSettingsForm.cycleRegularity}
-                      onChange={(event) =>
-                        setCycleSettingsForm((current) => ({
-                          ...current,
-                          cycleRegularity: event.target.value as CycleRegularity,
-                        }))
-                      }
-                    >
-                      <option value="regular">Regular</option>
-                      <option value="somewhat-irregular">Somewhat irregular</option>
-                      <option value="irregular">Irregular</option>
-                    </select>
-                  </label>
-
-                  <label className="field">
-                    <span>Hormonal contraception</span>
-                    <select
-                      className="select-input"
-                      value={cycleSettingsForm.usesHormonalContraception}
-                      onChange={(event) =>
-                        setCycleSettingsForm((current) => ({
-                          ...current,
-                          usesHormonalContraception: event.target.value as CycleSettingsFormState['usesHormonalContraception'],
-                        }))
-                      }
-                    >
-                      <option value="unknown">Prefer not to say</option>
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                    </select>
-                  </label>
-
-                  <label className="field">
-                    <span>Naturally cycling</span>
-                    <select
-                      className="select-input"
-                      value={cycleSettingsForm.isNaturallyCycling}
-                      onChange={(event) =>
-                        setCycleSettingsForm((current) => ({
-                          ...current,
-                          isNaturallyCycling: event.target.value as CycleSettingsFormState['isNaturallyCycling'],
-                        }))
-                      }
-                    >
-                      <option value="unknown">Prefer not to say</option>
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div className="action-row">
-                  <button type="submit" className="primary-button" disabled={isSavingCycleSettings}>
-                    {isSavingCycleSettings ? 'Saving guidance settings...' : 'Save cycle settings'}
-                  </button>
-                </div>
-
-                {cycleMessage || cycleError ? (
-                  <div className="feedback-stack">
-                    {cycleMessage ? <p className="feedback success">{cycleMessage}</p> : null}
-                    {cycleError ? <p className="feedback error">{cycleError}</p> : null}
-                  </div>
-                ) : null}
-              </form>
-
-              <div className="goal-progress-list">
-                <article className="assistant-card assistant-card-highlight cycle-guidance-card">
-                  <span className="stat-label">Current guidance</span>
-                  <strong>{cycleGuidance?.guidanceHeadline ?? 'Cycle-aware guidance is off'}</strong>
-                  <p>
-                    {cycleGuidance?.guidanceMessage ??
-                      'Enable cycle-aware training guidance and add a recent period start date to begin getting practical session context.'}
+            <div className="profile-form-panel cycle-toggle-panel">
+              <div className="toggle-row">
+                <div>
+                  <strong>Enable cycle-aware training guidance</strong>
+                  <p className="muted-note">
+                    Turn this on only if you want cycle-aware prediction, symptom logging, and training context in the app.
                   </p>
-                  <div className="assistant-list">
-                    <div className="assistant-list-item">
-                      <strong>Estimated phase</strong>
-                      <span>{cycleGuidance?.estimatedCurrentPhase ?? 'Not enough data yet'}</span>
-                    </div>
-                    <div className="assistant-list-item">
-                      <strong>Next period estimate</strong>
-                      <span>
-                        {cycleGuidance?.estimatedNextPeriodStartDate
-                          ? formatDate(cycleGuidance.estimatedNextPeriodStartDate)
-                          : 'Not enough data yet'}
-                      </span>
-                    </div>
-                    <div className="assistant-list-item">
-                      <strong>Prediction confidence</strong>
-                      <span>{cycleGuidance?.predictionConfidence ?? 'Needs data'}</span>
-                    </div>
-                    <div className="assistant-list-item">
-                      <strong>Recent load</strong>
-                      <span>
-                        {cycleGuidance
-                          ? `${cycleGuidance.recentLoadLabel} load from ${cycleGuidance.recentWorkoutCount} workout${cycleGuidance.recentWorkoutCount === 1 ? '' : 's'} in the last 7 days`
-                          : 'No guidance yet'}
-                      </span>
-                    </div>
-                  </div>
+                </div>
+                <label className="toggle-control">
+                  <input
+                    type="checkbox"
+                    checked={cycleSettings.isEnabled}
+                    onChange={(event) => void handleCycleToggleChange(event.target.checked)}
+                    disabled={isSavingCycleToggle}
+                  />
+                  <span>{cycleSettings.isEnabled ? 'On' : 'Off'}</span>
+                </label>
+              </div>
+
+              <div className="assistant-grid cycle-overview-grid">
+                <article className="assistant-card">
+                  <span className="stat-label">Visibility</span>
+                  <strong>{cycleSettings.isEnabled ? 'Cycle page available' : 'Hidden from navigation'}</strong>
+                  <p>
+                    {cycleSettings.isEnabled
+                      ? 'The dedicated Cycle page is now available for settings, period history, symptom logs, and guidance.'
+                      : 'Cycle-specific guidance and navigation stay hidden until you opt in.'}
+                  </p>
+                </article>
+
+                <article className="assistant-card">
+                  <span className="stat-label">Current guidance</span>
+                  <strong>{cycleGuidance?.estimatedCurrentPhase ?? 'No cycle estimate active'}</strong>
+                  <p>
+                    {cycleSettings.isEnabled
+                      ? cycleGuidance?.guidanceMessage ?? 'Finish your cycle setup on the Cycle page to get more useful guidance.'
+                      : 'No cycle-aware training guidance is shown across the app while the feature is off.'}
+                  </p>
                 </article>
               </div>
+
+              {cycleSettings.isEnabled ? (
+                <p className="section-note">
+                  Full setup, period history, symptom logging, and personalized guidance now live on the <Link to="/cycle">Cycle page</Link>.
+                </p>
+              ) : null}
             </div>
 
-            <div className="cycle-history-section">
-              <div className="section-title-row">
-                <div>
-                  <h3>Period history</h3>
-                  <p>Log past period windows so future estimates can lean on your actual history instead of one-off inputs.</p>
-                </div>
+            {cycleMessage || cycleError ? (
+              <div className="feedback-stack">
+                {cycleMessage ? <p className="feedback success">{cycleMessage}</p> : null}
+                {cycleError ? <p className="feedback error">{cycleError}</p> : null}
               </div>
-
-              <div className="content-grid cycle-history-grid">
-                <form className="weight-form profile-form-panel" onSubmit={handleCycleEntrySubmit}>
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>Period start date</span>
-                      <input
-                        type="date"
-                        value={cycleEntryForm.periodStartDate}
-                        max={new Date().toISOString().slice(0, 10)}
-                        onChange={(event) =>
-                          setCycleEntryForm((current) => ({
-                            ...current,
-                            periodStartDate: event.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Period end date</span>
-                      <input
-                        type="date"
-                        value={cycleEntryForm.periodEndDate}
-                        max={new Date().toISOString().slice(0, 10)}
-                        onChange={(event) =>
-                          setCycleEntryForm((current) => ({
-                            ...current,
-                            periodEndDate: event.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-
-                    <label className="field field-span-2">
-                      <span>Notes</span>
-                      <textarea
-                        className="text-area"
-                        rows={3}
-                        maxLength={500}
-                        value={cycleEntryForm.notes}
-                        onChange={(event) =>
-                          setCycleEntryForm((current) => ({ ...current, notes: event.target.value }))
-                        }
-                        placeholder="Optional context like unusually hard training or recovery notes."
-                      />
-                    </label>
-                  </div>
-
-                  <div className="action-row">
-                    {editingCycleEntryId !== null ? (
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => {
-                          setEditingCycleEntryId(null)
-                          setCycleEntryForm(emptyCycleEntryForm)
-                        }}
-                      >
-                        Cancel edit
-                      </button>
-                    ) : null}
-                    <button type="submit" className="primary-button" disabled={isSavingCycleEntry}>
-                      {isSavingCycleEntry
-                        ? 'Saving history...'
-                        : editingCycleEntryId === null
-                          ? 'Add history entry'
-                          : 'Update history entry'}
-                    </button>
-                  </div>
-
-                  {cycleHistoryMessage || cycleHistoryError ? (
-                    <div className="feedback-stack">
-                      {cycleHistoryMessage ? <p className="feedback success">{cycleHistoryMessage}</p> : null}
-                      {cycleHistoryError ? <p className="feedback error">{cycleHistoryError}</p> : null}
-                    </div>
-                  ) : null}
-                </form>
-
-                <div className="entry-list">
-                  {cycleHistory.length === 0 ? (
-                    <StateCard
-                      title="No cycle history yet"
-                      description="Add your past period dates here to improve phase and next-cycle estimates over time."
-                    />
-                  ) : (
-                    cycleHistory.map((entry) => (
-                      <article key={entry.id} className="entry-card">
-                        <div className="entry-copy">
-                          <p className="entry-date">
-                            {formatDate(entry.periodStartDate)} to {formatDate(entry.periodEndDate)}
-                          </p>
-                          <strong className="entry-weight">
-                            {getDaySpan(entry.periodStartDate, entry.periodEndDate)} day
-                            {getDaySpan(entry.periodStartDate, entry.periodEndDate) === 1 ? '' : 's'}
-                          </strong>
-                          <span className="record-hint">Logged {formatDate(entry.createdAt)}</span>
-                          {entry.notes ? <p className="workout-notes">{entry.notes}</p> : null}
-                        </div>
-
-                        <div className="entry-actions">
-                          <button
-                            type="button"
-                            className="ghost-button"
-                            onClick={() => startEditingCycleEntry(entry)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="ghost-button subtle-danger-button"
-                            onClick={() => void handleDeleteCycleEntry(entry.id)}
-                            disabled={deletingCycleEntryId === entry.id}
-                          >
-                            {deletingCycleEntryId === entry.id ? 'Removing...' : 'Delete'}
-                          </button>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
+            ) : null}
           </div>
         </section>
       )}
@@ -910,28 +509,9 @@ function mapProfileToForm(profile: UserProfile): ProfileFormState {
   }
 }
 
-function mapCycleSettingsToForm(settings: CycleSettings): CycleSettingsFormState {
-  return {
-    isEnabled: settings.isEnabled,
-    lastPeriodStartDate: settings.lastPeriodStartDate ?? '',
-    averageCycleLengthDays:
-      settings.averageCycleLengthDays === null ? '' : settings.averageCycleLengthDays.toString(),
-    averagePeriodLengthDays:
-      settings.averagePeriodLengthDays === null ? '' : settings.averagePeriodLengthDays.toString(),
-    cycleRegularity: settings.cycleRegularity,
-    usesHormonalContraception: mapBooleanToTriState(settings.usesHormonalContraception),
-    isNaturallyCycling: mapBooleanToTriState(settings.isNaturallyCycling),
-  }
-}
-
 function toOptionalValue(value: string) {
   const trimmedValue = value.trim()
   return trimmedValue === '' ? null : trimmedValue
-}
-
-function toOptionalNumber(value: string) {
-  const trimmedValue = value.trim()
-  return trimmedValue === '' ? null : Number(trimmedValue)
 }
 
 function validateProfileForm(form: ProfileFormState) {
@@ -952,77 +532,4 @@ function validateProfileForm(form: ProfileFormState) {
   }
 
   return null
-}
-
-function validateCycleSettingsForm(form: CycleSettingsFormState) {
-  if (!form.isEnabled) {
-    return null
-  }
-
-  if (!form.lastPeriodStartDate) {
-    return 'Last period start date is required when cycle-aware guidance is enabled.'
-  }
-
-  const cycleLength = Number(form.averageCycleLengthDays)
-  if (!form.averageCycleLengthDays || Number.isNaN(cycleLength) || cycleLength < 20 || cycleLength > 45) {
-    return 'Average cycle length must be between 20 and 45 days.'
-  }
-
-  const periodLength = Number(form.averagePeriodLengthDays)
-  if (!form.averagePeriodLengthDays || Number.isNaN(periodLength) || periodLength < 2 || periodLength > 10) {
-    return 'Average period length must be between 2 and 10 days.'
-  }
-
-  if (periodLength >= cycleLength) {
-    return 'Average period length must be shorter than average cycle length.'
-  }
-
-  return null
-}
-
-function validateCycleEntryForm(form: CycleEntryFormState) {
-  if (!form.periodStartDate || !form.periodEndDate) {
-    return 'Period start and end dates are required.'
-  }
-
-  if (form.periodEndDate < form.periodStartDate) {
-    return 'Period end date must be on or after the start date.'
-  }
-
-  const today = new Date().toISOString().slice(0, 10)
-  if (form.periodStartDate > today || form.periodEndDate > today) {
-    return 'Cycle history cannot be saved in the future.'
-  }
-
-  return null
-}
-
-function mapBooleanToTriState(value: boolean | null) {
-  if (value === true) {
-    return 'yes'
-  }
-
-  if (value === false) {
-    return 'no'
-  }
-
-  return 'unknown'
-}
-
-function mapTriStateToBoolean(value: 'yes' | 'no' | 'unknown') {
-  if (value === 'yes') {
-    return true
-  }
-
-  if (value === 'no') {
-    return false
-  }
-
-  return null
-}
-
-function getDaySpan(startDate: string, endDate: string) {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1)
 }
