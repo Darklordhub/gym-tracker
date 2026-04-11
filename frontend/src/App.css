@@ -746,6 +746,16 @@
   margin-bottom: 20px;
 }
 
+.info-pill-cardio {
+  background: var(--accent-surface-strong);
+  color: var(--accent-strong);
+}
+
+.info-pill-strength {
+  background: var(--surface-overlay-strong);
+  color: var(--text-strong);
+}
+
 .suggestion-callout {
   display: grid;
   gap: 8px;
@@ -1454,6 +1464,13 @@
 
 .exercise-summary-meta {
   justify-items: end;
+}
+
+.cardio-summary-item {
+  border-style: solid;
+  background:
+    linear-gradient(180deg, var(--surface-overlay-subtle), transparent),
+    var(--surface-overlay-strong);
 }
 
 .record-card {

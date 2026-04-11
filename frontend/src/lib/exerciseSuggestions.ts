@@ -135,17 +135,19 @@ export function getWorkoutAssistantInsight(
   const weeklyTarget = goals?.weeklyWorkoutTarget ?? null
   const weeklyNudge =
     weeklyTarget === null
-      ? 'Set a weekly workout target to unlock consistency nudges.'
+      ? 'Set a weekly workout target to unlock consistency reminders.'
       : workoutsThisWeek >= weeklyTarget
-        ? `Weekly goal met. You have logged ${workoutsThisWeek} of ${weeklyTarget} planned workouts this week.`
-        : `${weeklyTarget - workoutsThisWeek} more workout${weeklyTarget - workoutsThisWeek === 1 ? '' : 's'} would keep you on track for this week.`
+        ? `You have already hit your weekly goal with ${workoutsThisWeek} of ${weeklyTarget} planned workouts logged.`
+        : `${weeklyTarget - workoutsThisWeek} more workout${weeklyTarget - workoutsThisWeek === 1 ? '' : 's'} would keep you on track this week.`
 
   const exerciseStats = buildExerciseStats(workouts)
 
   const prOpportunity =
-    [...exerciseStats.values()]
-      .filter((entry) => entry.recentBestWeightKg >= entry.personalBestWeightKg - 2.5)
-      .sort((left, right) => right.recentBestWeightKg - left.recentBestWeightKg)[0] ?? null
+    exerciseStats.size === 0
+      ? null
+      : [...exerciseStats.values()]
+          .filter((entry) => entry.recentBestWeightKg >= entry.personalBestWeightKg - 2.5)
+          .sort((left, right) => right.recentBestWeightKg - left.recentBestWeightKg)[0] ?? null
 
   const revisitSuggestions = [...exerciseStats.values()]
     .filter((entry) => entry.daysSinceLastSession >= 7)
@@ -165,7 +167,7 @@ export function getWorkoutAssistantInsight(
           exerciseName: prOpportunity.exerciseName,
           message:
             prOpportunity.recentBestWeightKg >= prOpportunity.personalBestWeightKg
-              ? `${prOpportunity.exerciseName} is already matching your best recent work. Consider a small PR attempt if session quality is good.`
+              ? `${prOpportunity.exerciseName} is already matching your best recent work. If the session feels good, a small PR attempt may be there.`
               : `${prOpportunity.exerciseName} is within ${Number((prOpportunity.personalBestWeightKg - prOpportunity.recentBestWeightKg).toFixed(1))} kg of your best lift.`,
           targetWeightKg: getSuggestedIncrease(prOpportunity.personalBestWeightKg),
         }
@@ -221,9 +223,9 @@ export function getDailyTrainingSuggestion(
   if (highFatigueSignals && highTrainingLoad) {
     return {
       trainingType: 'rest' as const,
-      title: 'Rest or keep movement very easy',
+      title: 'Rest or keep movement very light',
       message:
-        'Recent load is already high and your current recovery signals look strained. A rest day or a short low-intensity walk would be the safer call.',
+        'Recent load is already high and your recovery signals look strained. A full rest day or a short easy walk is the better call today.',
     }
   }
 
@@ -239,9 +241,9 @@ export function getDailyTrainingSuggestion(
   if (moderateTrainingLoad) {
     return {
       trainingType: 'cardio' as const,
-      title: 'Recovery cardio is a good option',
+      title: 'Recovery cardio is a solid option',
       message:
-        'Recent strength load is building. Low-intensity cardio can keep momentum up without stacking another demanding session.',
+        'Recent strength load is building. Low-intensity cardio can keep you moving without stacking another demanding lifting session.',
     }
   }
 
@@ -251,7 +253,7 @@ export function getDailyTrainingSuggestion(
       title: 'Strength work looks well supported',
       message:
         cycleGuidance?.estimatedCurrentPhase === 'Follicular' || cycleGuidance?.estimatedCurrentPhase === 'Ovulatory'
-          ? 'Recovery looks solid and this phase can often tolerate harder work better. Strength or higher-intensity training is reasonable if session quality feels good.'
+          ? 'Recovery looks solid and this phase can often tolerate harder work well. Strength or higher-intensity work is reasonable if the session feels sharp.'
           : 'Recovery looks good and recent load is manageable. A focused strength session should fit well today.',
     }
   }
@@ -259,9 +261,9 @@ export function getDailyTrainingSuggestion(
   if (recentWorkouts.length === 0) {
     return {
       trainingType: 'strength' as const,
-      title: 'Start with a simple strength session',
+      title: 'Start with a manageable session',
       message:
-        'You do not have much recent training load yet. A straightforward strength workout is a good default if energy feels normal.',
+        'You do not have much recent training load yet. A straightforward strength session is a good default if energy feels normal.',
     }
   }
 
@@ -269,7 +271,7 @@ export function getDailyTrainingSuggestion(
     trainingType: 'cardio' as const,
     title: 'Cardio is the balanced option today',
     message:
-      'Recent load is not excessive, but a moderate cardio session can keep you active without demanding as much recovery as another full strength day.',
+      'Recent load is manageable, and cardio is a balanced way to stay active without asking for as much recovery as another full strength day.',
   }
 }
 
@@ -288,7 +290,7 @@ function normalizeExerciseName(exerciseName: string) {
 function getPrOpportunity(currentWeightKg: number, personalBestWeightKg: number) {
   if (currentWeightKg >= personalBestWeightKg) {
     return {
-      message: 'You are already at your best logged weight. A small increase could create a new PR.',
+      message: 'You are already at your best logged weight. A small increase could set a new PR.',
       targetWeightKg: getSuggestedIncrease(personalBestWeightKg),
     }
   }

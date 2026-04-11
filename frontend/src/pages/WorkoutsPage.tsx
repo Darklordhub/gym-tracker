@@ -890,12 +890,12 @@ export function WorkoutsPage() {
                   <strong>
                     {assistantInsight.prOpportunity
                       ? `${assistantInsight.prOpportunity.exerciseName} PR window`
-                      : 'No immediate PR push'}
+                      : 'No clear PR push right now'}
                   </strong>
                   <span>
                     {assistantInsight.prOpportunity
                       ? `${assistantInsight.prOpportunity.message}${assistantInsight.prOpportunity.targetWeightKg ? ` Target ${assistantInsight.prOpportunity.targetWeightKg} kg.` : ''}`
-                      : 'Let the next few sessions confirm momentum before pushing heavier sets.'}
+                      : 'Build a little more recent strength data before pushing for a heavier top set.'}
                   </span>
                 </div>
 
@@ -1051,31 +1051,34 @@ export function WorkoutsPage() {
                 <small className="field-error">{quickLogErrors.exerciseEntries}</small>
               ) : null}
 
-              <div className="exercise-list">
-                {quickLogForm.exerciseEntries.map((exercise, exerciseIndex) => (
-                  <ExerciseEditorCard
-                    key={`quick-${exerciseIndex}`}
-                    title={`Exercise ${exerciseIndex + 1}`}
-                    sectionLabel="Quick log"
-                    exercise={exercise}
-                    errors={quickLogErrors.exercises[exerciseIndex]}
-                    workouts={workouts}
-                    onExerciseChange={(field, value) =>
-                      updateExercise('quick', exerciseIndex, field, value)
-                    }
-                    onSetChange={(setIndex, field, value) =>
-                      updateSet('quick', exerciseIndex, setIndex, field, value)
-                    }
-                    onAddSet={() => addSet('quick', exerciseIndex)}
-                    onRemoveSet={(setIndex) => removeSet('quick', exerciseIndex, setIndex)}
-                    onRemoveExercise={
-                      quickLogForm.exerciseEntries.length > 1
-                        ? () => removeExercise('quick', exerciseIndex)
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
+              {quickLogForm.exerciseEntries.length === 0 ? (
+                <StateCard
+                  title="No exercises yet"
+                  description="Add your first exercise when you are ready to build this strength workout."
+                />
+              ) : (
+                <div className="exercise-list">
+                  {quickLogForm.exerciseEntries.map((exercise, exerciseIndex) => (
+                    <ExerciseEditorCard
+                      key={`quick-${exerciseIndex}`}
+                      title={`Exercise ${exerciseIndex + 1}`}
+                      sectionLabel="Quick log"
+                      exercise={exercise}
+                      errors={quickLogErrors.exercises[exerciseIndex]}
+                      workouts={workouts}
+                      onExerciseChange={(field, value) =>
+                        updateExercise('quick', exerciseIndex, field, value)
+                      }
+                      onSetChange={(setIndex, field, value) =>
+                        updateSet('quick', exerciseIndex, setIndex, field, value)
+                      }
+                      onAddSet={() => addSet('quick', exerciseIndex)}
+                      onRemoveSet={(setIndex) => removeSet('quick', exerciseIndex, setIndex)}
+                      onRemoveExercise={() => removeExercise('quick', exerciseIndex)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="action-row action-row-prominent">
@@ -1282,6 +1285,15 @@ export function WorkoutsPage() {
                           : `${workout.exerciseEntries.length} exercises`}
                       </strong>
                     </div>
+                    <span
+                      className={
+                        workout.workoutType === 'cardio'
+                          ? 'info-pill info-pill-cardio'
+                          : 'info-pill info-pill-strength'
+                      }
+                    >
+                      {workout.workoutType === 'cardio' ? 'Cardio' : 'Strength'}
+                    </span>
                   </div>
 
                   {workout.notes ? <p className="workout-notes">{workout.notes}</p> : null}
@@ -1299,6 +1311,9 @@ export function WorkoutsPage() {
                         <div className="exercise-summary-meta">
                           <span className="info-pill">
                             {formatCardioIntensity(workout.cardioIntensity)}
+                          </span>
+                          <span className="record-hint">
+                            {workout.cardioDistanceKm ? 'Duration, distance, intensity' : 'Duration and intensity'}
                           </span>
                         </div>
                       </div>
