@@ -350,11 +350,15 @@ export function CyclePage() {
         <div className="stats-grid">
           <article className="stat-card stat-card-emphasis">
             <span className="stat-label">Current Phase</span>
-            <strong>{cycleGuidance?.estimatedCurrentPhase ?? 'Building estimate'}</strong>
+            <strong>
+              {cycleSettings.canPredict
+                ? cycleGuidance?.estimatedCurrentPhase ?? 'Building estimate'
+                : 'Setup incomplete'}
+            </strong>
             <span className="stat-subtext">
-              {cycleGuidance?.currentCycleDay
+              {cycleSettings.canPredict && cycleGuidance?.currentCycleDay
                 ? `Cycle day ${cycleGuidance.currentCycleDay}`
-                : 'Add enough data to estimate your current phase'}
+                : cycleSettings.setupMessage ?? 'Add enough data to estimate your current phase'}
             </span>
           </article>
           <article className="stat-card">
@@ -396,7 +400,11 @@ export function CyclePage() {
             <article className="assistant-card assistant-card-highlight">
               <span className="stat-label">Current recommendation</span>
               <strong>{cycleGuidance?.guidanceHeadline ?? 'No guidance yet'}</strong>
-              <p>{cycleGuidance?.guidanceMessage ?? 'Add more cycle data to unlock a more useful estimate.'}</p>
+              <p>
+                {cycleSettings.setupMessage ??
+                  cycleGuidance?.guidanceMessage ??
+                  'Add more cycle data to unlock a more useful estimate.'}
+              </p>
             </article>
 
             <article className="assistant-card">
@@ -849,22 +857,30 @@ function validateCycleSettingsForm(form: CycleSettingsFormState) {
     return null
   }
 
-  if (!form.lastPeriodStartDate) {
-    return 'Last period start date is required when cycle-aware guidance is enabled.'
+  if (form.averageCycleLengthDays) {
+    const cycleLength = Number(form.averageCycleLengthDays)
+    if (Number.isNaN(cycleLength) || cycleLength < 20 || cycleLength > 45) {
+      return 'Average cycle length must be between 20 and 45 days.'
+    }
   }
 
-  const cycleLength = Number(form.averageCycleLengthDays)
-  if (!form.averageCycleLengthDays || Number.isNaN(cycleLength) || cycleLength < 20 || cycleLength > 45) {
-    return 'Average cycle length must be between 20 and 45 days.'
+  if (form.averagePeriodLengthDays) {
+    const periodLength = Number(form.averagePeriodLengthDays)
+    if (Number.isNaN(periodLength) || periodLength < 2 || periodLength > 10) {
+      return 'Average period length must be between 2 and 10 days.'
+    }
   }
 
-  const periodLength = Number(form.averagePeriodLengthDays)
-  if (!form.averagePeriodLengthDays || Number.isNaN(periodLength) || periodLength < 2 || periodLength > 10) {
-    return 'Average period length must be between 2 and 10 days.'
+  if (form.averageCycleLengthDays && form.averagePeriodLengthDays) {
+    const cycleLength = Number(form.averageCycleLengthDays)
+    const periodLength = Number(form.averagePeriodLengthDays)
+    if (periodLength >= cycleLength) {
+      return 'Average period length must be shorter than average cycle length.'
+    }
   }
 
-  if (periodLength >= cycleLength) {
-    return 'Average period length must be shorter than average cycle length.'
+  if (form.lastPeriodStartDate && form.lastPeriodStartDate > new Date().toISOString().slice(0, 10)) {
+    return 'Last period start date cannot be in the future.'
   }
 
   return null

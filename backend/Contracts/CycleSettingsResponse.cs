@@ -10,4 +10,7 @@ public class CycleSettingsResponse
     public bool? UsesHormonalContraception { get; set; }
     public bool? IsNaturallyCycling { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public bool IsSetupComplete { get; set; }
+    public bool CanPredict { get; set; }
+    public string? SetupMessage { get; set; }
 }

@@ -280,6 +280,12 @@ public class CycleController : ControllerBase
 
     private static CycleSettingsResponse MapSettings(UserCycleSettings? settings)
     {
+        var isSetupComplete = settings is not null
+            && settings.IsEnabled
+            && settings.LastPeriodStartDate.HasValue
+            && settings.AverageCycleLengthDays.HasValue
+            && settings.AveragePeriodLengthDays.HasValue;
+
         return new CycleSettingsResponse
         {
             IsEnabled = settings?.IsEnabled ?? false,
@@ -290,6 +296,9 @@ public class CycleController : ControllerBase
             UsesHormonalContraception = settings?.UsesHormonalContraception,
             IsNaturallyCycling = settings?.IsNaturallyCycling,
             UpdatedAt = settings?.UpdatedAt,
+            IsSetupComplete = isSetupComplete,
+            CanPredict = isSetupComplete,
+            SetupMessage = BuildSetupMessage(settings, isSetupComplete),
         };
     }
 
@@ -323,9 +332,24 @@ public class CycleController : ControllerBase
         };
     }
 
-    private static string NormalizeRegularity(string value)
+    private static string NormalizeRegularity(string? value)
     {
-        return value.Trim().ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(value) ? "regular" : value.Trim().ToLowerInvariant();
+    }
+
+    private static string? BuildSetupMessage(UserCycleSettings? settings, bool isSetupComplete)
+    {
+        if (settings is null || !settings.IsEnabled)
+        {
+            return null;
+        }
+
+        if (isSetupComplete)
+        {
+            return null;
+        }
+
+        return "Complete your cycle setup to enable prediction and guidance.";
     }
 
     private static string NormalizeMood(string value)

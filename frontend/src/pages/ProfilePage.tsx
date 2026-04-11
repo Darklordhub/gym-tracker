@@ -46,6 +46,9 @@ const emptyCycleSettings: CycleSettings = {
   usesHormonalContraception: null,
   isNaturallyCycling: null,
   updatedAt: null,
+  isSetupComplete: false,
+  canPredict: false,
+  setupMessage: null,
 }
 
 export function ProfilePage() {
@@ -192,7 +195,7 @@ export function ProfilePage() {
       window.dispatchEvent(new CustomEvent('cycle-settings-updated', { detail: { isEnabled: savedSettings.isEnabled } }))
       setCycleMessage(
         savedSettings.isEnabled
-          ? 'Cycle-aware guidance enabled. You can manage the full feature from the Cycle page.'
+          ? savedSettings.setupMessage ?? 'Cycle-aware guidance enabled. You can manage the full feature from the Cycle page.'
           : 'Cycle-aware guidance disabled. Cycle-specific guidance and navigation are now hidden.',
       )
     } catch (error) {
@@ -470,10 +473,14 @@ export function ProfilePage() {
 
                 <article className="assistant-card">
                   <span className="stat-label">Current guidance</span>
-                  <strong>{cycleGuidance?.estimatedCurrentPhase ?? 'No cycle estimate active'}</strong>
+                  <strong>
+                    {cycleSettings.canPredict
+                      ? cycleGuidance?.estimatedCurrentPhase ?? 'Building estimate'
+                      : 'Setup incomplete'}
+                  </strong>
                   <p>
                     {cycleSettings.isEnabled
-                      ? cycleGuidance?.guidanceMessage ?? 'Finish your cycle setup on the Cycle page to get more useful guidance.'
+                      ? cycleSettings.setupMessage ?? cycleGuidance?.guidanceMessage ?? 'Finish your cycle setup on the Cycle page to get more useful guidance.'
                       : 'No cycle-aware training guidance is shown across the app while the feature is off.'}
                   </p>
                 </article>

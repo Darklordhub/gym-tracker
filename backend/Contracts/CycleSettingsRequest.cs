@@ -13,34 +13,19 @@ public class CycleSettingsRequest : IValidatableObject
     [Range(2, 10)]
     public int? AveragePeriodLengthDays { get; set; }
 
-    [Required]
     [StringLength(40)]
-    public string CycleRegularity { get; set; } = "regular";
+    public string? CycleRegularity { get; set; }
 
     public bool? UsesHormonalContraception { get; set; }
     public bool? IsNaturallyCycling { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (IsEnabled && LastPeriodStartDate is null)
+        if (string.IsNullOrWhiteSpace(CycleRegularity))
         {
             yield return new ValidationResult(
-                "Last period start date is required when cycle-aware guidance is enabled.",
-                [nameof(LastPeriodStartDate)]);
-        }
-
-        if (IsEnabled && AverageCycleLengthDays is null)
-        {
-            yield return new ValidationResult(
-                "Average cycle length is required when cycle-aware guidance is enabled.",
-                [nameof(AverageCycleLengthDays)]);
-        }
-
-        if (IsEnabled && AveragePeriodLengthDays is null)
-        {
-            yield return new ValidationResult(
-                "Average period length is required when cycle-aware guidance is enabled.",
-                [nameof(AveragePeriodLengthDays)]);
+                "Cycle regularity is required.",
+                [nameof(CycleRegularity)]);
         }
 
         if (AverageCycleLengthDays.HasValue && AveragePeriodLengthDays.HasValue

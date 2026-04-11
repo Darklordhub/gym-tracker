@@ -9,6 +9,9 @@ export type CycleSettings = {
   usesHormonalContraception: boolean | null
   isNaturallyCycling: boolean | null
   updatedAt: string | null
+  isSetupComplete: boolean
+  canPredict: boolean
+  setupMessage: string | null
 }
 
 export type CycleSettingsPayload = {
