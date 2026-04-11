@@ -1,16 +1,26 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { fetchLatestReadinessLog, upsertReadinessLog } from '../api/readiness'
 import { fetchCycleGuidance } from '../api/cycle'
 import { fetchGoals, updateGoals } from '../api/goals'
 import { fetchWeightEntries } from '../api/weightEntries'
 import { fetchWorkouts } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
 import { getWorkoutAssistantInsight } from '../lib/exerciseSuggestions'
-import { formatDate } from '../lib/format'
+import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings, GoalSettingsPayload } from '../types/goals'
+import type { ReadinessLog } from '../types/readiness'
 import type { WeightEntry } from '../types/weight'
 import type { Workout } from '../types/workout'
+
+const initialReadinessForm = {
+  energyLevel: 2,
+  sorenessLevel: 2,
+  sleepQuality: 2,
+  motivationLevel: 2,
+  notes: '',
+}
 
 export function DashboardPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
@@ -31,6 +41,11 @@ export function DashboardPage() {
   const [goalMessage, setGoalMessage] = useState<string | null>(null)
   const [goalErrorMessage, setGoalErrorMessage] = useState<string | null>(null)
   const [cycleGuidance, setCycleGuidance] = useState<CycleGuidance | null>(null)
+  const [readinessLog, setReadinessLog] = useState<ReadinessLog | null>(null)
+  const [readinessForm, setReadinessForm] = useState(initialReadinessForm)
+  const [isSavingReadiness, setIsSavingReadiness] = useState(false)
+  const [readinessMessage, setReadinessMessage] = useState<string | null>(null)
+  const [readinessErrorMessage, setReadinessErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     void loadDashboard()
@@ -103,9 +118,11 @@ export function DashboardPage() {
   }, [goals, weightEntries, workouts])
 
   const assistantInsight = useMemo(
-    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance),
-    [cycleGuidance, goals, workouts],
+    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog),
+    [cycleGuidance, goals, readinessLog, workouts],
   )
+
+  const hasTodayReadinessLog = readinessLog?.date === getTodayDateValue()
 
   async function loadDashboard() {
     try {
@@ -113,18 +130,31 @@ export function DashboardPage() {
       setErrorMessage(null)
       setGoalMessage(null)
       setGoalErrorMessage(null)
+      setReadinessMessage(null)
+      setReadinessErrorMessage(null)
 
-      const [workoutData, weightData, goalsData, cycleGuidanceData] = await Promise.all([
+      const [workoutData, weightData, goalsData, cycleGuidanceData, latestReadinessLog] = await Promise.all([
         fetchWorkouts(),
         fetchWeightEntries(),
         fetchGoals(),
         fetchCycleGuidance().catch(() => null),
+        fetchLatestReadinessLog().catch(() => null),
       ])
 
       setWorkouts(workoutData)
       setWeightEntries(weightData)
       applyGoalState(goalsData)
       setCycleGuidance(cycleGuidanceData)
+      setReadinessLog(latestReadinessLog)
+      if (latestReadinessLog?.date === getTodayDateValue()) {
+        setReadinessForm({
+          energyLevel: latestReadinessLog.energyLevel,
+          sorenessLevel: latestReadinessLog.sorenessLevel,
+          sleepQuality: latestReadinessLog.sleepQuality,
+          motivationLevel: latestReadinessLog.motivationLevel,
+          notes: latestReadinessLog.notes ?? '',
+        })
+      }
     } catch (error) {
       setErrorMessage(getRequestErrorMessage(error, 'Unable to load dashboard data.'))
     } finally {
@@ -165,6 +195,32 @@ export function DashboardPage() {
         nextGoals.weeklyWorkoutTarget === null ? '' : nextGoals.weeklyWorkoutTarget.toString(),
       fitnessPhase: nextGoals.fitnessPhase,
     })
+  }
+
+  async function handleReadinessSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    try {
+      setIsSavingReadiness(true)
+      setReadinessMessage(null)
+      setReadinessErrorMessage(null)
+
+      const savedLog = await upsertReadinessLog({
+        date: getTodayDateValue(),
+        energyLevel: readinessForm.energyLevel,
+        sorenessLevel: readinessForm.sorenessLevel,
+        sleepQuality: readinessForm.sleepQuality,
+        motivationLevel: readinessForm.motivationLevel,
+        notes: readinessForm.notes.trim() === '' ? null : readinessForm.notes.trim(),
+      })
+
+      setReadinessLog(savedLog)
+      setReadinessMessage(hasTodayReadinessLog ? 'Today’s check-in updated.' : 'Today’s check-in saved.')
+    } catch (error) {
+      setReadinessErrorMessage(getRequestErrorMessage(error, 'Unable to save today’s check-in.'))
+    } finally {
+      setIsSavingReadiness(false)
+    }
   }
 
   return (
@@ -344,6 +400,90 @@ export function DashboardPage() {
                 </article>
               </div>
             </div>
+          )}
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>How are you feeling today?</h2>
+              <p>Log a quick readiness check-in so daily training suggestions reflect how you actually feel.</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <StateCard title="Loading check-in" description="Preparing today’s readiness prompt." loading />
+          ) : errorMessage ? (
+            <StateCard title="Check-in unavailable" description={errorMessage} tone="error" />
+          ) : (
+            <form className="readiness-form" onSubmit={handleReadinessSubmit}>
+              <div className="readiness-grid">
+                <ReadinessSelector
+                  label="Energy"
+                  value={readinessForm.energyLevel}
+                  lowLabel="Low"
+                  mediumLabel="Okay"
+                  highLabel="High"
+                  onChange={(value) => setReadinessForm((current) => ({ ...current, energyLevel: value }))}
+                />
+                <ReadinessSelector
+                  label="Soreness"
+                  value={readinessForm.sorenessLevel}
+                  lowLabel="Light"
+                  mediumLabel="Some"
+                  highLabel="Heavy"
+                  onChange={(value) => setReadinessForm((current) => ({ ...current, sorenessLevel: value }))}
+                />
+                <ReadinessSelector
+                  label="Sleep"
+                  value={readinessForm.sleepQuality}
+                  lowLabel="Poor"
+                  mediumLabel="Okay"
+                  highLabel="Good"
+                  onChange={(value) => setReadinessForm((current) => ({ ...current, sleepQuality: value }))}
+                />
+                <ReadinessSelector
+                  label="Motivation"
+                  value={readinessForm.motivationLevel}
+                  lowLabel="Low"
+                  mediumLabel="Steady"
+                  highLabel="High"
+                  onChange={(value) => setReadinessForm((current) => ({ ...current, motivationLevel: value }))}
+                />
+              </div>
+
+              <label className="field">
+                <span>Notes (optional)</span>
+                <textarea
+                  className="text-area"
+                  rows={3}
+                  maxLength={500}
+                  value={readinessForm.notes}
+                  onChange={(event) => setReadinessForm((current) => ({ ...current, notes: event.target.value }))}
+                  placeholder="Short context if something is affecting training today."
+                />
+              </label>
+
+              <div className="feedback-stack">
+                {hasTodayReadinessLog && readinessLog ? (
+                  <p className="feedback success">
+                    Today&apos;s status: {readinessLog.readinessLabel}. Energy {readinessLog.energyLevel}/3, soreness{' '}
+                    {readinessLog.sorenessLevel}/3, sleep {readinessLog.sleepQuality}/3, motivation{' '}
+                    {readinessLog.motivationLevel}/3.
+                  </p>
+                ) : (
+                  <p className="feedback">No check-in logged yet today. A 10-second update improves today&apos;s recommendation.</p>
+                )}
+                {readinessMessage ? <p className="feedback success">{readinessMessage}</p> : null}
+                {readinessErrorMessage ? <p className="feedback error">{readinessErrorMessage}</p> : null}
+              </div>
+
+              <div className="action-row">
+                <button type="submit" className="primary-button" disabled={isSavingReadiness}>
+                  {isSavingReadiness ? 'Saving check-in...' : hasTodayReadinessLog ? 'Update today’s check-in' : 'Save today’s check-in'}
+                </button>
+              </div>
+            </form>
           )}
         </div>
 
@@ -531,6 +671,42 @@ export function DashboardPage() {
         </div>
       </section>
     </main>
+  )
+}
+
+type ReadinessSelectorProps = {
+  label: string
+  value: number
+  lowLabel: string
+  mediumLabel: string
+  highLabel: string
+  onChange: (value: number) => void
+}
+
+function ReadinessSelector({
+  label,
+  value,
+  lowLabel,
+  mediumLabel,
+  highLabel,
+  onChange,
+}: ReadinessSelectorProps) {
+  return (
+    <div className="readiness-selector">
+      <span>{label}</span>
+      <div className="readiness-option-row" role="group" aria-label={label}>
+        {[1, 2, 3].map((option) => (
+          <button
+            key={option}
+            type="button"
+            className={option === value ? 'readiness-option readiness-option-active' : 'readiness-option'}
+            onClick={() => onChange(option)}
+          >
+            {option === 1 ? lowLabel : option === 2 ? mediumLabel : highLabel}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

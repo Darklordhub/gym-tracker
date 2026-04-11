@@ -1592,6 +1592,58 @@
   gap: 16px;
 }
 
+.readiness-form {
+  display: grid;
+  gap: 16px;
+}
+
+.readiness-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.readiness-selector {
+  display: grid;
+  gap: 8px;
+}
+
+.readiness-selector span {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.readiness-option-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.readiness-option {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-overlay);
+  color: var(--text);
+  font: inherit;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.readiness-option:hover {
+  border-color: var(--accent-border);
+  background: var(--surface-overlay-subtle);
+}
+
+.readiness-option-active {
+  border-color: var(--accent-border-strong);
+  background: var(--accent-surface);
+  color: var(--accent-strong);
+}
+
 .goal-progress-card {
   display: grid;
   gap: 12px;
@@ -2072,6 +2124,7 @@
   .weight-form,
   .auth-form,
   .goal-form,
+  .readiness-form,
   .goal-progress-list,
   .exercise-list,
   .workout-list,
@@ -2087,6 +2140,10 @@
   .select-input {
     height: 46px;
     padding: 0 12px;
+  }
+
+  .readiness-option-row {
+    grid-template-columns: 1fr;
   }
 
   .text-area {

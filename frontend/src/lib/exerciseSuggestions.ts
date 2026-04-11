@@ -1,6 +1,7 @@
 import type { Workout } from '../types/workout'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings } from '../types/goals'
+import type { ReadinessLog } from '../types/readiness'
 
 export type ExerciseSuggestion = {
   suggestedWeightKg: number
@@ -122,6 +123,7 @@ export function getWorkoutAssistantInsight(
   workouts: Workout[],
   goals: GoalSettings | null,
   cycleGuidance?: CycleGuidance | null,
+  readinessLog?: ReadinessLog | null,
   now = new Date(),
 ): WorkoutAssistantInsight {
   const weekStart = startOfWeek(now)
@@ -161,7 +163,7 @@ export function getWorkoutAssistantInsight(
 
   return {
     weeklyNudge,
-    todaySuggestion: getDailyTrainingSuggestion(workouts, cycleGuidance, now),
+    todaySuggestion: getDailyTrainingSuggestion(workouts, cycleGuidance, readinessLog, now),
     prOpportunity: prOpportunity
       ? {
           exerciseName: prOpportunity.exerciseName,
@@ -179,6 +181,7 @@ export function getWorkoutAssistantInsight(
 export function getDailyTrainingSuggestion(
   workouts: Workout[],
   cycleGuidance?: CycleGuidance | null,
+  readinessLog?: ReadinessLog | null,
   now = new Date(),
 ) {
   const recentWindowStart = new Date(now)
@@ -220,12 +223,34 @@ export function getDailyTrainingSuggestion(
       cycleGuidance?.recentRecoveryFeeling === undefined ||
       cycleGuidance.recentRecoveryFeeling >= 3)
 
+  const readiness = getCurrentReadinessSignal(readinessLog, now)
+
+  if (readiness?.level === 'low') {
+    if (highTrainingLoad || highFatigueSignals) {
+      return {
+        trainingType: 'rest' as const,
+        title: 'Recovery should lead today',
+        message:
+          'Today’s check-in points to low readiness, and your broader recovery signals are not asking for more stress. Rest or keep movement very light.',
+      }
+    }
+
+    return {
+      trainingType: 'cardio' as const,
+      title: 'Keep it easy today',
+      message:
+        'Today’s check-in points to lower readiness. Easy cardio or a short walk is a better fit than a demanding strength session.',
+    }
+  }
+
   if (highFatigueSignals && highTrainingLoad) {
     return {
       trainingType: 'rest' as const,
       title: 'Rest or keep movement very light',
       message:
-        'Recent load is already high and your recovery signals look strained. A full rest day or a short easy walk is the better call today.',
+        readiness?.level === 'high'
+          ? 'You feel ready, but recent load and fatigue signals are still pointing toward recovery. Keep today light rather than forcing another hard session.'
+          : 'Recent load is already high and your recovery signals look strained. A full rest day or a short easy walk is the better call today.',
     }
   }
 
@@ -234,7 +259,18 @@ export function getDailyTrainingSuggestion(
       trainingType: 'cardio' as const,
       title: 'Low-intensity cardio fits better today',
       message:
-        'Recovery signals look softer today. A walk, easy cycle, or other low-intensity cardio session is likely a better fit than another hard strength workout.',
+        readiness?.level === 'high'
+          ? 'Your check-in looks solid, but broader fatigue signals still favor a walk, easy cycle, or other low-intensity cardio over a hard strength session.'
+          : 'Recovery signals look softer today. A walk, easy cycle, or other low-intensity cardio session is likely a better fit than another hard strength workout.',
+    }
+  }
+
+  if (readiness?.level === 'medium' && moderateTrainingLoad) {
+    return {
+      trainingType: 'cardio' as const,
+      title: 'Choose a moderate day',
+      message:
+        'Today’s check-in is steady rather than sharp, and recent load is already building. Recovery cardio or a controlled strength session would both make sense.',
     }
   }
 
@@ -258,6 +294,24 @@ export function getDailyTrainingSuggestion(
     }
   }
 
+  if (readiness?.level === 'high') {
+    return {
+      trainingType: 'strength' as const,
+      title: 'You look ready for strength work',
+      message:
+        'Today’s check-in looks strong and recent load is manageable. A focused strength session or a higher-quality main lift should fit well.',
+    }
+  }
+
+  if (readiness?.level === 'medium') {
+    return {
+      trainingType: 'cardio' as const,
+      title: 'A balanced session fits best',
+      message:
+        'Today’s check-in looks steady. Moderate cardio or a controlled strength session both fit, but there is no strong case for pushing hard.',
+    }
+  }
+
   if (recentWorkouts.length === 0) {
     return {
       trainingType: 'strength' as const,
@@ -273,6 +327,27 @@ export function getDailyTrainingSuggestion(
     message:
       'Recent load is manageable, and cardio is a balanced way to stay active without asking for as much recovery as another full strength day.',
   }
+}
+
+function getCurrentReadinessSignal(readinessLog: ReadinessLog | null | undefined, now: Date) {
+  if (!readinessLog) {
+    return null
+  }
+
+  const today = now.toISOString().slice(0, 10)
+  if (readinessLog.date !== today) {
+    return null
+  }
+
+  if (readinessLog.readinessScore >= 2.5) {
+    return { level: 'high' as const }
+  }
+
+  if (readinessLog.readinessScore >= 1.9) {
+    return { level: 'medium' as const }
+  }
+
+  return { level: 'low' as const }
 }
 
 function getSuggestedIncrease(weightKg: number) {

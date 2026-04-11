@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchCycleGuidance } from '../api/cycle'
 import { fetchGoals } from '../api/goals'
+import { fetchLatestReadinessLog } from '../api/readiness'
 import {
   completeActiveWorkoutSession,
   createWorkout,
@@ -18,6 +19,7 @@ import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings } from '../types/goals'
+import type { ReadinessLog } from '../types/readiness'
 import type {
   ActiveWorkoutSession,
   CardioActivityType,
@@ -235,6 +237,7 @@ export function WorkoutsPage() {
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
   const [goals, setGoals] = useState<GoalSettings | null>(null)
   const [cycleGuidance, setCycleGuidance] = useState<CycleGuidance | null>(null)
+  const [readinessLog, setReadinessLog] = useState<ReadinessLog | null>(null)
   const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null)
   const [activeForm, setActiveForm] = useState<WorkoutFormState>(initialActiveFormState)
   const [activeErrors, setActiveErrors] = useState<WorkoutFormErrors>({ exercises: [] })
@@ -314,8 +317,8 @@ export function WorkoutsPage() {
   }, [activeForm.exerciseEntries])
 
   const assistantInsight = useMemo(
-    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance),
-    [cycleGuidance, goals, workouts],
+    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog),
+    [cycleGuidance, goals, readinessLog, workouts],
   )
 
   async function loadData() {
@@ -323,18 +326,20 @@ export function WorkoutsPage() {
       setIsLoading(true)
       setErrorMessage(null)
 
-      const [workoutData, templateData, currentActiveSession, goalData, cycleGuidanceData] = await Promise.all([
+      const [workoutData, templateData, currentActiveSession, goalData, cycleGuidanceData, latestReadinessLog] = await Promise.all([
         fetchWorkouts(),
         fetchWorkoutTemplates(),
         fetchActiveWorkoutSession(),
         fetchGoals().catch(() => null),
         fetchCycleGuidance().catch(() => null),
+        fetchLatestReadinessLog().catch(() => null),
       ])
 
       setWorkouts(workoutData)
       setTemplates(templateData)
       setGoals(goalData)
       setCycleGuidance(cycleGuidanceData)
+      setReadinessLog(latestReadinessLog)
       setActiveSession(currentActiveSession)
       setActiveForm(currentActiveSession ? mapSessionToForm(currentActiveSession) : initialActiveFormState())
     } catch (error) {
