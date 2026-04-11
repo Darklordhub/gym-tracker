@@ -103,8 +103,8 @@ export function DashboardPage() {
   }, [goals, weightEntries, workouts])
 
   const assistantInsight = useMemo(
-    () => getWorkoutAssistantInsight(workouts, goals),
-    [goals, workouts],
+    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance),
+    [cycleGuidance, goals, workouts],
   )
 
   async function loadDashboard() {
@@ -412,6 +412,15 @@ export function DashboardPage() {
                 <strong>Weekly focus</strong>
                 <p>{assistantInsight.weeklyNudge}</p>
                 <span className="record-hint">Based on your current weekly workout target.</span>
+              </article>
+
+              <article className="assistant-card">
+                <span className="stat-label">Today&apos;s training suggestion</span>
+                <strong>{assistantInsight.todaySuggestion.title}</strong>
+                <p>{assistantInsight.todaySuggestion.message}</p>
+                <span className="record-hint">
+                  Recommended focus: {assistantInsight.todaySuggestion.trainingType}
+                </span>
               </article>
 
               <article className="assistant-card">

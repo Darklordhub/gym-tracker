@@ -26,7 +26,7 @@ export function generateNotifications(
     const workoutDate = new Date(workout.date)
     return workoutDate >= weekStart
   }).length
-  const assistantInsight = getWorkoutAssistantInsight(sortedWorkouts, goals, now)
+  const assistantInsight = getWorkoutAssistantInsight(sortedWorkouts, goals, undefined, now)
 
   if (goals?.weeklyWorkoutTarget) {
     if (workoutsThisWeek >= goals.weeklyWorkoutTarget) {

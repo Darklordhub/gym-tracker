@@ -19,6 +19,8 @@ import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings } from '../types/goals'
 import type {
   ActiveWorkoutSession,
+  CardioActivityType,
+  CardioIntensity,
   ExerciseEntryPayload,
   Workout,
   WorkoutTemplate,
@@ -59,6 +61,24 @@ type TemplateFormErrors = {
   name?: string
 }
 
+type CardioFormState = {
+  date: string
+  cardioActivityType: CardioActivityType
+  cardioDurationMinutes: string
+  cardioDistanceKm: string
+  cardioIntensity: CardioIntensity
+  notes: string
+}
+
+type CardioFormErrors = {
+  date?: string
+  cardioActivityType?: string
+  cardioDurationMinutes?: string
+  cardioDistanceKm?: string
+  cardioIntensity?: string
+  notes?: string
+}
+
 const createSetForm = (): ExerciseSetFormState => ({
   reps: '',
   weightKg: '',
@@ -79,6 +99,15 @@ const initialActiveFormState = (): WorkoutFormState => ({
   date: getTodayDateValue(),
   notes: '',
   exerciseEntries: [],
+})
+
+const initialCardioFormState = (): CardioFormState => ({
+  date: getTodayDateValue(),
+  cardioActivityType: 'walking',
+  cardioDurationMinutes: '',
+  cardioDistanceKm: '',
+  cardioIntensity: 'low',
+  notes: '',
 })
 
 function validateWorkoutForm(
@@ -210,6 +239,8 @@ export function WorkoutsPage() {
   const [activeErrors, setActiveErrors] = useState<WorkoutFormErrors>({ exercises: [] })
   const [quickLogForm, setQuickLogForm] = useState<WorkoutFormState>(initialQuickLogFormState)
   const [quickLogErrors, setQuickLogErrors] = useState<WorkoutFormErrors>({ exercises: [] })
+  const [cardioForm, setCardioForm] = useState<CardioFormState>(initialCardioFormState)
+  const [cardioErrors, setCardioErrors] = useState<CardioFormErrors>({})
   const [workoutSearch, setWorkoutSearch] = useState('')
   const [workoutDateFrom, setWorkoutDateFrom] = useState('')
   const [workoutDateTo, setWorkoutDateTo] = useState('')
@@ -217,6 +248,7 @@ export function WorkoutsPage() {
   const [templateErrors, setTemplateErrors] = useState<TemplateFormErrors>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingCardio, setIsSavingCardio] = useState(false)
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
   const [isStartingSession, setIsStartingSession] = useState(false)
   const [isSavingSession, setIsSavingSession] = useState(false)
@@ -244,36 +276,10 @@ export function WorkoutsPage() {
     return {
       latestWorkout,
       totalWorkouts: workouts.length,
+      cardioSessions: workouts.filter((workout) => workout.workoutType === 'cardio').length,
       totalExercises,
       totalSets,
     }
-  }, [workouts])
-
-  const personalRecords = useMemo(() => {
-    const records = new Map<string, { exerciseName: string; weightKg: number; date: string }>()
-
-    const sortedByDate = [...workouts].sort(
-      (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime() || right.id - left.id,
-    )
-
-    for (const workout of sortedByDate) {
-      for (const exercise of workout.exerciseEntries) {
-        const key = exercise.exerciseName.trim().toUpperCase()
-        const current = records.get(key)
-
-        if (!current || exercise.personalRecordWeightKg >= current.weightKg) {
-          records.set(key, {
-            exerciseName: exercise.exerciseName,
-            weightKg: exercise.personalRecordWeightKg,
-            date: workout.date,
-          })
-        }
-      }
-    }
-
-    return [...records.values()].sort(
-      (left, right) => right.weightKg - left.weightKg || left.exerciseName.localeCompare(right.exerciseName),
-    )
   }, [workouts])
 
   const filteredWorkouts = useMemo(() => {
@@ -286,6 +292,7 @@ export function WorkoutsPage() {
       const matchesSearch =
         !normalizedSearch ||
         workout.notes.toUpperCase().includes(normalizedSearch) ||
+        (workout.cardioActivityType?.toUpperCase().includes(normalizedSearch) ?? false) ||
         workout.exerciseEntries.some((exercise) =>
           exercise.exerciseName.trim().toUpperCase().includes(normalizedSearch),
         )
@@ -305,8 +312,8 @@ export function WorkoutsPage() {
   }, [activeForm.exerciseEntries])
 
   const assistantInsight = useMemo(
-    () => getWorkoutAssistantInsight(workouts, goals),
-    [goals, workouts],
+    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance),
+    [cycleGuidance, goals, workouts],
   )
 
   async function loadData() {
@@ -338,6 +345,11 @@ export function WorkoutsPage() {
   function resetQuickLogForm() {
     setQuickLogForm(initialQuickLogFormState())
     setQuickLogErrors({ exercises: [] })
+  }
+
+  function resetCardioForm() {
+    setCardioForm(initialCardioFormState())
+    setCardioErrors({})
   }
 
   function resetActiveForm(session: ActiveWorkoutSession | null) {
@@ -495,6 +507,42 @@ export function WorkoutsPage() {
     }
   }
 
+  async function handleCardioSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const nextErrors = validateCardioForm(cardioForm)
+    setCardioErrors(nextErrors)
+    setFeedback(null)
+    setErrorMessage(null)
+
+    if (hasCardioErrors(nextErrors)) {
+      return
+    }
+
+    try {
+      setIsSavingCardio(true)
+      const createdWorkout = await createWorkout({
+        date: cardioForm.date,
+        workoutType: 'cardio',
+        notes: cardioForm.notes.trim(),
+        exerciseEntries: [],
+        cardioActivityType: cardioForm.cardioActivityType,
+        cardioDurationMinutes: Number(cardioForm.cardioDurationMinutes),
+        cardioDistanceKm:
+          cardioForm.cardioDistanceKm.trim() === '' ? null : Number(cardioForm.cardioDistanceKm),
+        cardioIntensity: cardioForm.cardioIntensity,
+      })
+
+      setWorkouts((current) => [createdWorkout, ...current].sort(compareWorkouts))
+      setFeedback('Cardio session saved.')
+      resetCardioForm()
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to save this cardio session.'))
+    } finally {
+      setIsSavingCardio(false)
+    }
+  }
+
   async function handleSaveTemplate() {
     const name = templateName.trim()
 
@@ -623,7 +671,9 @@ export function WorkoutsPage() {
             <strong>{stats.latestWorkout ? formatDate(stats.latestWorkout.date) : 'No data'}</strong>
             <span className="stat-subtext">
               {stats.latestWorkout
-                ? `${stats.latestWorkout.exerciseEntries.length} exercises logged`
+                ? stats.latestWorkout.workoutType === 'cardio'
+                  ? `${formatCardioActivityType(stats.latestWorkout.cardioActivityType)} for ${stats.latestWorkout.cardioDurationMinutes} min`
+                  : `${stats.latestWorkout.exerciseEntries.length} exercises logged`
                 : 'Create your first workout'}
             </span>
           </article>
@@ -636,6 +686,11 @@ export function WorkoutsPage() {
             <span className="stat-label">Exercises</span>
             <strong>{stats.totalExercises}</strong>
             <span className="stat-subtext">Exercise entries across all workouts</span>
+          </article>
+          <article className="stat-card">
+            <span className="stat-label">Cardio</span>
+            <strong>{stats.cardioSessions}</strong>
+            <span className="stat-subtext">Cardio sessions logged</span>
           </article>
           <article className="stat-card">
             <span className="stat-label">Sets</span>
@@ -825,6 +880,11 @@ export function WorkoutsPage() {
                     </span>
                   </div>
                 ) : null}
+
+                <div className="assistant-list-item">
+                  <strong>{assistantInsight.todaySuggestion.title}</strong>
+                  <span>{assistantInsight.todaySuggestion.message}</span>
+                </div>
 
                 <div className="assistant-list-item">
                   <strong>
@@ -1029,31 +1089,130 @@ export function WorkoutsPage() {
         <div className="panel">
           <div className="panel-header">
             <div>
-              <h2>Personal records</h2>
-              <p>Heaviest logged set for each exercise.</p>
+              <h2>Quick log cardio</h2>
+              <p>Save a simple walk, run, ride, or recovery session without using strength fields.</p>
             </div>
           </div>
 
-          {isLoading ? (
-            <StateCard title="Loading personal records" description="Calculating your best lifts by exercise." loading />
-          ) : personalRecords.length === 0 ? (
-            <StateCard
-              title="No personal records yet"
-              description="Save a workout to establish your first recorded best."
-            />
-          ) : (
-            <div className="records-list" role="list">
-              {personalRecords.map((record) => (
-                <article key={record.exerciseName} className="record-card" role="listitem">
-                  <div>
-                    <p className="entry-date">{record.exerciseName}</p>
-                    <strong className="entry-weight">{record.weightKg} kg</strong>
-                  </div>
-                  <span className="record-date">Set on {formatDate(record.date)}</span>
-                </article>
-              ))}
+          <form className="weight-form profile-form-panel" onSubmit={handleCardioSubmit} noValidate>
+            <div className="form-grid">
+              <label className="field">
+                <span>Date</span>
+                <input
+                  type="date"
+                  value={cardioForm.date}
+                  onChange={(event) =>
+                    setCardioForm((current) => ({ ...current, date: event.target.value }))
+                  }
+                  aria-invalid={Boolean(cardioErrors.date)}
+                />
+                {cardioErrors.date ? <small className="field-error">{cardioErrors.date}</small> : null}
+              </label>
+
+              <label className="field">
+                <span>Cardio type</span>
+                <select
+                  className="select-input"
+                  value={cardioForm.cardioActivityType}
+                  onChange={(event) =>
+                    setCardioForm((current) => ({
+                      ...current,
+                      cardioActivityType: event.target.value as CardioActivityType,
+                    }))
+                  }
+                >
+                  <option value="walking">Walking</option>
+                  <option value="running">Running</option>
+                  <option value="cycling">Cycling</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Duration (minutes)</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="600"
+                  step="1"
+                  value={cardioForm.cardioDurationMinutes}
+                  onChange={(event) =>
+                    setCardioForm((current) => ({
+                      ...current,
+                      cardioDurationMinutes: event.target.value,
+                    }))
+                  }
+                  aria-invalid={Boolean(cardioErrors.cardioDurationMinutes)}
+                />
+                {cardioErrors.cardioDurationMinutes ? (
+                  <small className="field-error">{cardioErrors.cardioDurationMinutes}</small>
+                ) : null}
+              </label>
+
+              <label className="field">
+                <span>Intensity</span>
+                <select
+                  className="select-input"
+                  value={cardioForm.cardioIntensity}
+                  onChange={(event) =>
+                    setCardioForm((current) => ({
+                      ...current,
+                      cardioIntensity: event.target.value as CardioIntensity,
+                    }))
+                  }
+                >
+                  <option value="low">Low</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Distance (km)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="500"
+                  step="0.1"
+                  value={cardioForm.cardioDistanceKm}
+                  onChange={(event) =>
+                    setCardioForm((current) => ({ ...current, cardioDistanceKm: event.target.value }))
+                  }
+                  aria-invalid={Boolean(cardioErrors.cardioDistanceKm)}
+                  placeholder="Optional"
+                />
+                <small>Optional if you only want to track time and effort.</small>
+                {cardioErrors.cardioDistanceKm ? (
+                  <small className="field-error">{cardioErrors.cardioDistanceKm}</small>
+                ) : null}
+              </label>
+
+              <label className="field field-span-2">
+                <span>Notes</span>
+                <textarea
+                  className="text-area"
+                  rows={3}
+                  maxLength={500}
+                  value={cardioForm.notes}
+                  onChange={(event) =>
+                    setCardioForm((current) => ({ ...current, notes: event.target.value }))
+                  }
+                  aria-invalid={Boolean(cardioErrors.notes)}
+                  placeholder="Optional context like recovery walk, incline treadmill, or easy spin."
+                />
+                {cardioErrors.notes ? <small className="field-error">{cardioErrors.notes}</small> : null}
+              </label>
             </div>
-          )}
+
+            <div className="action-row">
+              <button type="button" className="ghost-button" onClick={resetCardioForm} disabled={isSavingCardio}>
+                Clear cardio form
+              </button>
+              <button type="submit" className="primary-button" disabled={isSavingCardio}>
+                {isSavingCardio ? 'Saving cardio...' : 'Save cardio'}
+              </button>
+            </div>
+          </form>
         </div>
       </section>
 
@@ -1117,26 +1276,49 @@ export function WorkoutsPage() {
                   <div className="workout-card-header">
                     <div>
                       <p className="entry-date">{formatDate(workout.date)}</p>
-                      <strong className="entry-weight">{workout.exerciseEntries.length} exercises</strong>
+                      <strong className="entry-weight">
+                        {workout.workoutType === 'cardio'
+                          ? `${formatCardioActivityType(workout.cardioActivityType)} cardio`
+                          : `${workout.exerciseEntries.length} exercises`}
+                      </strong>
                     </div>
                   </div>
 
                   {workout.notes ? <p className="workout-notes">{workout.notes}</p> : null}
 
-                  <div className="exercise-summary-list">
-                    {workout.exerciseEntries.map((exercise) => (
-                      <div key={exercise.id} className="exercise-summary-item">
+                  {workout.workoutType === 'cardio' ? (
+                    <div className="exercise-summary-list">
+                      <div className="exercise-summary-item cardio-summary-item">
                         <div className="exercise-summary-copy">
-                          <strong>{exercise.exerciseName}</strong>
-                          <span>{describeSets(exercise.sets)}</span>
+                          <strong>{formatCardioActivityType(workout.cardioActivityType)}</strong>
+                          <span>
+                            {workout.cardioDurationMinutes} min
+                            {workout.cardioDistanceKm ? ` • ${workout.cardioDistanceKm} km` : ''}
+                          </span>
                         </div>
                         <div className="exercise-summary-meta">
-                          {exercise.isPersonalRecord ? <span className="pr-badge">PR</span> : null}
-                          <span className="record-hint">Best: {exercise.personalRecordWeightKg} kg</span>
+                          <span className="info-pill">
+                            {formatCardioIntensity(workout.cardioIntensity)}
+                          </span>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="exercise-summary-list">
+                      {workout.exerciseEntries.map((exercise) => (
+                        <div key={exercise.id} className="exercise-summary-item">
+                          <div className="exercise-summary-copy">
+                            <strong>{exercise.exerciseName}</strong>
+                            <span>{describeSets(exercise.sets)}</span>
+                          </div>
+                          <div className="exercise-summary-meta">
+                            {exercise.isPersonalRecord ? <span className="pr-badge">PR</span> : null}
+                            <span className="record-hint">Best: {exercise.personalRecordWeightKg} kg</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -1144,6 +1326,49 @@ export function WorkoutsPage() {
         </div>
       </section>
     </main>
+  )
+}
+
+function validateCardioForm(form: CardioFormState): CardioFormErrors {
+  const errors: CardioFormErrors = {}
+
+  if (!form.date) {
+    errors.date = 'Date is required.'
+  } else if (form.date > getTodayDateValue()) {
+    errors.date = 'Date cannot be in the future.'
+  }
+
+  if (!form.cardioDurationMinutes.trim()) {
+    errors.cardioDurationMinutes = 'Duration is required.'
+  } else {
+    const duration = Number(form.cardioDurationMinutes)
+    if (Number.isNaN(duration) || duration < 1 || duration > 600) {
+      errors.cardioDurationMinutes = 'Duration must be between 1 and 600 minutes.'
+    }
+  }
+
+  if (form.cardioDistanceKm.trim()) {
+    const distance = Number(form.cardioDistanceKm)
+    if (Number.isNaN(distance) || distance <= 0 || distance > 500) {
+      errors.cardioDistanceKm = 'Distance must be between 0.1 and 500 km.'
+    }
+  }
+
+  if (form.notes.length > 500) {
+    errors.notes = 'Notes must be 500 characters or less.'
+  }
+
+  return errors
+}
+
+function hasCardioErrors(errors: CardioFormErrors) {
+  return Boolean(
+    errors.date ||
+      errors.cardioActivityType ||
+      errors.cardioDurationMinutes ||
+      errors.cardioDistanceKm ||
+      errors.cardioIntensity ||
+      errors.notes,
   )
 }
 
@@ -1163,6 +1388,34 @@ function describeSets(
     .sort((left, right) => left.order - right.order)
     .map((set) => `Set ${set.order}: ${set.reps} reps at ${set.weightKg} kg`)
     .join(' • ')
+}
+
+function formatCardioActivityType(activityType: Workout['cardioActivityType']) {
+  switch (activityType) {
+    case 'walking':
+      return 'Walking'
+    case 'running':
+      return 'Running'
+    case 'cycling':
+      return 'Cycling'
+    case 'other':
+      return 'Other'
+    default:
+      return 'Cardio'
+  }
+}
+
+function formatCardioIntensity(intensity: Workout['cardioIntensity']) {
+  switch (intensity) {
+    case 'low':
+      return 'Low intensity'
+    case 'moderate':
+      return 'Moderate intensity'
+    case 'high':
+      return 'High intensity'
+    default:
+      return 'Cardio'
+  }
 }
 
 function ExerciseEditorCard({

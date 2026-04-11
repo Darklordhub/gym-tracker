@@ -84,6 +84,18 @@ public class AppDbContext : DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Workout>()
+            .Property(workout => workout.WorkoutType)
+            .HasMaxLength(20);
+
+        modelBuilder.Entity<Workout>()
+            .Property(workout => workout.CardioActivityType)
+            .HasMaxLength(40);
+
+        modelBuilder.Entity<Workout>()
+            .Property(workout => workout.CardioIntensity)
+            .HasMaxLength(20);
+
+        modelBuilder.Entity<Workout>()
             .HasOne(workout => workout.User)
             .WithMany(user => user.Workouts)
             .HasForeignKey(workout => workout.UserId)

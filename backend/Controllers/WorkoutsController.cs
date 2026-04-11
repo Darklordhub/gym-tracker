@@ -60,23 +60,33 @@ public class WorkoutsController : ControllerBase
     public async Task<ActionResult<WorkoutResponse>> CreateWorkout(WorkoutRequest request)
     {
         var userId = User.GetRequiredUserId();
+        var workoutType = NormalizeWorkoutType(request.WorkoutType);
         var workout = new Workout
         {
             UserId = userId,
             Date = NormalizeDate(request.Date),
+            WorkoutType = workoutType,
             Notes = request.Notes.Trim(),
-            ExerciseEntries = request.ExerciseEntries.Select(exercise => new ExerciseEntry
-            {
-                ExerciseName = exercise.ExerciseName.Trim(),
-                Sets = exercise.Sets
-                    .Select((set, index) => new ExerciseSet
-                    {
-                        Order = index + 1,
-                        Reps = set.Reps,
-                        WeightKg = decimal.Round(set.WeightKg, 1, MidpointRounding.AwayFromZero),
-                    })
-                    .ToList(),
-            }).ToList(),
+            CardioActivityType = workoutType == "cardio" ? NormalizeOptionalText(request.CardioActivityType) : null,
+            CardioDurationMinutes = workoutType == "cardio" ? request.CardioDurationMinutes : null,
+            CardioDistanceKm = workoutType == "cardio" && request.CardioDistanceKm.HasValue
+                ? decimal.Round(request.CardioDistanceKm.Value, 1, MidpointRounding.AwayFromZero)
+                : null,
+            CardioIntensity = workoutType == "cardio" ? NormalizeOptionalText(request.CardioIntensity)?.ToLowerInvariant() : null,
+            ExerciseEntries = workoutType == "cardio"
+                ? new List<ExerciseEntry>()
+                : request.ExerciseEntries.Select(exercise => new ExerciseEntry
+                {
+                    ExerciseName = exercise.ExerciseName.Trim(),
+                    Sets = exercise.Sets
+                        .Select((set, index) => new ExerciseSet
+                        {
+                            Order = index + 1,
+                            Reps = set.Reps,
+                            WeightKg = decimal.Round(set.WeightKg, 1, MidpointRounding.AwayFromZero),
+                        })
+                        .ToList(),
+                }).ToList(),
         };
 
         _dbContext.Workouts.Add(workout);
@@ -98,7 +108,12 @@ public class WorkoutsController : ControllerBase
         {
             Id = workout.Id,
             Date = workout.Date,
+            WorkoutType = NormalizeWorkoutType(workout.WorkoutType),
             Notes = workout.Notes,
+            CardioActivityType = workout.CardioActivityType,
+            CardioDurationMinutes = workout.CardioDurationMinutes,
+            CardioDistanceKm = workout.CardioDistanceKm,
+            CardioIntensity = workout.CardioIntensity,
             ExerciseEntries = workout.ExerciseEntries
                 .OrderBy(exercise => exercise.Id)
                 .Select(exercise => new ExerciseEntryResponse
@@ -173,5 +188,20 @@ public class WorkoutsController : ControllerBase
     private static string NormalizeExerciseName(string exerciseName)
     {
         return exerciseName.Trim().ToUpperInvariant();
+    }
+
+    private static string NormalizeWorkoutType(string? workoutType)
+    {
+        return string.IsNullOrWhiteSpace(workoutType) ? "strength" : workoutType.Trim().ToLowerInvariant();
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim();
     }
 }

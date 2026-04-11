@@ -1,4 +1,5 @@
 import type { Workout } from '../types/workout'
+import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings } from '../types/goals'
 
 export type ExerciseSuggestion = {
@@ -21,6 +22,11 @@ export type ExerciseSetHistoryItem = {
 
 export type WorkoutAssistantInsight = {
   weeklyNudge: string
+  todaySuggestion: {
+    trainingType: 'strength' | 'cardio' | 'rest'
+    title: string
+    message: string
+  }
   prOpportunity: {
     exerciseName: string
     message: string
@@ -115,6 +121,7 @@ export function getSuggestedNextWeight(
 export function getWorkoutAssistantInsight(
   workouts: Workout[],
   goals: GoalSettings | null,
+  cycleGuidance?: CycleGuidance | null,
   now = new Date(),
 ): WorkoutAssistantInsight {
   const weekStart = startOfWeek(now)
@@ -152,6 +159,7 @@ export function getWorkoutAssistantInsight(
 
   return {
     weeklyNudge,
+    todaySuggestion: getDailyTrainingSuggestion(workouts, cycleGuidance, now),
     prOpportunity: prOpportunity
       ? {
           exerciseName: prOpportunity.exerciseName,
@@ -163,6 +171,105 @@ export function getWorkoutAssistantInsight(
         }
       : null,
     revisitSuggestions,
+  }
+}
+
+export function getDailyTrainingSuggestion(
+  workouts: Workout[],
+  cycleGuidance?: CycleGuidance | null,
+  now = new Date(),
+) {
+  const recentWindowStart = new Date(now)
+  recentWindowStart.setHours(0, 0, 0, 0)
+  recentWindowStart.setDate(recentWindowStart.getDate() - 6)
+
+  const recentWorkouts = workouts.filter((workout) => new Date(workout.date) >= recentWindowStart)
+  const recentStrengthSessions = recentWorkouts.filter((workout) => workout.workoutType !== 'cardio')
+  const recentCardioSessions = recentWorkouts.filter((workout) => workout.workoutType === 'cardio')
+  const recentSetCount = recentStrengthSessions.reduce(
+    (count, workout) => count + workout.exerciseEntries.reduce((sum, exercise) => sum + exercise.sets.length, 0),
+    0,
+  )
+  const recentCardioMinutes = recentCardioSessions.reduce(
+    (total, workout) => total + (workout.cardioDurationMinutes ?? 0),
+    0,
+  )
+
+  const highTrainingLoad =
+    recentStrengthSessions.length >= 4 || recentSetCount >= 36 || recentCardioMinutes >= 180
+  const moderateTrainingLoad =
+    recentStrengthSessions.length >= 3 || recentSetCount >= 22 || recentCardioMinutes >= 90
+
+  const highFatigueSignals =
+    Boolean(cycleGuidance?.isHigherFatiguePhase) ||
+    cycleGuidance?.symptomLoadLabel === 'High' ||
+    (cycleGuidance?.recentRecoveryFeeling !== null &&
+      cycleGuidance?.recentRecoveryFeeling !== undefined &&
+      cycleGuidance.recentRecoveryFeeling <= 2) ||
+    (cycleGuidance?.recentSleepQuality !== null &&
+      cycleGuidance?.recentSleepQuality !== undefined &&
+      cycleGuidance.recentSleepQuality <= 2)
+
+  const lowFatigueSignals =
+    Boolean(cycleGuidance?.isEnabled) &&
+    cycleGuidance?.isHigherFatiguePhase === false &&
+    cycleGuidance?.symptomLoadLabel !== 'High' &&
+    (cycleGuidance?.recentRecoveryFeeling === null ||
+      cycleGuidance?.recentRecoveryFeeling === undefined ||
+      cycleGuidance.recentRecoveryFeeling >= 3)
+
+  if (highFatigueSignals && highTrainingLoad) {
+    return {
+      trainingType: 'rest' as const,
+      title: 'Rest or keep movement very easy',
+      message:
+        'Recent load is already high and your current recovery signals look strained. A rest day or a short low-intensity walk would be the safer call.',
+    }
+  }
+
+  if (highFatigueSignals) {
+    return {
+      trainingType: 'cardio' as const,
+      title: 'Low-intensity cardio fits better today',
+      message:
+        'Recovery signals look softer today. A walk, easy cycle, or other low-intensity cardio session is likely a better fit than another hard strength workout.',
+    }
+  }
+
+  if (moderateTrainingLoad) {
+    return {
+      trainingType: 'cardio' as const,
+      title: 'Recovery cardio is a good option',
+      message:
+        'Recent strength load is building. Low-intensity cardio can keep momentum up without stacking another demanding session.',
+    }
+  }
+
+  if (lowFatigueSignals) {
+    return {
+      trainingType: 'strength' as const,
+      title: 'Strength work looks well supported',
+      message:
+        cycleGuidance?.estimatedCurrentPhase === 'Follicular' || cycleGuidance?.estimatedCurrentPhase === 'Ovulatory'
+          ? 'Recovery looks solid and this phase can often tolerate harder work better. Strength or higher-intensity training is reasonable if session quality feels good.'
+          : 'Recovery looks good and recent load is manageable. A focused strength session should fit well today.',
+    }
+  }
+
+  if (recentWorkouts.length === 0) {
+    return {
+      trainingType: 'strength' as const,
+      title: 'Start with a simple strength session',
+      message:
+        'You do not have much recent training load yet. A straightforward strength workout is a good default if energy feels normal.',
+    }
+  }
+
+  return {
+    trainingType: 'cardio' as const,
+    title: 'Cardio is the balanced option today',
+    message:
+      'Recent load is not excessive, but a moderate cardio session can keep you active without demanding as much recovery as another full strength day.',
   }
 }
 
@@ -211,6 +318,10 @@ function buildExerciseStats(workouts: Workout[]) {
   const now = new Date()
 
   for (const workout of workouts) {
+    if (workout.workoutType === 'cardio') {
+      continue
+    }
+
     for (const exercise of workout.exerciseEntries) {
       const key = normalizeExerciseName(exercise.exerciseName)
       const workoutDate = workout.date

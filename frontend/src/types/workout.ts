@@ -1,3 +1,7 @@
+export type WorkoutType = 'strength' | 'cardio'
+export type CardioActivityType = 'walking' | 'running' | 'cycling' | 'other'
+export type CardioIntensity = 'low' | 'moderate' | 'high'
+
 export type ExerciseSet = {
   id: number
   order: number
@@ -21,7 +25,12 @@ export type ExerciseEntry = {
 export type Workout = {
   id: number
   date: string
+  workoutType: WorkoutType
   notes: string
+  cardioActivityType: CardioActivityType | null
+  cardioDurationMinutes: number | null
+  cardioDistanceKm: number | null
+  cardioIntensity: CardioIntensity | null
   exerciseEntries: ExerciseEntry[]
 }
 
@@ -32,8 +41,13 @@ export type ExerciseEntryPayload = {
 
 export type WorkoutPayload = {
   date: string
+  workoutType?: WorkoutType
   notes: string
   exerciseEntries: ExerciseEntryPayload[]
+  cardioActivityType?: CardioActivityType | null
+  cardioDurationMinutes?: number | null
+  cardioDistanceKm?: number | null
+  cardioIntensity?: CardioIntensity | null
 }
 
 export type WorkoutTemplateExerciseEntry = {

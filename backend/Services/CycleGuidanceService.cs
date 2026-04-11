@@ -238,8 +238,18 @@ public static class CycleGuidanceService
     {
         var windowStart = currentDate.AddDays(-6).ToDateTime(TimeOnly.MinValue);
         var recentWorkouts = workouts.Where(workout => workout.Date >= windowStart).ToList();
-        var setCount = recentWorkouts.Sum(workout => workout.ExerciseEntries.Sum(entry => entry.Sets.Count));
-        var trainingLoad = recentWorkouts.Sum(workout => workout.ExerciseEntries.Sum(entry => entry.Sets.Sum(set => set.WeightKg * set.Reps)));
+        var setCount = recentWorkouts.Sum(workout =>
+            workout.WorkoutType == "cardio"
+                ? 0
+                : workout.ExerciseEntries.Sum(entry => entry.Sets.Count));
+        var strengthTrainingLoad = recentWorkouts.Sum(workout =>
+            workout.WorkoutType == "cardio"
+                ? 0
+                : workout.ExerciseEntries.Sum(entry => entry.Sets.Sum(set => set.WeightKg * set.Reps)));
+        var cardioLoad = recentWorkouts
+            .Where(workout => workout.WorkoutType == "cardio")
+            .Sum(workout => (workout.CardioDurationMinutes ?? 0) * GetCardioIntensityFactor(workout.CardioIntensity));
+        var trainingLoad = strengthTrainingLoad + cardioLoad;
 
         var label = trainingLoad >= 6000m || setCount >= 36 || recentWorkouts.Count >= 4
             ? "High"
@@ -322,6 +332,16 @@ public static class CycleGuidanceService
     {
         var strain = log.FatigueLevel + log.CrampsLevel + log.BloatingLevel + (6 - log.SleepQuality) + (6 - log.RecoveryFeeling);
         return strain / 5d;
+    }
+
+    private static decimal GetCardioIntensityFactor(string? cardioIntensity)
+    {
+        return cardioIntensity?.Trim().ToLowerInvariant() switch
+        {
+            "high" => 30m,
+            "moderate" => 20m,
+            _ => 12m,
+        };
     }
 
     private static string NormalizeRegularity(string value)
