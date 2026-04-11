@@ -21,6 +21,8 @@ public class AppDbContext : DbContext
     public DbSet<ActiveWorkoutSessionExerciseEntry> ActiveWorkoutSessionExerciseEntries => Set<ActiveWorkoutSessionExerciseEntry>();
     public DbSet<ActiveWorkoutSessionExerciseSet> ActiveWorkoutSessionExerciseSets => Set<ActiveWorkoutSessionExerciseSet>();
     public DbSet<GoalSettings> GoalSettings => Set<GoalSettings>();
+    public DbSet<UserCycleSettings> UserCycleSettings => Set<UserCycleSettings>();
+    public DbSet<UserCycleEntry> UserCycleEntries => Set<UserCycleEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -54,6 +56,18 @@ public class AppDbContext : DbContext
             .Property(user => user.IsActive)
             .HasDefaultValue(true);
 
+        modelBuilder.Entity<UserCycleSettings>()
+            .Property(settings => settings.CycleRegularity)
+            .HasMaxLength(40);
+
+        modelBuilder.Entity<UserCycleSettings>()
+            .Property(settings => settings.IsEnabled)
+            .HasDefaultValue(false);
+
+        modelBuilder.Entity<UserCycleEntry>()
+            .Property(entry => entry.Notes)
+            .HasMaxLength(500);
+
         modelBuilder.Entity<WeightEntry>()
             .HasOne(weightEntry => weightEntry.User)
             .WithMany(user => user.WeightEntries)
@@ -84,8 +98,28 @@ public class AppDbContext : DbContext
             .HasForeignKey(goalSettings => goalSettings.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<UserCycleSettings>()
+            .HasOne(settings => settings.User)
+            .WithMany(user => user.CycleSettings)
+            .HasForeignKey(settings => settings.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserCycleEntry>()
+            .HasOne(entry => entry.User)
+            .WithMany(user => user.CycleEntries)
+            .HasForeignKey(entry => entry.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<GoalSettings>()
             .HasIndex(goalSettings => goalSettings.UserId)
+            .IsUnique();
+
+        modelBuilder.Entity<UserCycleSettings>()
+            .HasIndex(settings => settings.UserId)
+            .IsUnique();
+
+        modelBuilder.Entity<UserCycleEntry>()
+            .HasIndex(entry => new { entry.UserId, entry.PeriodStartDate })
             .IsUnique();
 
         modelBuilder.Entity<WeightEntry>()

@@ -19,6 +19,8 @@ public class AppUser
     public List<WorkoutTemplate> WorkoutTemplates { get; set; } = new();
     public List<ActiveWorkoutSession> ActiveWorkoutSessions { get; set; } = new();
     public List<GoalSettings> GoalSettings { get; set; } = new();
+    public List<UserCycleSettings> CycleSettings { get; set; } = new();
+    public List<UserCycleEntry> CycleEntries { get; set; } = new();
     public string Role { get; set; } = AppRoles.User;
     public bool IsActive { get; set; } = true;
 }

@@ -1081,6 +1081,47 @@
   background: var(--surface-overlay-subtle);
 }
 
+.cycle-grid,
+.cycle-history-grid {
+  grid-template-columns: minmax(320px, 1fr) minmax(0, 1fr);
+}
+
+.cycle-history-section {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.cycle-guidance-card {
+  height: 100%;
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-overlay-muted);
+}
+
+.toggle-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: var(--surface-overlay-emphasis);
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.toggle-control input {
+  margin: 0;
+}
+
 .muted-note {
   color: var(--muted);
 }
@@ -1651,7 +1692,9 @@
   .chart-summary,
   .exercise-history-metrics,
   .profile-meta-grid,
-  .form-grid {
+  .form-grid,
+  .cycle-grid,
+  .cycle-history-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1672,6 +1715,7 @@
   .notification-panel-header,
   .notification-card-header,
   .notification-card-footer,
+  .toggle-row,
   .template-toolbar,
   .filter-toolbar,
   .toolbar-actions,

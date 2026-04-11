@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { fetchCycleGuidance } from '../api/cycle'
 import { fetchGoals, updateGoals } from '../api/goals'
 import { fetchWeightEntries } from '../api/weightEntries'
 import { fetchWorkouts } from '../api/workouts'
@@ -6,6 +7,7 @@ import { StateCard } from '../components/StateCard'
 import { getWorkoutAssistantInsight } from '../lib/exerciseSuggestions'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
+import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings, GoalSettingsPayload } from '../types/goals'
 import type { WeightEntry } from '../types/weight'
 import type { Workout } from '../types/workout'
@@ -28,6 +30,7 @@ export function DashboardPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [goalMessage, setGoalMessage] = useState<string | null>(null)
   const [goalErrorMessage, setGoalErrorMessage] = useState<string | null>(null)
+  const [cycleGuidance, setCycleGuidance] = useState<CycleGuidance | null>(null)
 
   useEffect(() => {
     void loadDashboard()
@@ -111,15 +114,17 @@ export function DashboardPage() {
       setGoalMessage(null)
       setGoalErrorMessage(null)
 
-      const [workoutData, weightData, goalsData] = await Promise.all([
+      const [workoutData, weightData, goalsData, cycleGuidanceData] = await Promise.all([
         fetchWorkouts(),
         fetchWeightEntries(),
         fetchGoals(),
+        fetchCycleGuidance().catch(() => null),
       ])
 
       setWorkouts(workoutData)
       setWeightEntries(weightData)
       applyGoalState(goalsData)
+      setCycleGuidance(cycleGuidanceData)
     } catch (error) {
       setErrorMessage(getRequestErrorMessage(error, 'Unable to load dashboard data.'))
     } finally {
@@ -448,6 +453,26 @@ export function DashboardPage() {
                   </div>
                 )}
               </article>
+
+              {cycleGuidance?.isEnabled ? (
+                <article className="assistant-card">
+                  <span className="stat-label">Cycle-aware guidance</span>
+                  <strong>
+                    {cycleGuidance.estimatedCurrentPhase
+                      ? `${cycleGuidance.estimatedCurrentPhase} phase`
+                      : 'Prediction building'}
+                  </strong>
+                  <p>{cycleGuidance.guidanceMessage}</p>
+                  <span className="record-hint">
+                    {cycleGuidance.currentCycleDay
+                      ? `Day ${cycleGuidance.currentCycleDay}`
+                      : 'Add more history for a better estimate'}
+                    {cycleGuidance.estimatedNextPeriodStartDate
+                      ? ` • Next period around ${formatDate(cycleGuidance.estimatedNextPeriodStartDate)}`
+                      : ''}
+                  </span>
+                </article>
+              ) : null}
             </div>
           )}
         </div>

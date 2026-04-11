@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { fetchCycleGuidance } from '../api/cycle'
 import { fetchGoals } from '../api/goals'
 import {
   completeActiveWorkoutSession,
@@ -14,6 +15,7 @@ import { StateCard } from '../components/StateCard'
 import { getWorkoutAssistantInsight, getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
+import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings } from '../types/goals'
 import type {
   ActiveWorkoutSession,
@@ -202,6 +204,7 @@ export function WorkoutsPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
   const [goals, setGoals] = useState<GoalSettings | null>(null)
+  const [cycleGuidance, setCycleGuidance] = useState<CycleGuidance | null>(null)
   const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null)
   const [activeForm, setActiveForm] = useState<WorkoutFormState>(initialActiveFormState)
   const [activeErrors, setActiveErrors] = useState<WorkoutFormErrors>({ exercises: [] })
@@ -311,16 +314,18 @@ export function WorkoutsPage() {
       setIsLoading(true)
       setErrorMessage(null)
 
-      const [workoutData, templateData, currentActiveSession, goalData] = await Promise.all([
+      const [workoutData, templateData, currentActiveSession, goalData, cycleGuidanceData] = await Promise.all([
         fetchWorkouts(),
         fetchWorkoutTemplates(),
         fetchActiveWorkoutSession(),
         fetchGoals().catch(() => null),
+        fetchCycleGuidance().catch(() => null),
       ])
 
       setWorkouts(workoutData)
       setTemplates(templateData)
       setGoals(goalData)
+      setCycleGuidance(cycleGuidanceData)
       setActiveSession(currentActiveSession)
       setActiveForm(currentActiveSession ? mapSessionToForm(currentActiveSession) : initialActiveFormState())
     } catch (error) {
@@ -808,6 +813,18 @@ export function WorkoutsPage() {
                   <strong>Weekly consistency</strong>
                   <span>{assistantInsight.weeklyNudge}</span>
                 </div>
+
+                {cycleGuidance?.isEnabled ? (
+                  <div className="assistant-list-item">
+                    <strong>{cycleGuidance.guidanceHeadline}</strong>
+                    <span>
+                      {cycleGuidance.guidanceMessage}
+                      {cycleGuidance.estimatedCurrentPhase
+                        ? ` Estimated phase: ${cycleGuidance.estimatedCurrentPhase}.`
+                        : ''}
+                    </span>
+                  </div>
+                ) : null}
 
                 <div className="assistant-list-item">
                   <strong>
