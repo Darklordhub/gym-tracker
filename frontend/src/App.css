@@ -747,6 +747,25 @@
   margin-bottom: 20px;
 }
 
+.workout-assistant-panel {
+  background:
+    linear-gradient(180deg, var(--surface-overlay-subtle), transparent),
+    var(--card-bg);
+}
+
+.workout-assistant-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.page-feedback-panel {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.page-feedback-stack {
+  max-width: 100%;
+}
+
 .info-pill-cardio {
   background: var(--accent-surface-strong);
   color: var(--accent-strong);
@@ -1279,6 +1298,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .workout-assistant-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .goals-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 20px;
@@ -1393,6 +1416,14 @@
 
 .workout-card-actions button {
   flex: 0 0 auto;
+}
+
+.template-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .exercise-card-heading {
@@ -1843,6 +1874,10 @@
     grid-template-columns: 1fr;
   }
 
+  .workout-assistant-grid {
+    grid-template-columns: 1fr;
+  }
+
   .assistant-grid {
     grid-template-columns: 1fr;
   }
@@ -1926,6 +1961,10 @@
   }
 
   .workout-card-actions button {
+    flex: 1 1 0;
+  }
+
+  .template-card-footer button {
     flex: 1 1 0;
   }
 

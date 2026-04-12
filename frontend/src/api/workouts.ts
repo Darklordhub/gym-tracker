@@ -32,6 +32,10 @@ export async function createWorkoutTemplate(payload: WorkoutTemplatePayload) {
   return response.data
 }
 
+export async function deleteWorkoutTemplate(id: number) {
+  await apiClient.delete(`/WorkoutTemplates/${id}`)
+}
+
 export async function fetchActiveWorkoutSession() {
   try {
     const response = await apiClient.get<ActiveWorkoutSession>('/ActiveWorkoutSession')

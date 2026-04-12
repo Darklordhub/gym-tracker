@@ -6,6 +6,7 @@ import {
   completeActiveWorkoutSession,
   createWorkout,
   createWorkoutTemplate,
+  deleteWorkoutTemplate,
   deleteWorkout,
   fetchActiveWorkoutSession,
   fetchWorkoutTemplates,
@@ -258,6 +259,7 @@ export function WorkoutsPage() {
   const [isSavingSession, setIsSavingSession] = useState(false)
   const [isCompletingSession, setIsCompletingSession] = useState(false)
   const [deletingWorkoutId, setDeletingWorkoutId] = useState<number | null>(null)
+  const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -610,6 +612,26 @@ export function WorkoutsPage() {
     }
   }
 
+  async function handleDeleteTemplate(template: WorkoutTemplate) {
+    const confirmed = window.confirm('Are you sure you want to delete this template? This cannot be undone.')
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setDeletingTemplateId(template.id)
+      setFeedback(null)
+      setErrorMessage(null)
+      await deleteWorkoutTemplate(template.id)
+      setTemplates((current) => current.filter((currentTemplate) => currentTemplate.id !== template.id))
+      setFeedback(`Template "${template.name}" deleted.`)
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to delete this template.'))
+    } finally {
+      setDeletingTemplateId(null)
+    }
+  }
+
   async function handleSaveActiveSession() {
     if (!activeSession) {
       return
@@ -733,6 +755,91 @@ export function WorkoutsPage() {
                 : 'Start from scratch or a template'}
             </span>
           </article>
+        </div>
+      </section>
+
+      {feedback || errorMessage ? (
+        <section className="content-grid workout-grid">
+          <div className="panel panel-span-2 page-feedback-panel">
+            <div className="feedback-stack page-feedback-stack">
+              {feedback ? <p className="feedback success">{feedback}</p> : null}
+              {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="content-grid workout-grid">
+        <div className="panel panel-span-2 workout-assistant-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Workout assistant</h2>
+              <p>Keep the guidance visible, but separate it from your templates and logging actions.</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <StateCard title="Loading guidance" description="Reviewing your recent training patterns." loading />
+          ) : errorMessage ? (
+            <StateCard title="Guidance unavailable" description={errorMessage} tone="error" />
+          ) : (
+            <div className="assistant-grid workout-assistant-grid">
+              <article className="assistant-card assistant-card-highlight">
+                <span className="stat-label">Today&apos;s suggestion</span>
+                <strong>{assistantInsight.todaySuggestion.title}</strong>
+                <p>{assistantInsight.todaySuggestion.message}</p>
+                <span className="record-hint">
+                  Recommended focus: {assistantInsight.todaySuggestion.trainingType}
+                </span>
+              </article>
+
+              <article className="assistant-card">
+                <span className="stat-label">Weekly consistency</span>
+                <strong>Stay on track</strong>
+                <p>{assistantInsight.weeklyNudge}</p>
+                <span className="record-hint">Based on your current weekly workout target.</span>
+              </article>
+
+              <article className="assistant-card">
+                <span className="stat-label">PR opportunity</span>
+                <strong>
+                  {assistantInsight.prOpportunity
+                    ? `${assistantInsight.prOpportunity.exerciseName} PR window`
+                    : 'No clear PR push right now'}
+                </strong>
+                <p>
+                  {assistantInsight.prOpportunity
+                    ? `${assistantInsight.prOpportunity.message}${assistantInsight.prOpportunity.targetWeightKg ? ` Target ${assistantInsight.prOpportunity.targetWeightKg} kg.` : ''}`
+                    : 'Build a little more recent strength data before pushing for a heavier top set.'}
+                </p>
+                <span className="record-hint">Simple heuristics from your recent logs.</span>
+              </article>
+
+              <article className="assistant-card">
+                <span className="stat-label">
+                  {cycleGuidance?.isEnabled ? 'Cycle-aware guidance' : 'Revisit next'}
+                </span>
+                <strong>
+                  {cycleGuidance?.isEnabled
+                    ? cycleGuidance.guidanceHeadline
+                    : assistantInsight.revisitSuggestions[0]?.exerciseName ?? 'Exercise rotation looks current'}
+                </strong>
+                <p>
+                  {cycleGuidance?.isEnabled
+                    ? cycleGuidance.guidanceMessage
+                    : assistantInsight.revisitSuggestions[0]?.message ??
+                      'Nothing stands out as overdue from your recent history.'}
+                </p>
+                <span className="record-hint">
+                  {cycleGuidance?.isEnabled
+                    ? cycleGuidance.estimatedCurrentPhase
+                      ? `Estimated phase: ${cycleGuidance.estimatedCurrentPhase}.`
+                      : 'Add more cycle history for a better estimate.'
+                    : 'Use this as a simple prompt, not fixed programming.'}
+                </span>
+              </article>
+            </div>
+          )}
         </div>
       </section>
 
@@ -868,8 +975,6 @@ export function WorkoutsPage() {
             </div>
           )}
 
-          {feedback ? <p className="feedback success">{feedback}</p> : null}
-          {errorMessage ? <p className="feedback error">{errorMessage}</p> : null}
         </div>
 
         <div className="panel">
@@ -880,64 +985,9 @@ export function WorkoutsPage() {
             </div>
           </div>
 
-          {!isLoading && !errorMessage ? (
-            <div className="assistant-card workout-assistant-card">
-              <div className="assistant-card-header">
-                <div>
-                  <span className="stat-label">Workout assistant</span>
-                  <strong>What to focus on next</strong>
-                </div>
-                <span className="record-hint">Heuristic guidance</span>
-              </div>
-
-              <div className="assistant-list">
-                <div className="assistant-list-item">
-                  <strong>Weekly consistency</strong>
-                  <span>{assistantInsight.weeklyNudge}</span>
-                </div>
-
-                {cycleGuidance?.isEnabled ? (
-                  <div className="assistant-list-item">
-                    <strong>{cycleGuidance.guidanceHeadline}</strong>
-                    <span>
-                      {cycleGuidance.guidanceMessage}
-                      {cycleGuidance.estimatedCurrentPhase
-                        ? ` Estimated phase: ${cycleGuidance.estimatedCurrentPhase}.`
-                        : ''}
-                    </span>
-                  </div>
-                ) : null}
-
-                <div className="assistant-list-item">
-                  <strong>{assistantInsight.todaySuggestion.title}</strong>
-                  <span>{assistantInsight.todaySuggestion.message}</span>
-                </div>
-
-                <div className="assistant-list-item">
-                  <strong>
-                    {assistantInsight.prOpportunity
-                      ? `${assistantInsight.prOpportunity.exerciseName} PR window`
-                      : 'No clear PR push right now'}
-                  </strong>
-                  <span>
-                    {assistantInsight.prOpportunity
-                      ? `${assistantInsight.prOpportunity.message}${assistantInsight.prOpportunity.targetWeightKg ? ` Target ${assistantInsight.prOpportunity.targetWeightKg} kg.` : ''}`
-                      : 'Build a little more recent strength data before pushing for a heavier top set.'}
-                  </span>
-                </div>
-
-                <div className="assistant-list-item">
-                  <strong>
-                    {assistantInsight.revisitSuggestions[0]?.exerciseName ?? 'Exercise rotation looks current'}
-                  </strong>
-                  <span>
-                    {assistantInsight.revisitSuggestions[0]?.message ??
-                      'Nothing stands out as overdue from your recent history.'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : null}
+          <p className="section-note">
+            Keep a short list of repeatable structures here, then use quick log or active mode when you are ready to train.
+          </p>
 
           {isLoading ? (
             <StateCard title="Loading templates" description="Fetching your saved workout structures." loading />
@@ -987,6 +1037,17 @@ export function WorkoutsPage() {
                       Start active
                     </button>
                   </div>
+
+                  <div className="template-card-footer">
+                    <button
+                      type="button"
+                      className="ghost-button subtle-danger-button compact-button"
+                      onClick={() => void handleDeleteTemplate(template)}
+                      disabled={deletingTemplateId === template.id}
+                    >
+                      {deletingTemplateId === template.id ? 'Deleting...' : 'Delete template'}
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -996,12 +1057,12 @@ export function WorkoutsPage() {
 
       <section className="content-grid workout-grid">
         <div className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Quick log workout</h2>
-              <p>Save a completed workout directly without using active mode.</p>
+            <div className="panel-header">
+              <div>
+                <h2>Quick strength log</h2>
+                <p>Save a completed strength workout directly without using active mode.</p>
+              </div>
             </div>
-          </div>
 
           <div className="template-toolbar template-toolbar-workout">
             <label className="field template-name-field">

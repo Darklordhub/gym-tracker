@@ -84,6 +84,24 @@ public class WorkoutTemplatesController : ControllerBase
             MapTemplate(template));
     }
 
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteWorkoutTemplate(int id)
+    {
+        var userId = User.GetRequiredUserId();
+        var template = await _dbContext.WorkoutTemplates
+            .FirstOrDefaultAsync(currentTemplate => currentTemplate.Id == id && currentTemplate.UserId == userId);
+
+        if (template is null)
+        {
+            return NotFound();
+        }
+
+        _dbContext.WorkoutTemplates.Remove(template);
+        await _dbContext.SaveChangesAsync();
+
+        return NoContent();
+    }
+
     private static WorkoutTemplateResponse MapTemplate(WorkoutTemplate template)
     {
         return new WorkoutTemplateResponse
