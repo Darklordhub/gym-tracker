@@ -2,6 +2,7 @@
   --page-bg: #f5efe6;
   --surface: rgba(255, 249, 242, 0.84);
   --surface-strong: #fff6ee;
+  --surface-popup: #fff8f1;
   --surface-muted: rgba(255, 248, 240, 0.72);
   --card-bg: rgba(255, 255, 255, 0.78);
   --input-bg: rgba(255, 255, 255, 0.95);
@@ -62,6 +63,7 @@
   --page-bg: #0f1519;
   --surface: rgba(22, 30, 36, 0.9);
   --surface-strong: #182127;
+  --surface-popup: #1b242b;
   --surface-muted: rgba(24, 33, 40, 0.92);
   --card-bg: rgba(30, 40, 48, 0.84);
   --input-bg: rgba(15, 21, 25, 0.96);

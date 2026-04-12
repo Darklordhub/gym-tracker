@@ -8,4 +8,5 @@ public class JwtOptions
     public string Issuer { get; set; } = "gym-tracker-api";
     public string Audience { get; set; } = "gym-tracker-app";
     public int ExpirationHours { get; set; } = 24;
+
 }

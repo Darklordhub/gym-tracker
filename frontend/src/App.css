@@ -192,8 +192,10 @@
   padding: 16px;
   border: 1px solid var(--border-strong);
   border-radius: 22px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: var(--surface-popup);
+  box-shadow:
+    0 22px 52px rgba(24, 18, 12, 0.14),
+    var(--shadow);
 }
 
 .notification-panel-header {
@@ -219,7 +221,7 @@
   padding: 14px 16px;
   border: 1px dashed var(--border-strong);
   border-radius: 18px;
-  background: var(--surface-overlay-subtle);
+  background: var(--surface-muted);
 }
 
 .notification-empty p {
@@ -232,12 +234,11 @@
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: 18px;
-  background: var(--surface-overlay);
+  background: var(--surface-strong);
 }
 
 .notification-card-read {
-  opacity: 0.78;
-  background: var(--surface-overlay-subtle);
+  background: var(--surface-muted);
 }
 
 .notification-card-header,
@@ -1259,6 +1260,35 @@
   background: var(--surface-overlay-muted);
 }
 
+@media (min-width: 901px) and (max-width: 1280px) {
+  .dashboard-hero-header {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
+  }
+
+  .content-grid,
+  .workout-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  .dashboard-grid {
+    gap: 20px;
+  }
+
+  .assistant-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .goals-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  .exercise-progress-hero-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  }
+}
+
 @media (max-width: 900px) {
   .app-header {
     padding: 0 20px 20px;
@@ -1288,6 +1318,10 @@
   border: 1px solid var(--border);
   border-radius: 22px;
   background: var(--surface-overlay-subtle);
+}
+
+.progress-filter-card {
+  max-width: 440px;
 }
 
 .exercise-builder {
