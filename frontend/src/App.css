@@ -3161,3 +3161,387 @@
     border-radius: 22px;
   }
 }
+
+/* Dashboard and workouts phase-2 migration */
+
+.dashboard-hero-forge,
+.workouts-hero-forge {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.8fr);
+  gap: 18px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(212, 241, 74, 0.12), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(79, 143, 255, 0.08), transparent 26%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.04), transparent 28%),
+    var(--surface-strong);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  position: relative;
+}
+
+.dashboard-hero-forge::after,
+.workouts-hero-forge::after {
+  content: 'FORGE';
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Clash Display', 'Cabinet Grotesk', system-ui, sans-serif;
+  font-size: clamp(5rem, 16vw, 10rem);
+  letter-spacing: -0.08em;
+  color: rgba(255, 255, 255, 0.025);
+  pointer-events: none;
+}
+
+.dashboard-hero-main,
+.workouts-hero-main,
+.dashboard-hero-side,
+.workouts-hero-side {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-hero-main,
+.workouts-hero-main {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.dashboard-hero-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.hero-inline-stat,
+.forge-focus-card {
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadow-soft);
+}
+
+.hero-inline-stat strong,
+.forge-focus-card strong {
+  color: var(--text-strong);
+  font-family: 'Clash Display', 'Cabinet Grotesk', system-ui, sans-serif;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.hero-inline-stat-accent,
+.forge-focus-card {
+  border-color: rgba(212, 241, 74, 0.16);
+  background:
+    linear-gradient(135deg, rgba(212, 241, 74, 0.12), transparent 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    rgba(255, 255, 255, 0.05);
+}
+
+.forge-focus-card p,
+.forge-stat-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.forge-focus-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.forge-stat-strip {
+  display: grid;
+  gap: 14px;
+}
+
+.forge-stat-strip-dashboard {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.forge-stat-strip-workouts {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.forge-stat-card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-height: 168px;
+  padding: 18px 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.forge-stat-card strong {
+  color: var(--text-strong);
+  font-family: 'Clash Display', 'Cabinet Grotesk', system-ui, sans-serif;
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  letter-spacing: -0.05em;
+  line-height: 0.96;
+}
+
+.forge-stat-card strong span {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 0.62em;
+}
+
+.forge-stat-glow {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  filter: blur(38px);
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.forge-stat-trend {
+  margin-top: auto;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.forge-stat-card-lime .forge-stat-glow { background: var(--accent-strong); }
+.forge-stat-card-blue .forge-stat-glow { background: var(--tone-blue); }
+.forge-stat-card-teal .forge-stat-glow { background: var(--tone-teal); }
+.forge-stat-card-amber .forge-stat-glow { background: var(--tone-amber); }
+.forge-stat-card-violet .forge-stat-glow { background: var(--tone-violet); }
+.forge-stat-card-rose .forge-stat-glow { background: var(--tone-rose); }
+
+.dashboard-forge-grid,
+.workouts-main-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.dashboard-goals-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.dashboard-goal-form,
+.dashboard-goal-progress-grid,
+.dashboard-readiness-form {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-goal-progress-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-progress-card {
+  min-height: 100%;
+}
+
+.dashboard-progress-card-phase {
+  background:
+    linear-gradient(135deg, rgba(157, 124, 255, 0.12), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-overlay);
+}
+
+.dashboard-readiness-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(45, 217, 184, 0.1), transparent 70%),
+    var(--surface-overlay);
+}
+
+.dashboard-readiness-score {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.dashboard-readiness-score span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-readiness-score strong {
+  color: var(--text-strong);
+  font-family: 'Clash Display', 'Cabinet Grotesk', system-ui, sans-serif;
+  font-size: 2.5rem;
+  line-height: 0.9;
+}
+
+.dashboard-readiness-grid {
+  gap: 12px;
+}
+
+.dashboard-weekly-grid,
+.dashboard-overview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-weekly-card,
+.dashboard-overview-card {
+  min-height: 148px;
+}
+
+.dashboard-assistant-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.workouts-assistant-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.workouts-panel-full {
+  grid-column: 1 / -1;
+}
+
+.workouts-template-toolbar,
+.workouts-exercise-builder,
+.workouts-active-shell {
+  gap: 16px;
+}
+
+.workouts-panel-strength .exercise-builder,
+.workouts-panel-full .exercise-builder {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-overlay);
+}
+
+.workouts-active-banner {
+  margin-bottom: 18px;
+}
+
+.workouts-empty-launch {
+  align-items: start;
+}
+
+.workouts-panel-templates .template-list,
+.workouts-panel-history .workout-list {
+  gap: 16px;
+}
+
+.workouts-panel-templates .template-card,
+.workouts-panel-history .workout-card {
+  border-radius: 22px;
+}
+
+.workouts-panel-cardio .form-grid {
+  gap: 16px;
+}
+
+.workouts-panel-history .filter-toolbar {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface-overlay);
+}
+
+.workouts-panel-history .workout-card,
+.workouts-panel-templates .template-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-overlay);
+}
+
+@media (max-width: 1280px) {
+  .forge-stat-strip-workouts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard-assistant-grid,
+  .workouts-assistant-grid,
+  .dashboard-goal-progress-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1024px) {
+  .dashboard-hero-forge,
+  .workouts-hero-forge,
+  .dashboard-goals-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .forge-stat-strip-dashboard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-forge-grid,
+  .workouts-main-grid,
+  .forge-stat-strip-dashboard,
+  .forge-stat-strip-workouts,
+  .dashboard-weekly-grid,
+  .dashboard-overview-grid,
+  .dashboard-assistant-grid,
+  .workouts-assistant-grid,
+  .dashboard-goal-progress-grid,
+  .dashboard-hero-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-hero-forge,
+  .workouts-hero-forge {
+    padding: 22px;
+    border-radius: 24px;
+  }
+
+  .dashboard-readiness-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-readiness-score {
+    justify-items: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-hero-forge,
+  .workouts-hero-forge {
+    padding: 18px;
+  }
+
+  .forge-stat-card {
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .hero-inline-stat,
+  .forge-focus-card {
+    padding: 16px;
+  }
+}

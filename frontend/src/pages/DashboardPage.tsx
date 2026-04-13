@@ -123,6 +123,12 @@ export function DashboardPage() {
   )
 
   const hasTodayReadinessLog = readinessLog?.date === getTodayDateValue()
+  const readinessAverage =
+    (readinessForm.energyLevel +
+      readinessForm.sorenessLevel +
+      readinessForm.sleepQuality +
+      readinessForm.motivationLevel) /
+    4
 
   async function loadDashboard() {
     try {
@@ -225,61 +231,92 @@ export function DashboardPage() {
 
   return (
     <main className="page-shell">
-      <section className="hero-panel dashboard-hero-panel">
-        <div className="dashboard-hero-header">
-          <div className="hero-copy">
-            <span className="eyebrow">Gym Tracker</span>
-            <h1>Dashboard</h1>
-            <p className="hero-text">
-              Your weekly training snapshot, current goals, and recent body-weight progress in one place.
-            </p>
-          </div>
+      <section className="dashboard-hero-forge">
+        <div className="dashboard-hero-main">
+          <span className="eyebrow">FORGE / Overview</span>
+          <h1>Dashboard</h1>
+          <p className="hero-text">
+            Your weekly training snapshot, body-weight direction, readiness, and coaching signals in one operating view.
+          </p>
 
-          <div className="dashboard-highlight-card">
-            <span className="stat-label">Focus this week</span>
-            <strong>
-              {goals.weeklyWorkoutTarget === null
-                ? 'Set a target'
-                : `${metrics.workoutsThisWeek}/${goals.weeklyWorkoutTarget} workouts`}
-            </strong>
-            <span className="stat-subtext">
-              {goals.weeklyWorkoutTarget === null
-                ? 'Add a weekly workout goal to measure consistency.'
-                : metrics.weeklyWorkoutGoalProgress.message}
-            </span>
+          <div className="dashboard-hero-actions">
+            <div className="hero-inline-stat">
+              <span className="stat-label">Current phase</span>
+              <strong>{formatPhase(goals.fitnessPhase)}</strong>
+              <span className="stat-subtext">{getPhaseSummary(goals.fitnessPhase)}</span>
+            </div>
+            <div className="hero-inline-stat hero-inline-stat-accent">
+              <span className="stat-label">Focus this week</span>
+              <strong>
+                {goals.weeklyWorkoutTarget === null
+                  ? 'Set a target'
+                  : `${metrics.workoutsThisWeek}/${goals.weeklyWorkoutTarget}`}
+              </strong>
+              <span className="stat-subtext">
+                {goals.weeklyWorkoutTarget === null
+                  ? 'Add a weekly workout goal to measure consistency.'
+                  : metrics.weeklyWorkoutGoalProgress.message}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="stats-grid dashboard-stats-grid">
-          <article className="stat-card stat-card-emphasis">
-            <span className="stat-label">This Week</span>
-            <strong>{metrics.workoutsThisWeek}</strong>
-            <span className="stat-subtext">Workouts logged this week</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Average Weight</span>
-            <strong>{metrics.averageBodyWeight === null ? 'No data' : `${metrics.averageBodyWeight} kg`}</strong>
-            <span className="stat-subtext">Average across all weigh-ins</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Workout Streak</span>
-            <strong>{metrics.workoutStreakWeeks}</strong>
-            <span className="stat-subtext">Consecutive active weeks</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Current Phase</span>
-            <strong>{formatPhase(goals.fitnessPhase)}</strong>
-            <span className="stat-subtext">Active goal setting mode</span>
+        <div className="dashboard-hero-side">
+          <article className="forge-focus-card">
+            <span className="stat-label">Training status</span>
+            <strong>{getDashboardStatus(metrics.workoutsThisWeek, goals.weeklyWorkoutTarget)}</strong>
+            <p>{assistantInsight.weeklyNudge}</p>
+            <div className="forge-focus-pills">
+              <span className="info-pill">{metrics.workoutStreakWeeks} week streak</span>
+              <span className="info-pill info-pill-strength">
+                {metrics.averageBodyWeightThisWeek === null
+                  ? 'No weekly weigh-ins'
+                  : `${metrics.averageBodyWeightThisWeek} kg this week`}
+              </span>
+            </div>
           </article>
         </div>
       </section>
 
-      <section className="content-grid dashboard-grid">
-        <div className="panel panel-span-2">
+      <section className="forge-stat-strip forge-stat-strip-dashboard">
+        <ForgeStatCard
+          tone="lime"
+          label="This week"
+          value={metrics.workoutsThisWeek.toString()}
+          description="Workouts logged during the current week"
+          trend={metrics.weeklyWorkoutGoalProgress.message}
+        />
+        <ForgeStatCard
+          tone="blue"
+          label="Average weight"
+          value={metrics.averageBodyWeight === null ? 'No data' : `${metrics.averageBodyWeight}`}
+          unit={metrics.averageBodyWeight === null ? undefined : 'kg'}
+          description="Average across all recorded weigh-ins"
+        />
+        <ForgeStatCard
+          tone="teal"
+          label="Workout streak"
+          value={metrics.workoutStreakWeeks.toString()}
+          description="Consecutive active weeks"
+        />
+        <ForgeStatCard
+          tone="violet"
+          label="Readiness"
+          value={hasTodayReadinessLog && readinessLog ? readinessLog.readinessLabel : readinessAverage.toFixed(1)}
+          description={
+            hasTodayReadinessLog && readinessLog
+              ? 'Today’s check-in already logged'
+              : 'Live average from the current check-in inputs'
+          }
+        />
+      </section>
+
+      <section className="dashboard-forge-grid">
+        <div className="panel panel-span-2 dashboard-panel-goals">
           <div className="panel-header">
             <div>
               <h2>Goals</h2>
-              <p>Set simple targets, then use the progress cards to see whether the week is on track.</p>
+              <p>Set body-weight and weekly workload targets, then keep progress visible in a cleaner operating layout.</p>
             </div>
           </div>
 
@@ -288,8 +325,8 @@ export function DashboardPage() {
           ) : errorMessage ? (
             <StateCard title="Goals unavailable" description={errorMessage} tone="error" />
           ) : (
-            <div className="goals-grid">
-              <form className="goal-form" onSubmit={handleGoalSubmit}>
+            <div className="dashboard-goals-layout">
+              <form className="goal-form dashboard-goal-form" onSubmit={handleGoalSubmit}>
                 <p className="section-note">
                   Keep this lightweight. A target weight and weekly workout count are enough to anchor the dashboard.
                 </p>
@@ -349,7 +386,7 @@ export function DashboardPage() {
                 </label>
 
                 <div className="action-row">
-                  <button type="submit" disabled={isSavingGoals}>
+                  <button type="submit" className="primary-button" disabled={isSavingGoals}>
                     {isSavingGoals ? 'Saving goals...' : 'Save goals'}
                   </button>
                 </div>
@@ -358,8 +395,8 @@ export function DashboardPage() {
                 {goalErrorMessage ? <p className="feedback error">{goalErrorMessage}</p> : null}
               </form>
 
-              <div className="goal-progress-list">
-                <article className="goal-progress-card">
+              <div className="goal-progress-list dashboard-goal-progress-grid">
+                <article className="goal-progress-card dashboard-progress-card">
                   <div className="goal-progress-header">
                     <span className="stat-label">Body-weight goal</span>
                     <strong>
@@ -375,7 +412,7 @@ export function DashboardPage() {
                   </div>
                 </article>
 
-                <article className="goal-progress-card">
+                <article className="goal-progress-card dashboard-progress-card">
                   <div className="goal-progress-header">
                     <span className="stat-label">Weekly workout goal</span>
                     <strong>
@@ -391,7 +428,7 @@ export function DashboardPage() {
                   </div>
                 </article>
 
-                <article className="goal-progress-card">
+                <article className="goal-progress-card dashboard-progress-card dashboard-progress-card-phase">
                   <div className="goal-progress-header">
                     <span className="stat-label">Fitness phase</span>
                     <strong>{formatPhase(goals.fitnessPhase)}</strong>
@@ -403,7 +440,7 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div className="panel">
+        <div className="panel dashboard-panel-readiness">
           <div className="panel-header">
             <div>
               <h2>How are you feeling today?</h2>
@@ -416,8 +453,24 @@ export function DashboardPage() {
           ) : errorMessage ? (
             <StateCard title="Check-in unavailable" description={errorMessage} tone="error" />
           ) : (
-            <form className="readiness-form" onSubmit={handleReadinessSubmit}>
-              <div className="readiness-grid">
+            <form className="readiness-form dashboard-readiness-form" onSubmit={handleReadinessSubmit}>
+              <div className="dashboard-readiness-summary">
+                <div>
+                  <span className="stat-label">Today</span>
+                  <strong>{hasTodayReadinessLog && readinessLog ? readinessLog.readinessLabel : 'Check in now'}</strong>
+                  <p className="stat-subtext">
+                    {hasTodayReadinessLog && readinessLog
+                      ? `Energy ${readinessLog.energyLevel}/3, soreness ${readinessLog.sorenessLevel}/3, sleep ${readinessLog.sleepQuality}/3, motivation ${readinessLog.motivationLevel}/3.`
+                      : 'A quick update improves daily workout suggestions and recovery context.'}
+                  </p>
+                </div>
+                <div className="dashboard-readiness-score">
+                  <span>Readiness avg</span>
+                  <strong>{readinessAverage.toFixed(1)}</strong>
+                </div>
+              </div>
+
+              <div className="readiness-grid dashboard-readiness-grid">
                 <ReadinessSelector
                   label="Energy"
                   value={readinessForm.energyLevel}
@@ -487,7 +540,7 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div className="panel">
+        <div className="panel dashboard-panel-weekly">
           <div className="panel-header">
             <div>
               <h2>Weekly stats</h2>
@@ -500,23 +553,23 @@ export function DashboardPage() {
           ) : errorMessage ? (
             <StateCard title="Dashboard unavailable" description={errorMessage} tone="error" />
           ) : (
-            <div className="dashboard-metric-list">
-              <div className="dashboard-metric-card">
+            <div className="dashboard-metric-list dashboard-weekly-grid">
+              <div className="dashboard-metric-card dashboard-weekly-card">
                 <span className="stat-label">Workout count</span>
                 <strong>{metrics.workoutsThisWeek}</strong>
                 <span className="stat-subtext">Completed sessions logged this week</span>
               </div>
-              <div className="dashboard-metric-card">
+              <div className="dashboard-metric-card dashboard-weekly-card">
                 <span className="stat-label">Exercises logged</span>
                 <strong>{metrics.exercisesThisWeek}</strong>
                 <span className="stat-subtext">Total exercise entries across this week</span>
               </div>
-              <div className="dashboard-metric-card">
+              <div className="dashboard-metric-card dashboard-weekly-card">
                 <span className="stat-label">Weigh-ins</span>
                 <strong>{metrics.weighInsThisWeek}</strong>
                 <span className="stat-subtext">Entries captured during the current week</span>
               </div>
-              <div className="dashboard-metric-card">
+              <div className="dashboard-metric-card dashboard-weekly-card">
                 <span className="stat-label">Weekly avg body weight</span>
                 <strong>
                   {metrics.averageBodyWeightThisWeek === null
@@ -529,11 +582,11 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div className="panel">
+        <div className="panel panel-span-2 dashboard-panel-assistant">
           <div className="panel-header">
             <div>
               <h2>Workout assistant</h2>
-              <p>Simple coaching cues based on your logged history and weekly goal.</p>
+              <p>Simple coaching cues based on your logged history, readiness, and weekly target.</p>
             </div>
           </div>
 
@@ -546,7 +599,7 @@ export function DashboardPage() {
           ) : errorMessage ? (
             <StateCard title="Suggestions unavailable" description={errorMessage} tone="error" />
           ) : (
-            <div className="assistant-grid">
+            <div className="assistant-grid dashboard-assistant-grid">
               <article className="assistant-card assistant-card-highlight">
                 <span className="stat-label">Consistency nudge</span>
                 <strong>Weekly focus</strong>
@@ -626,7 +679,7 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div className="panel">
+        <div className="panel panel-span-2 dashboard-panel-overview">
           <div className="panel-header">
             <div>
               <h2>Overview</h2>
@@ -639,18 +692,18 @@ export function DashboardPage() {
           ) : errorMessage ? (
             <StateCard title="Dashboard unavailable" description={errorMessage} tone="error" />
           ) : (
-            <div className="dashboard-metric-list">
-              <div className="dashboard-metric-card">
+            <div className="dashboard-metric-list dashboard-overview-grid">
+              <div className="dashboard-metric-card dashboard-overview-card">
                 <span className="stat-label">Total workouts</span>
                 <strong>{metrics.totalWorkouts}</strong>
                 <span className="stat-subtext">All recorded sessions</span>
               </div>
-              <div className="dashboard-metric-card">
+              <div className="dashboard-metric-card dashboard-overview-card">
                 <span className="stat-label">Latest workout</span>
                 <strong>{metrics.latestWorkout ? formatDate(metrics.latestWorkout.date) : 'No data'}</strong>
                 <span className="stat-subtext">Most recent logged training day</span>
               </div>
-              <div className="dashboard-metric-card">
+              <div className="dashboard-metric-card dashboard-overview-card">
                 <span className="stat-label">Latest weigh-in</span>
                 <strong>
                   {metrics.latestWeightEntry
@@ -659,7 +712,7 @@ export function DashboardPage() {
                 </strong>
                 <span className="stat-subtext">Latest recorded body weight</span>
               </div>
-              <div className="dashboard-metric-card">
+              <div className="dashboard-metric-card dashboard-overview-card">
                 <span className="stat-label">Last weigh-in date</span>
                 <strong>
                   {metrics.latestWeightEntry ? formatDate(metrics.latestWeightEntry.date) : 'No data'}
@@ -671,6 +724,35 @@ export function DashboardPage() {
         </div>
       </section>
     </main>
+  )
+}
+
+function ForgeStatCard({
+  tone,
+  label,
+  value,
+  unit,
+  description,
+  trend,
+}: {
+  tone: 'lime' | 'blue' | 'teal' | 'violet'
+  label: string
+  value: string
+  unit?: string
+  description: string
+  trend?: string
+}) {
+  return (
+    <article className={`forge-stat-card forge-stat-card-${tone}`}>
+      <div className="forge-stat-glow" aria-hidden="true" />
+      <span className="stat-label">{label}</span>
+      <strong>
+        {value}
+        {unit ? <span>{unit}</span> : null}
+      </strong>
+      <p>{description}</p>
+      {trend ? <span className="forge-stat-trend">{trend}</span> : null}
+    </article>
   )
 }
 
@@ -826,6 +908,22 @@ function getWeeklyWorkoutGoalProgress(workoutCount: number, weeklyWorkoutTarget:
 
 function formatPhase(fitnessPhase: GoalSettings['fitnessPhase']) {
   return fitnessPhase.charAt(0).toUpperCase() + fitnessPhase.slice(1)
+}
+
+function getDashboardStatus(workoutsThisWeek: number, weeklyWorkoutTarget: number | null) {
+  if (weeklyWorkoutTarget === null) {
+    return 'Target not set'
+  }
+
+  if (workoutsThisWeek >= weeklyWorkoutTarget) {
+    return 'Weekly target met'
+  }
+
+  if (workoutsThisWeek === 0) {
+    return 'Week not started'
+  }
+
+  return 'On the climb'
 }
 
 function getPhaseSummary(fitnessPhase: GoalSettings['fitnessPhase']) {

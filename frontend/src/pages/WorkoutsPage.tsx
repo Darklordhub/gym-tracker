@@ -705,57 +705,54 @@ export function WorkoutsPage() {
 
   return (
     <main className="page-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <span className="eyebrow">Gym Tracker</span>
+      <section className="workouts-hero-forge">
+        <div className="workouts-hero-main">
+          <span className="eyebrow">FORGE / Workload</span>
           <h1>Workouts</h1>
           <p className="hero-text">
-            Run an active workout session, quick-log completed sessions, reuse templates, and track every set inside each exercise.
+            Log strength and cardio cleanly, keep templates close, and surface coaching signals without crowding the core workflow.
           </p>
         </div>
-
-        <div className="stats-grid">
-          <article className="stat-card">
-            <span className="stat-label">Latest</span>
-            <strong>{stats.latestWorkout ? formatDate(stats.latestWorkout.date) : 'No data'}</strong>
-            <span className="stat-subtext">
-              {stats.latestWorkout
-                ? stats.latestWorkout.workoutType === 'cardio'
-                  ? `${formatCardioActivityType(stats.latestWorkout.cardioActivityType)} for ${stats.latestWorkout.cardioDurationMinutes} min`
-                  : `${stats.latestWorkout.exerciseEntries.length} exercises logged`
-                : 'Create your first workout'}
-            </span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Workouts</span>
-            <strong>{stats.totalWorkouts}</strong>
-            <span className="stat-subtext">Sessions recorded</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Exercises</span>
-            <strong>{stats.totalExercises}</strong>
-            <span className="stat-subtext">Exercise entries across all workouts</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Cardio</span>
-            <strong>{stats.cardioSessions}</strong>
-            <span className="stat-subtext">Cardio sessions logged</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Sets</span>
-            <strong>{stats.totalSets}</strong>
-            <span className="stat-subtext">Logged working sets</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Active Session</span>
-            <strong>{activeSession ? 'In progress' : 'Idle'}</strong>
-            <span className="stat-subtext">
+        <div className="workouts-hero-side">
+          <article className="forge-focus-card">
+            <span className="stat-label">Current operating state</span>
+            <strong>{activeSession ? 'Active workout running' : 'Ready to log'}</strong>
+            <p>
               {activeSession
-                ? `Started ${formatDate(activeSession.startedAtUtc)}`
-                : 'Start from scratch or a template'}
-            </span>
+                ? `${activeSessionStats.exerciseCount} exercises and ${activeSessionStats.setCount} sets in progress.`
+                : assistantInsight.todaySuggestion.message}
+            </p>
+            <div className="forge-focus-pills">
+              <span className="info-pill">{stats.totalWorkouts} total workouts</span>
+              <span className="info-pill info-pill-cardio">{stats.cardioSessions} cardio sessions</span>
+            </div>
           </article>
         </div>
+      </section>
+
+      <section className="forge-stat-strip forge-stat-strip-workouts">
+        <WorkoutSignalCard
+          tone="lime"
+          label="Latest"
+          value={stats.latestWorkout ? formatDate(stats.latestWorkout.date) : 'No data'}
+          description={
+            stats.latestWorkout
+              ? stats.latestWorkout.workoutType === 'cardio'
+                ? `${formatCardioActivityType(stats.latestWorkout.cardioActivityType)} for ${stats.latestWorkout.cardioDurationMinutes} min`
+                : `${stats.latestWorkout.exerciseEntries.length} exercises logged`
+              : 'Create your first workout'
+          }
+        />
+        <WorkoutSignalCard tone="blue" label="Workouts" value={stats.totalWorkouts.toString()} description="Sessions recorded" />
+        <WorkoutSignalCard tone="teal" label="Exercises" value={stats.totalExercises.toString()} description="Exercise entries across all workouts" />
+        <WorkoutSignalCard tone="amber" label="Sets" value={stats.totalSets.toString()} description="Logged working sets" />
+        <WorkoutSignalCard tone="violet" label="Cardio" value={stats.cardioSessions.toString()} description="Cardio sessions logged" />
+        <WorkoutSignalCard
+          tone="rose"
+          label="Active session"
+          value={activeSession ? 'In progress' : 'Idle'}
+          description={activeSession ? `Started ${formatDate(activeSession.startedAtUtc)}` : 'Start from scratch or a template'}
+        />
       </section>
 
       {feedback || errorMessage ? (
@@ -769,12 +766,12 @@ export function WorkoutsPage() {
         </section>
       ) : null}
 
-      <section className="content-grid workout-grid">
-        <div className="panel panel-span-2 workout-assistant-panel">
+      <section className="workouts-main-grid">
+        <div className="panel panel-span-2 workout-assistant-panel workouts-panel-full">
           <div className="panel-header">
             <div>
               <h2>Workout assistant</h2>
-              <p>Keep the guidance visible, but separate it from your templates and logging actions.</p>
+              <p>Keep guidance prominent, but isolate it from the logging actions so the page stays readable under load.</p>
             </div>
           </div>
 
@@ -783,7 +780,7 @@ export function WorkoutsPage() {
           ) : errorMessage ? (
             <StateCard title="Guidance unavailable" description={errorMessage} tone="error" />
           ) : (
-            <div className="assistant-grid workout-assistant-grid">
+            <div className="assistant-grid workout-assistant-grid workouts-assistant-grid">
               <article className="assistant-card assistant-card-highlight">
                 <span className="stat-label">Today&apos;s suggestion</span>
                 <strong>{assistantInsight.todaySuggestion.title}</strong>
@@ -841,13 +838,11 @@ export function WorkoutsPage() {
             </div>
           )}
         </div>
-      </section>
 
-      <section className="content-grid workout-grid">
-        <div className="panel">
+        <div className="panel panel-span-2 workouts-panel-full">
           <div className="panel-header">
             <div>
-              <h2>{activeSession ? 'Active workout' : 'Start workout'}</h2>
+              <h2>{activeSession ? 'Active workout bay' : 'Start workout'}</h2>
               <p>
                 {activeSession
                   ? 'This session stays in progress until you complete it.'
@@ -860,7 +855,7 @@ export function WorkoutsPage() {
             <StateCard title="Loading active workout" description="Checking whether you already have a session in progress." loading />
           ) : activeSession ? (
             <>
-              <div className="session-banner session-banner-prominent">
+              <div className="session-banner session-banner-prominent workouts-active-banner">
                 <div className="session-banner-copy">
                   <span className="pr-badge">In Progress</span>
                   <span className="record-hint">Started on {formatDate(activeSession.startedAtUtc)}</span>
@@ -875,7 +870,7 @@ export function WorkoutsPage() {
                 </div>
               </div>
 
-              <div className="weight-form workout-flow-stack">
+              <div className="weight-form workout-flow-stack workouts-active-shell">
                 <label className="field">
                   <span>Notes</span>
                   <textarea
@@ -959,7 +954,7 @@ export function WorkoutsPage() {
               </div>
             </>
           ) : (
-            <div className="start-workout-stack workout-empty-state">
+            <div className="start-workout-stack workout-empty-state workouts-empty-launch">
               <StateCard
                 title="No active workout"
                 description="Start from scratch here, or start from one of your saved templates."
@@ -974,10 +969,130 @@ export function WorkoutsPage() {
               </button>
             </div>
           )}
-
         </div>
 
-        <div className="panel">
+        <div className="panel workouts-panel-strength">
+          <div className="panel-header">
+            <div>
+              <h2>Quick strength log</h2>
+              <p>Save a completed strength workout directly without using active mode.</p>
+            </div>
+          </div>
+
+          <div className="template-toolbar template-toolbar-workout workouts-template-toolbar">
+            <label className="field template-name-field">
+              <span>Save current structure as template</span>
+              <input
+                type="text"
+                placeholder="Upper Body A"
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
+                aria-invalid={Boolean(templateErrors.name)}
+              />
+              {templateErrors.name ? <small className="field-error">{templateErrors.name}</small> : null}
+            </label>
+
+            <div className="toolbar-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => void handleSaveTemplate()}
+                disabled={isSavingTemplate}
+              >
+                {isSavingTemplate ? 'Saving...' : 'Save as template'}
+              </button>
+
+              <button type="button" className="ghost-button" onClick={resetQuickLogForm} disabled={isSaving}>
+                Clear form
+              </button>
+            </div>
+          </div>
+
+          <form className="weight-form workout-flow-stack workouts-strength-form" onSubmit={handleQuickLogSubmit} noValidate>
+            <label className="field">
+              <span>Date</span>
+              <input
+                type="date"
+                value={quickLogForm.date}
+                onChange={(event) =>
+                  setQuickLogForm((current) => ({ ...current, date: event.target.value }))
+                }
+                aria-invalid={Boolean(quickLogErrors.date)}
+              />
+              {quickLogErrors.date ? <small className="field-error">{quickLogErrors.date}</small> : null}
+            </label>
+
+            <label className="field">
+              <span>Notes</span>
+              <textarea
+                className="text-area"
+                rows={4}
+                maxLength={500}
+                placeholder="Optional notes for this session"
+                value={quickLogForm.notes}
+                onChange={(event) =>
+                  setQuickLogForm((current) => ({ ...current, notes: event.target.value }))
+                }
+                aria-invalid={Boolean(quickLogErrors.notes)}
+              />
+              <small>Optional notes help add context before this workout goes into history.</small>
+              {quickLogErrors.notes ? <small className="field-error">{quickLogErrors.notes}</small> : null}
+            </label>
+
+            <div className="exercise-builder workouts-exercise-builder">
+              <div className="section-title-row">
+                <div>
+                  <h3>Exercises</h3>
+                  <p>Add each movement in the order you performed it. Consistent naming keeps history and PR suggestions cleaner.</p>
+                </div>
+                <button type="button" className="ghost-button" onClick={() => addExercise('quick')}>
+                  Add exercise
+                </button>
+              </div>
+
+              {quickLogErrors.exerciseEntries ? (
+                <small className="field-error">{quickLogErrors.exerciseEntries}</small>
+              ) : null}
+
+              {quickLogForm.exerciseEntries.length === 0 ? (
+                <StateCard
+                  title="No exercises yet"
+                  description="Add your first exercise when you are ready to build this strength workout."
+                />
+              ) : (
+                <div className="exercise-list">
+                  {quickLogForm.exerciseEntries.map((exercise, exerciseIndex) => (
+                    <ExerciseEditorCard
+                      key={`quick-${exerciseIndex}`}
+                      title={`Exercise ${exerciseIndex + 1}`}
+                      sectionLabel="Quick log"
+                      exercise={exercise}
+                      errors={quickLogErrors.exercises[exerciseIndex]}
+                      workouts={workouts}
+                      onExerciseChange={(field, value) =>
+                        updateExercise('quick', exerciseIndex, field, value)
+                      }
+                      onSetChange={(setIndex, field, value) =>
+                        updateSet('quick', exerciseIndex, setIndex, field, value)
+                      }
+                      onAddSet={() => addSet('quick', exerciseIndex)}
+                      onRemoveSet={(setIndex) => removeSet('quick', exerciseIndex, setIndex)}
+                      onRemoveExercise={() => removeExercise('quick', exerciseIndex)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="action-row action-row-prominent">
+              <button type="submit" className="primary-button" disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save workout'}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div className="panel workouts-panel-templates">
           <div className="panel-header">
             <div>
               <h2>Templates</h2>
@@ -1053,131 +1168,8 @@ export function WorkoutsPage() {
             </div>
           )}
         </div>
-      </section>
 
-      <section className="content-grid workout-grid">
-        <div className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>Quick strength log</h2>
-                <p>Save a completed strength workout directly without using active mode.</p>
-              </div>
-            </div>
-
-          <div className="template-toolbar template-toolbar-workout">
-            <label className="field template-name-field">
-              <span>Save current structure as template</span>
-              <input
-                type="text"
-                placeholder="Upper Body A"
-                value={templateName}
-                onChange={(event) => setTemplateName(event.target.value)}
-                aria-invalid={Boolean(templateErrors.name)}
-              />
-              {templateErrors.name ? <small className="field-error">{templateErrors.name}</small> : null}
-            </label>
-
-            <div className="toolbar-actions">
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() => void handleSaveTemplate()}
-                disabled={isSavingTemplate}
-              >
-                {isSavingTemplate ? 'Saving...' : 'Save as template'}
-              </button>
-
-              <button type="button" className="ghost-button" onClick={resetQuickLogForm} disabled={isSaving}>
-                Clear form
-              </button>
-            </div>
-          </div>
-
-          <form className="weight-form workout-flow-stack" onSubmit={handleQuickLogSubmit} noValidate>
-            <label className="field">
-              <span>Date</span>
-              <input
-                type="date"
-                value={quickLogForm.date}
-                onChange={(event) =>
-                  setQuickLogForm((current) => ({ ...current, date: event.target.value }))
-                }
-                aria-invalid={Boolean(quickLogErrors.date)}
-              />
-              {quickLogErrors.date ? <small className="field-error">{quickLogErrors.date}</small> : null}
-            </label>
-
-            <label className="field">
-              <span>Notes</span>
-              <textarea
-                className="text-area"
-                rows={4}
-                maxLength={500}
-                placeholder="Optional notes for this session"
-                value={quickLogForm.notes}
-                onChange={(event) =>
-                  setQuickLogForm((current) => ({ ...current, notes: event.target.value }))
-                }
-                aria-invalid={Boolean(quickLogErrors.notes)}
-              />
-              <small>Optional notes help add context before this workout goes into history.</small>
-              {quickLogErrors.notes ? <small className="field-error">{quickLogErrors.notes}</small> : null}
-            </label>
-
-            <div className="exercise-builder">
-              <div className="section-title-row">
-                <div>
-                  <h3>Exercises</h3>
-                  <p>Add each movement in the order you performed it. Keep exercise names consistent for cleaner history and PR tracking.</p>
-                </div>
-                <button type="button" className="ghost-button" onClick={() => addExercise('quick')}>
-                  Add exercise
-                </button>
-              </div>
-
-              {quickLogErrors.exerciseEntries ? (
-                <small className="field-error">{quickLogErrors.exerciseEntries}</small>
-              ) : null}
-
-              {quickLogForm.exerciseEntries.length === 0 ? (
-                <StateCard
-                  title="No exercises yet"
-                  description="Add your first exercise when you are ready to build this strength workout."
-                />
-              ) : (
-                <div className="exercise-list">
-                  {quickLogForm.exerciseEntries.map((exercise, exerciseIndex) => (
-                    <ExerciseEditorCard
-                      key={`quick-${exerciseIndex}`}
-                      title={`Exercise ${exerciseIndex + 1}`}
-                      sectionLabel="Quick log"
-                      exercise={exercise}
-                      errors={quickLogErrors.exercises[exerciseIndex]}
-                      workouts={workouts}
-                      onExerciseChange={(field, value) =>
-                        updateExercise('quick', exerciseIndex, field, value)
-                      }
-                      onSetChange={(setIndex, field, value) =>
-                        updateSet('quick', exerciseIndex, setIndex, field, value)
-                      }
-                      onAddSet={() => addSet('quick', exerciseIndex)}
-                      onRemoveSet={(setIndex) => removeSet('quick', exerciseIndex, setIndex)}
-                      onRemoveExercise={() => removeExercise('quick', exerciseIndex)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="action-row action-row-prominent">
-              <button type="submit" className="primary-button" disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save workout'}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <div className="panel">
+        <div className="panel workouts-panel-cardio">
           <div className="panel-header">
             <div>
               <h2>Quick log cardio</h2>
@@ -1305,10 +1297,8 @@ export function WorkoutsPage() {
             </div>
           </form>
         </div>
-      </section>
 
-      <section className="content-grid workout-grid">
-        <div className="panel panel-span-2">
+        <div className="panel panel-span-2 workouts-panel-history">
           <div className="panel-header">
             <div>
               <h2>Recent workouts</h2>
@@ -1440,6 +1430,27 @@ export function WorkoutsPage() {
         </div>
       </section>
     </main>
+  )
+}
+
+function WorkoutSignalCard({
+  tone,
+  label,
+  value,
+  description,
+}: {
+  tone: 'lime' | 'blue' | 'teal' | 'amber' | 'violet' | 'rose'
+  label: string
+  value: string
+  description: string
+}) {
+  return (
+    <article className={`forge-stat-card forge-stat-card-${tone}`}>
+      <div className="forge-stat-glow" aria-hidden="true" />
+      <span className="stat-label">{label}</span>
+      <strong>{value}</strong>
+      <p>{description}</p>
+    </article>
   )
 }
 
