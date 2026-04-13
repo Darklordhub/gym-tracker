@@ -207,41 +207,61 @@ export function ProfilePage() {
 
   return (
     <main className="page-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <span className="eyebrow">Account</span>
+      <section className="profile-hero-forge">
+        <div className="profile-hero-main">
+          <span className="eyebrow">FORGE / Account</span>
           <h1>Profile</h1>
           <p className="hero-text">
-            Keep your personal details current, manage your password, and decide whether optional cycle-aware training guidance should be part of your app experience.
+            Keep your personal details current, manage password security, and decide whether cycle-aware guidance should be part of your experience.
           </p>
         </div>
 
-        <div className="stats-grid">
-          <article className="stat-card">
-            <span className="stat-label">Account Email</span>
-            <strong>{profile?.email ?? authState?.user.email ?? 'Loading...'}</strong>
-            <span className="stat-subtext">Your sign-in identifier stays read-only here.</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Member Since</span>
-            <strong>{profile ? formatDate(profile.createdAt) : 'Loading...'}</strong>
-            <span className="stat-subtext">Created automatically when your account was registered.</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Display Name</span>
-            <strong>{profile?.displayName || profile?.fullName || 'Not set'}</strong>
-            <span className="stat-subtext">Used as your preferred label inside the app.</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Cycle Feature</span>
-            <strong>{cycleSettings.isEnabled ? 'Enabled' : 'Off'}</strong>
-            <span className="stat-subtext">
+        <div className="profile-hero-side">
+          <article className="forge-focus-card">
+            <span className="stat-label">Account state</span>
+            <strong>{cycleSettings.isEnabled ? 'Cycle-aware mode active' : 'Core profile only'}</strong>
+            <p>
               {cycleSettings.isEnabled
                 ? cycleGuidance?.guidanceHeadline ?? 'Dedicated cycle tracking is available.'
-                : 'Hidden until you choose to turn it on.'}
-            </span>
+                : 'Cycle-specific guidance and navigation stay hidden until you opt in.'}
+            </p>
+            <div className="forge-focus-pills">
+              <span className="info-pill">{profile?.displayName || profile?.fullName || 'No display name'}</span>
+              <span className="info-pill info-pill-strength">{profile ? formatDate(profile.createdAt) : 'Loading...'}</span>
+            </div>
           </article>
         </div>
+      </section>
+
+      <section className="forge-stat-strip forge-stat-strip-profile">
+        <article className="forge-stat-card forge-stat-card-blue">
+          <div className="forge-stat-glow" aria-hidden="true" />
+          <span className="stat-label">Account email</span>
+          <strong>{profile?.email ?? authState?.user.email ?? 'Loading...'}</strong>
+          <p>Your sign-in identifier stays read-only here.</p>
+        </article>
+        <article className="forge-stat-card forge-stat-card-teal">
+          <div className="forge-stat-glow" aria-hidden="true" />
+          <span className="stat-label">Member since</span>
+          <strong>{profile ? formatDate(profile.createdAt) : 'Loading...'}</strong>
+          <p>Created automatically when your account was registered.</p>
+        </article>
+        <article className="forge-stat-card forge-stat-card-violet">
+          <div className="forge-stat-glow" aria-hidden="true" />
+          <span className="stat-label">Display name</span>
+          <strong>{profile?.displayName || profile?.fullName || 'Not set'}</strong>
+          <p>Used as your preferred label inside the app.</p>
+        </article>
+        <article className="forge-stat-card forge-stat-card-lime">
+          <div className="forge-stat-glow" aria-hidden="true" />
+          <span className="stat-label">Cycle feature</span>
+          <strong>{cycleSettings.isEnabled ? 'Enabled' : 'Off'}</strong>
+          <p>
+            {cycleSettings.isEnabled
+              ? cycleGuidance?.guidanceHeadline ?? 'Dedicated cycle tracking is available.'
+              : 'Hidden until you choose to turn it on.'}
+          </p>
+        </article>
       </section>
 
       {isLoading ? (
@@ -257,7 +277,7 @@ export function ProfilePage() {
           </div>
         </section>
       ) : (
-        <section className="content-grid profile-grid">
+        <section className="profile-main-grid">
           <div className="panel">
             <div className="panel-header">
               <div>
@@ -266,7 +286,7 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <form className="weight-form profile-form-panel" onSubmit={handleProfileSubmit}>
+            <form className="weight-form profile-form-panel profile-form-forge" onSubmit={handleProfileSubmit}>
               <p className="section-note">
                 Full name is required. Everything else here is optional and can be updated later.
               </p>
@@ -371,7 +391,7 @@ export function ProfilePage() {
               </div>
             </div>
 
-            <form className="weight-form profile-form-panel" onSubmit={handlePasswordSubmit}>
+            <form className="weight-form profile-form-panel profile-form-forge" onSubmit={handlePasswordSubmit}>
               <p className="section-note">
                 Use a password you do not reuse elsewhere and confirm it before saving.
               </p>
@@ -433,7 +453,7 @@ export function ProfilePage() {
             ) : null}
           </div>
 
-          <div className="panel panel-span-2">
+          <div className="panel panel-span-2 profile-cycle-panel">
             <div className="panel-header">
               <div>
                 <h2>Cycle-Aware Training</h2>

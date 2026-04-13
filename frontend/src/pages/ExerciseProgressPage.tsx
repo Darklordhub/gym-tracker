@@ -300,231 +300,261 @@ export function ExerciseProgressPage() {
 
   return (
     <main className="page-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <span className="eyebrow">Gym Tracker</span>
+      <section className="progress-hero-forge">
+        <div className="progress-hero-main">
+          <span className="eyebrow">FORGE / Analytics</span>
           <h1>Progress</h1>
           <p className="hero-text">
-            Review strength and cardio progress in one place, with focused summaries, trend direction, and searchable history.
+            Review strength and cardio progress in one place, with focused summaries, cleaner filtering, and searchable history.
           </p>
         </div>
 
-        <div className="exercise-filter-card progress-filter-card">
-          <p className="section-note">
-            Switch between strength exercises and cardio activities, then narrow the view to one item at a time.
-          </p>
-
-          <label className="field">
-            <span>Track progress for</span>
-            <select
-              className="select-input"
-              value={selectedMode}
-              onChange={(event) => setSelectedMode(event.target.value as ProgressMode)}
-              disabled={isLoading || (strengthExerciseNames.length === 0 && cardioActivityTypes.length === 0)}
+        <div className="progress-hero-filter">
+          <div className="progress-mode-switch" role="tablist" aria-label="Progress mode">
+            <button
+              type="button"
+              className={selectedMode === 'strength' ? 'readiness-option readiness-option-active' : 'readiness-option'}
+              onClick={() => setSelectedMode('strength')}
+              disabled={isLoading || strengthExerciseNames.length === 0}
             >
-              <option value="strength">Strength exercises</option>
-              <option value="cardio">Cardio activities</option>
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Search {selectedMode === 'strength' ? 'exercise' : 'activity'}</span>
-            <input
-              type="text"
-              placeholder={selectedMode === 'strength' ? 'Bench press' : 'Walking'}
-              value={itemSearch}
-              onChange={(event) => setItemSearch(event.target.value)}
-              disabled={isLoading || availableItems.length === 0}
-            />
-          </label>
-
-          <label className="field">
-            <span>{selectedMode === 'strength' ? 'Exercise' : 'Cardio activity'}</span>
-            <select
-              className="select-input"
-              value={selectedItem}
-              onChange={(event) => setSelectedItem(event.target.value)}
-              disabled={isLoading || filteredItems.length === 0}
+              Strength
+            </button>
+            <button
+              type="button"
+              className={selectedMode === 'cardio' ? 'readiness-option readiness-option-active' : 'readiness-option'}
+              onClick={() => setSelectedMode('cardio')}
+              disabled={isLoading || cardioActivityTypes.length === 0}
             >
-              {filteredItems.length === 0 ? (
-                <option value="">
-                  {selectedMode === 'strength' ? 'No exercises yet' : 'No cardio sessions yet'}
-                </option>
-              ) : (
-                filteredItems.map((item) => (
-                  <option key={item} value={item}>
-                    {selectedMode === 'strength' ? item : formatCardioActivityType(item as CardioActivityType)}
+              Cardio
+            </button>
+          </div>
+
+          <div className="progress-filter-panel">
+            <label className="field">
+              <span>Search {selectedMode === 'strength' ? 'exercise' : 'activity'}</span>
+              <input
+                type="text"
+                placeholder={selectedMode === 'strength' ? 'Bench press' : 'Walking'}
+                value={itemSearch}
+                onChange={(event) => setItemSearch(event.target.value)}
+                disabled={isLoading || availableItems.length === 0}
+              />
+            </label>
+
+            <label className="field">
+              <span>{selectedMode === 'strength' ? 'Exercise' : 'Cardio activity'}</span>
+              <select
+                className="select-input"
+                value={selectedItem}
+                onChange={(event) => setSelectedItem(event.target.value)}
+                disabled={isLoading || filteredItems.length === 0}
+              >
+                {filteredItems.length === 0 ? (
+                  <option value="">
+                    {selectedMode === 'strength' ? 'No exercises yet' : 'No cardio sessions yet'}
                   </option>
-                ))
-              )}
-            </select>
-          </label>
+                ) : (
+                  filteredItems.map((item) => (
+                    <option key={item} value={item}>
+                      {selectedMode === 'strength' ? item : formatCardioActivityType(item as CardioActivityType)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+          </div>
         </div>
+      </section>
 
-        {selectedMode === 'strength' ? (
-          <>
-            <div className="stats-grid">
-              <article className="stat-card">
-                <span className="stat-label">Selected Exercise</span>
-                <strong>{selectedItem || 'None selected'}</strong>
-                <span className="stat-subtext">
-                  {selectedItem
-                    ? `${strengthSummary.sessionCount} logged session${strengthSummary.sessionCount === 1 ? '' : 's'}`
-                    : 'Choose an exercise to begin'}
-                </span>
-              </article>
-              <article className="stat-card">
-                <span className="stat-label">Last Logged Weight</span>
-                <strong>{strengthSummary.latest ? `${strengthSummary.latest.weightKg} kg` : 'No data'}</strong>
-                <span className="stat-subtext">
-                  {strengthSummary.latest
-                    ? `Set ${strengthSummary.latest.setOrder} on ${formatDate(strengthSummary.latest.date)}`
-                    : 'Select an exercise'}
-                </span>
-              </article>
-              <article className="stat-card">
-                <span className="stat-label">Personal Best</span>
-                <strong>{strengthSummary.best ? `${strengthSummary.best.weightKg} kg` : 'No data'}</strong>
-                <span className="stat-subtext">
-                  {strengthSummary.best
-                    ? `${strengthSummary.best.reps} reps on ${formatDate(strengthSummary.best.date)}`
-                    : 'Need at least one set'}
-                </span>
-              </article>
-              <article className="stat-card">
-                <span className="stat-label">Recent Trend</span>
-                <strong className={getTrendClassName(strengthSummary.recentTrendDelta)}>
-                  {formatStrengthTrendLabel(strengthSummary.recentTrendDelta)}
-                </strong>
-                <span className="stat-subtext">
-                  {strengthSummary.recentTrendDelta === null
-                    ? 'Need more recent logs to compare windows'
-                    : `${strengthSummary.recentTrendDelta > 0 ? '+' : ''}${strengthSummary.recentTrendDelta} kg vs previous recent average`}
-                </span>
-              </article>
-            </div>
+      {selectedMode === 'strength' ? (
+        <>
+          <section className="forge-stat-strip forge-stat-strip-progress">
+            <ProgressSignalCard
+              tone="lime"
+              label="Selected exercise"
+              value={selectedItem || 'None selected'}
+              description={
+                selectedItem
+                  ? `${strengthSummary.sessionCount} logged session${strengthSummary.sessionCount === 1 ? '' : 's'}`
+                  : 'Choose an exercise to begin'
+              }
+            />
+            <ProgressSignalCard
+              tone="blue"
+              label="Last logged weight"
+              value={strengthSummary.latest ? `${strengthSummary.latest.weightKg} kg` : 'No data'}
+              description={
+                strengthSummary.latest
+                  ? `Set ${strengthSummary.latest.setOrder} on ${formatDate(strengthSummary.latest.date)}`
+                  : 'Select an exercise'
+              }
+            />
+            <ProgressSignalCard
+              tone="teal"
+              label="Personal best"
+              value={strengthSummary.best ? `${strengthSummary.best.weightKg} kg` : 'No data'}
+              description={
+                strengthSummary.best
+                  ? `${strengthSummary.best.reps} reps on ${formatDate(strengthSummary.best.date)}`
+                  : 'Need at least one set'
+              }
+            />
+            <ProgressSignalCard
+              tone="violet"
+              label="Recent trend"
+              value={formatStrengthTrendLabel(strengthSummary.recentTrendDelta)}
+              description={
+                strengthSummary.recentTrendDelta === null
+                  ? 'Need more recent logs to compare windows'
+                  : `${strengthSummary.recentTrendDelta > 0 ? '+' : ''}${strengthSummary.recentTrendDelta} kg vs previous recent average`
+              }
+            />
+          </section>
 
-            <div className="exercise-progress-hero-grid">
-              <div className="exercise-summary-card">
-                <div className="goal-progress-header">
-                  <span className="stat-label">Strength summary</span>
-                  <strong>{selectedItem || 'No exercise selected'}</strong>
-                </div>
-
-                <div className="exercise-progress-summary-grid">
-                  <div>
-                    <span className="stat-label">Sessions</span>
-                    <strong>{strengthSummary.sessionCount}</strong>
-                    <span className="stat-subtext">Distinct workout sessions</span>
-                  </div>
-                  <div>
-                    <span className="stat-label">Sets</span>
-                    <strong>{strengthSummary.totalSets}</strong>
-                    <span className="stat-subtext">Total logged sets</span>
-                  </div>
-                  <div>
-                    <span className="stat-label">Recent Average</span>
-                    <strong>{strengthSummary.recentAverage === null ? 'No data' : `${strengthSummary.recentAverage} kg`}</strong>
-                    <span className="stat-subtext">Average of the last 4 logged sets</span>
-                  </div>
-                  <div>
-                    <span className="stat-label">First Logged</span>
-                    <strong>{strengthSummary.firstLoggedAt ? formatDate(strengthSummary.firstLoggedAt) : 'No data'}</strong>
-                    <span className="stat-subtext">Earliest strength entry in view</span>
-                  </div>
+          <section className="progress-summary-grid">
+            <div className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Strength summary</h2>
+                  <p>{selectedItem || 'No exercise selected'}</p>
                 </div>
               </div>
 
-              <div className="suggestion-card hero-suggestion-card">
-                <span className="stat-label">Suggested Next Weight</span>
+              <div className="exercise-progress-summary-grid progress-analytics-grid">
+                <div>
+                  <span className="stat-label">Sessions</span>
+                  <strong>{strengthSummary.sessionCount}</strong>
+                  <span className="stat-subtext">Distinct workout sessions</span>
+                </div>
+                <div>
+                  <span className="stat-label">Sets</span>
+                  <strong>{strengthSummary.totalSets}</strong>
+                  <span className="stat-subtext">Total logged sets</span>
+                </div>
+                <div>
+                  <span className="stat-label">Recent average</span>
+                  <strong>{strengthSummary.recentAverage === null ? 'No data' : `${strengthSummary.recentAverage} kg`}</strong>
+                  <span className="stat-subtext">Average of the last 4 logged sets</span>
+                </div>
+                <div>
+                  <span className="stat-label">First logged</span>
+                  <strong>{strengthSummary.firstLoggedAt ? formatDate(strengthSummary.firstLoggedAt) : 'No data'}</strong>
+                  <span className="stat-subtext">Earliest strength entry in view</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Next set guidance</h2>
+                  <p>Smart suggestion built from your saved set history.</p>
+                </div>
+              </div>
+
+              <div className="suggestion-card hero-suggestion-card progress-suggestion-panel">
+                <span className="stat-label">Suggested next weight</span>
                 <strong>{suggestion ? `${suggestion.suggestedWeightKg} kg` : 'No suggestion yet'}</strong>
                 <span className="stat-subtext">
                   {suggestion ? suggestion.reason : 'Log this exercise to generate a recommendation.'}
                 </span>
               </div>
             </div>
-          </>
-        ) : (
-          <>
-            <div className="stats-grid">
-              <article className="stat-card">
-                <span className="stat-label">Selected Activity</span>
-                <strong>{selectedItem ? formatCardioActivityType(selectedItem as CardioActivityType) : 'None selected'}</strong>
-                <span className="stat-subtext">
-                  {selectedItem
-                    ? `${cardioSummary.sessionCount} logged session${cardioSummary.sessionCount === 1 ? '' : 's'}`
-                    : 'Choose an activity to begin'}
-                </span>
-              </article>
-              <article className="stat-card">
-                <span className="stat-label">Last Logged Session</span>
-                <strong>{cardioSummary.latest ? `${cardioSummary.latest.durationMinutes} min` : 'No data'}</strong>
-                <span className="stat-subtext">
-                  {cardioSummary.latest
-                    ? `${formatCardioIntensity(cardioSummary.latest.intensity)} on ${formatDate(cardioSummary.latest.date)}`
-                    : 'Select a cardio activity'}
-                </span>
-              </article>
-              <article className="stat-card">
-                <span className="stat-label">Total Duration</span>
-                <strong>{cardioSummary.sessionCount > 0 ? `${cardioSummary.totalDuration} min` : 'No data'}</strong>
-                <span className="stat-subtext">Across the current cardio view</span>
-              </article>
-              <article className="stat-card">
-                <span className="stat-label">Total Distance</span>
-                <strong>
-                  {cardioSummary.loggedDistanceSessions > 0 ? `${cardioSummary.totalDistance} km` : 'Not logged'}
-                </strong>
-                <span className="stat-subtext">
-                  {cardioSummary.loggedDistanceSessions > 0
-                    ? `${cardioSummary.loggedDistanceSessions} session${cardioSummary.loggedDistanceSessions === 1 ? '' : 's'} included distance`
-                    : 'Distance is optional for cardio sessions'}
-                </span>
-              </article>
-            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="forge-stat-strip forge-stat-strip-progress">
+            <ProgressSignalCard
+              tone="lime"
+              label="Selected activity"
+              value={selectedItem ? formatCardioActivityType(selectedItem as CardioActivityType) : 'None selected'}
+              description={
+                selectedItem
+                  ? `${cardioSummary.sessionCount} logged session${cardioSummary.sessionCount === 1 ? '' : 's'}`
+                  : 'Choose an activity to begin'
+              }
+            />
+            <ProgressSignalCard
+              tone="blue"
+              label="Last logged"
+              value={cardioSummary.latest ? `${cardioSummary.latest.durationMinutes} min` : 'No data'}
+              description={
+                cardioSummary.latest
+                  ? `${formatCardioIntensity(cardioSummary.latest.intensity)} on ${formatDate(cardioSummary.latest.date)}`
+                  : 'Select a cardio activity'
+              }
+            />
+            <ProgressSignalCard
+              tone="teal"
+              label="Total duration"
+              value={cardioSummary.sessionCount > 0 ? `${cardioSummary.totalDuration} min` : 'No data'}
+              description="Across the current cardio view"
+            />
+            <ProgressSignalCard
+              tone="violet"
+              label="Total distance"
+              value={cardioSummary.loggedDistanceSessions > 0 ? `${cardioSummary.totalDistance} km` : 'Not logged'}
+              description={
+                cardioSummary.loggedDistanceSessions > 0
+                  ? `${cardioSummary.loggedDistanceSessions} session${cardioSummary.loggedDistanceSessions === 1 ? '' : 's'} included distance`
+                  : 'Distance is optional for cardio sessions'
+              }
+            />
+          </section>
 
-            <div className="exercise-progress-hero-grid">
-              <div className="exercise-summary-card">
-                <div className="goal-progress-header">
-                  <span className="stat-label">Cardio summary</span>
-                  <strong>{selectedItem ? formatCardioActivityType(selectedItem as CardioActivityType) : 'No activity selected'}</strong>
-                </div>
-
-                <div className="exercise-progress-summary-grid">
-                  <div>
-                    <span className="stat-label">Sessions</span>
-                    <strong>{cardioSummary.sessionCount}</strong>
-                    <span className="stat-subtext">Saved cardio sessions</span>
-                  </div>
-                  <div>
-                    <span className="stat-label">Longest Session</span>
-                    <strong>{cardioSummary.longestSession ? `${cardioSummary.longestSession.durationMinutes} min` : 'No data'}</strong>
-                    <span className="stat-subtext">
-                      {cardioSummary.longestSession ? formatDate(cardioSummary.longestSession.date) : 'Log a cardio session'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="stat-label">Recent Trend</span>
-                    <strong className={getTrendClassName(cardioSummary.recentTrendDelta)}>
-                      {formatCardioTrendLabel(cardioSummary.recentTrendDelta)}
-                    </strong>
-                    <span className="stat-subtext">
-                      {cardioSummary.recentTrendDelta === null
-                        ? 'Need more recent cardio logs to compare windows'
-                        : `${cardioSummary.recentTrendDelta > 0 ? '+' : ''}${cardioSummary.recentTrendDelta} min vs previous recent average`}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="stat-label">Farthest Logged</span>
-                    <strong>{cardioSummary.farthestSession?.distanceKm ? `${cardioSummary.farthestSession.distanceKm} km` : 'Not logged'}</strong>
-                    <span className="stat-subtext">
-                      {cardioSummary.farthestSession ? formatDate(cardioSummary.farthestSession.date) : 'Distance has not been logged yet'}
-                    </span>
-                  </div>
+          <section className="progress-summary-grid">
+            <div className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Cardio summary</h2>
+                  <p>{selectedItem ? formatCardioActivityType(selectedItem as CardioActivityType) : 'No activity selected'}</p>
                 </div>
               </div>
 
-              <div className="suggestion-card hero-suggestion-card">
+              <div className="exercise-progress-summary-grid progress-analytics-grid">
+                <div>
+                  <span className="stat-label">Sessions</span>
+                  <strong>{cardioSummary.sessionCount}</strong>
+                  <span className="stat-subtext">Saved cardio sessions</span>
+                </div>
+                <div>
+                  <span className="stat-label">Longest session</span>
+                  <strong>{cardioSummary.longestSession ? `${cardioSummary.longestSession.durationMinutes} min` : 'No data'}</strong>
+                  <span className="stat-subtext">
+                    {cardioSummary.longestSession ? formatDate(cardioSummary.longestSession.date) : 'Log a cardio session'}
+                  </span>
+                </div>
+                <div>
+                  <span className="stat-label">Recent trend</span>
+                  <strong className={getTrendClassName(cardioSummary.recentTrendDelta)}>
+                    {formatCardioTrendLabel(cardioSummary.recentTrendDelta)}
+                  </strong>
+                  <span className="stat-subtext">
+                    {cardioSummary.recentTrendDelta === null
+                      ? 'Need more recent cardio logs to compare windows'
+                      : `${cardioSummary.recentTrendDelta > 0 ? '+' : ''}${cardioSummary.recentTrendDelta} min vs previous recent average`}
+                  </span>
+                </div>
+                <div>
+                  <span className="stat-label">Farthest logged</span>
+                  <strong>{cardioSummary.farthestSession?.distanceKm ? `${cardioSummary.farthestSession.distanceKm} km` : 'Not logged'}</strong>
+                  <span className="stat-subtext">
+                    {cardioSummary.farthestSession ? formatDate(cardioSummary.farthestSession.date) : 'Distance has not been logged yet'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Pattern readout</h2>
+                  <p>Recent cardio intensity and duration in a simpler summary card.</p>
+                </div>
+              </div>
+
+              <div className="suggestion-card hero-suggestion-card progress-suggestion-panel">
                 <span className="stat-label">Recent cardio pattern</span>
                 <strong>
                   {cardioSummary.latest
@@ -538,11 +568,11 @@ export function ExerciseProgressPage() {
                 </span>
               </div>
             </div>
-          </>
-        )}
-      </section>
+          </section>
+        </>
+      )}
 
-      <section className="content-grid exercise-progress-grid">
+      <section className="progress-main-grid">
         <div className="panel panel-span-2">
           <div className="panel-header">
             <div>
@@ -592,9 +622,7 @@ export function ExerciseProgressPage() {
             <CardioProgressChart entries={filteredCardioHistory} selectedActivity={selectedItem as CardioActivityType} />
           )}
         </div>
-      </section>
 
-      <section className="content-grid exercise-progress-grid">
         <div className="panel panel-span-2">
           <div className="panel-header">
             <div>
@@ -729,6 +757,27 @@ export function ExerciseProgressPage() {
         </div>
       </section>
     </main>
+  )
+}
+
+function ProgressSignalCard({
+  tone,
+  label,
+  value,
+  description,
+}: {
+  tone: 'lime' | 'blue' | 'teal' | 'violet'
+  label: string
+  value: string
+  description: string
+}) {
+  return (
+    <article className={`forge-stat-card forge-stat-card-${tone}`}>
+      <div className="forge-stat-glow" aria-hidden="true" />
+      <span className="stat-label">{label}</span>
+      <strong>{value}</strong>
+      <p>{description}</p>
+    </article>
   )
 }
 

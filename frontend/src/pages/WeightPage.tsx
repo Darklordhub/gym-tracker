@@ -197,58 +197,70 @@ export function WeightPage() {
 
   return (
     <main className="page-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <span className="eyebrow">Gym Tracker</span>
+      <section className="weight-hero-forge">
+        <div className="weight-hero-main">
+          <span className="eyebrow">FORGE / Composition</span>
           <h1>Weight</h1>
           <p className="hero-text">
-            Record weigh-ins, correct mistakes, and keep a clean history without leaving the page.
+            Record weigh-ins, review weekly averages, and keep trend context visible without breaking the flow.
           </p>
         </div>
-
-        <div className="stats-grid">
-          <article className="stat-card">
-            <span className="stat-label">Latest</span>
-            <strong>{stats.latestEntry ? `${stats.latestEntry.weightKg} kg` : 'No data'}</strong>
-            <span className="stat-subtext">
-              {stats.latestEntry ? formatDate(stats.latestEntry.date) : 'Add your first entry'}
-            </span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Entries</span>
-            <strong>{stats.totalEntries}</strong>
-            <span className="stat-subtext">Tracked weigh-ins</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Change</span>
-            <strong>
-              {stats.delta === null ? 'N/A' : `${stats.delta > 0 ? '+' : ''}${stats.delta} kg`}
-            </strong>
-            <span className="stat-subtext">Compared with previous entry</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Weekly Average</span>
-            <strong>
-              {stats.latestWeek ? `${stats.latestWeek.averageWeightKg} kg` : 'No data'}
-            </strong>
-            <span className="stat-subtext">
-              {stats.latestWeek ? stats.latestWeek.label : 'Need weigh-ins this week'}
-            </span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Trend</span>
-            <strong className={getTrendClassName(stats.weeklyDelta)}>{stats.trendLabel}</strong>
-            <span className="stat-subtext">
+        <div className="weight-hero-side">
+          <article className="forge-focus-card">
+            <span className="stat-label">Current direction</span>
+            <strong>{stats.trendLabel}</strong>
+            <p>
               {stats.weeklyDelta === null
-                ? 'Need two weeks of data'
-                : `${stats.weeklyDelta > 0 ? '+' : ''}${stats.weeklyDelta} kg vs previous week`}
-            </span>
+                ? 'Need at least two weekly averages before a clearer direction appears.'
+                : `${stats.weeklyDelta > 0 ? '+' : ''}${stats.weeklyDelta} kg compared with the previous weekly average.`}
+            </p>
+            <div className="forge-focus-pills">
+              <span className="info-pill">{stats.totalEntries} entries</span>
+              <span className="info-pill info-pill-strength">
+                {stats.latestEntry ? `${stats.latestEntry.weightKg} kg latest` : 'No latest entry'}
+              </span>
+            </div>
           </article>
         </div>
       </section>
 
-      <section className="content-grid">
-        <div className="panel">
+      <section className="forge-stat-strip forge-stat-strip-weight">
+        <WeightSignalCard
+          tone="lime"
+          label="Latest"
+          value={stats.latestEntry ? `${stats.latestEntry.weightKg}` : 'No data'}
+          unit={stats.latestEntry ? 'kg' : undefined}
+          description={stats.latestEntry ? formatDate(stats.latestEntry.date) : 'Add your first entry'}
+        />
+        <WeightSignalCard tone="blue" label="Entries" value={stats.totalEntries.toString()} description="Tracked weigh-ins" />
+        <WeightSignalCard
+          tone="teal"
+          label="Change"
+          value={stats.delta === null ? 'N/A' : `${stats.delta > 0 ? '+' : ''}${stats.delta}`}
+          unit={stats.delta === null ? undefined : 'kg'}
+          description="Compared with previous entry"
+        />
+        <WeightSignalCard
+          tone="violet"
+          label="Weekly average"
+          value={stats.latestWeek ? `${stats.latestWeek.averageWeightKg}` : 'No data'}
+          unit={stats.latestWeek ? 'kg' : undefined}
+          description={stats.latestWeek ? stats.latestWeek.label : 'Need weigh-ins this week'}
+        />
+        <WeightSignalCard
+          tone="amber"
+          label="Trend"
+          value={stats.trendLabel}
+          description={
+            stats.weeklyDelta === null
+              ? 'Need two weeks of data'
+              : `${stats.weeklyDelta > 0 ? '+' : ''}${stats.weeklyDelta} kg vs previous week`
+          }
+        />
+      </section>
+
+      <section className="weight-main-grid">
+        <div className="panel weight-entry-panel">
           <div className="panel-header">
             <div>
               <h2>{editingId === null ? 'Add entry' : 'Edit entry'}</h2>
@@ -265,7 +277,7 @@ export function WeightPage() {
             ) : null}
           </div>
 
-          <form className="weight-form weight-form-panel" onSubmit={handleSubmit} noValidate>
+          <form className="weight-form weight-form-panel weight-form-forge" onSubmit={handleSubmit} noValidate>
             <div className="form-grid">
               <label className="field">
                 <span>Date</span>
@@ -314,10 +326,10 @@ export function WeightPage() {
           ) : null}
         </div>
 
-        <div className="panel">
+        <div className="panel weight-chart-panel">
           <div className="panel-header">
             <div>
-              <h2>Progress</h2>
+              <h2>Trend area</h2>
               <p>Body weight over time with a quick start, current point, and net change summary.</p>
             </div>
           </div>
@@ -333,10 +345,8 @@ export function WeightPage() {
             <WeightProgressChart entries={chartData} />
           )}
         </div>
-      </section>
 
-      <section className="content-grid">
-        <div className="panel panel-span-2">
+        <div className="panel panel-span-2 weight-weekly-panel">
           <div className="panel-header">
             <div>
               <h2>Weekly averages</h2>
@@ -378,10 +388,8 @@ export function WeightPage() {
             </div>
           )}
         </div>
-      </section>
 
-      <section className="content-grid">
-        <div className="panel panel-span-2">
+        <div className="panel panel-span-2 weight-history-panel">
           <div className="panel-header">
             <div>
               <h2>History</h2>
@@ -419,6 +427,32 @@ export function WeightPage() {
         </div>
       </section>
     </main>
+  )
+}
+
+function WeightSignalCard({
+  tone,
+  label,
+  value,
+  unit,
+  description,
+}: {
+  tone: 'lime' | 'blue' | 'teal' | 'violet' | 'amber'
+  label: string
+  value: string
+  unit?: string
+  description: string
+}) {
+  return (
+    <article className={`forge-stat-card forge-stat-card-${tone}`}>
+      <div className="forge-stat-glow" aria-hidden="true" />
+      <span className="stat-label">{label}</span>
+      <strong>
+        {value}
+        {unit ? <span>{unit}</span> : null}
+      </strong>
+      <p>{description}</p>
+    </article>
   )
 }
 

@@ -3545,3 +3545,314 @@
     padding: 16px;
   }
 }
+
+/* Final redesign pass */
+
+.weight-hero-forge,
+.profile-hero-forge,
+.progress-hero-forge,
+.cycle-hero-forge {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.9fr);
+  gap: 18px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(79, 143, 255, 0.08), transparent 22%),
+    radial-gradient(circle at bottom left, rgba(212, 241, 74, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-strong);
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.weight-hero-forge::after,
+.profile-hero-forge::after,
+.progress-hero-forge::after,
+.cycle-hero-forge::after {
+  content: 'FORGE';
+  position: absolute;
+  right: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Clash Display', 'Cabinet Grotesk', system-ui, sans-serif;
+  font-size: clamp(5rem, 16vw, 9rem);
+  color: rgba(255, 255, 255, 0.025);
+  letter-spacing: -0.08em;
+  pointer-events: none;
+}
+
+.weight-hero-main,
+.profile-hero-main,
+.progress-hero-main,
+.cycle-hero-main,
+.weight-hero-side,
+.profile-hero-side,
+.progress-hero-side,
+.cycle-hero-side,
+.progress-hero-filter {
+  position: relative;
+  z-index: 1;
+}
+
+.forge-stat-strip-weight {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.forge-stat-strip-profile,
+.forge-stat-strip-progress,
+.forge-stat-strip-cycle {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.weight-main-grid,
+.profile-main-grid,
+.progress-main-grid,
+.cycle-main-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.weight-entry-panel,
+.weight-chart-panel,
+.weight-weekly-panel,
+.weight-history-panel,
+.profile-cycle-panel {
+  min-width: 0;
+}
+
+.weight-form-forge,
+.profile-form-forge,
+.progress-filter-panel {
+  gap: 16px;
+}
+
+.progress-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.progress-filter-panel,
+.progress-suggestion-panel,
+.progress-analytics-grid > div,
+.profile-meta-grid > div,
+.weekly-average-card,
+.exercise-history-card,
+.admin-table-shell,
+.entry-card,
+.record-card {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-overlay);
+  box-shadow: var(--shadow-soft);
+}
+
+.progress-filter-panel,
+.progress-suggestion-panel {
+  padding: 18px;
+}
+
+.progress-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 18px;
+}
+
+.progress-analytics-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.progress-analytics-grid > div,
+.profile-meta-grid > div {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+}
+
+.progress-hero-filter {
+  display: grid;
+  align-content: start;
+}
+
+.chart-card,
+.exercise-history-card,
+.exercise-summary-card {
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-overlay);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+}
+
+.exercise-summary-card {
+  padding: 22px;
+}
+
+.exercise-history-list,
+.entry-list,
+.weekly-average-list {
+  gap: 16px;
+}
+
+.profile-main-grid .panel,
+.cycle-main-grid .panel,
+.progress-main-grid .panel,
+.weight-main-grid .panel {
+  min-width: 0;
+}
+
+.cycle-main-grid .panel-span-2,
+.progress-main-grid .panel-span-2,
+.weight-main-grid .panel-span-2,
+.profile-main-grid .panel-span-2 {
+  grid-column: 1 / -1;
+}
+
+.cycle-main-grid .assistant-card {
+  min-height: 100%;
+}
+
+.cycle-main-grid .entry-card,
+.profile-cycle-panel .assistant-card,
+.profile-cycle-panel .toggle-row {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-overlay);
+}
+
+.toggle-row {
+  border-radius: 20px;
+}
+
+.toggle-control {
+  min-height: 44px;
+}
+
+.assistant-card,
+.assistant-list-item,
+.goal-progress-card,
+.dashboard-metric-card,
+.notification-card,
+.notification-empty,
+.template-card,
+.workout-card,
+.exercise-card,
+.set-card {
+  border-color: var(--border);
+}
+
+.field + .feedback-stack,
+.section-note + .feedback-stack {
+  margin-top: 12px;
+}
+
+.feedback {
+  backdrop-filter: blur(14px);
+}
+
+.admin-table-shell {
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-table th {
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.76rem;
+}
+
+.admin-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.notification-panel,
+.auth-card,
+.panel,
+.hero-panel,
+.template-card,
+.workout-card,
+.entry-card,
+.exercise-history-card,
+.exercise-summary-card,
+.chart-card {
+  backdrop-filter: blur(22px);
+}
+
+@media (max-width: 1280px) {
+  .forge-stat-strip-weight {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1024px) {
+  .weight-hero-forge,
+  .profile-hero-forge,
+  .progress-hero-forge,
+  .cycle-hero-forge,
+  .progress-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .forge-stat-strip-profile,
+  .forge-stat-strip-progress,
+  .forge-stat-strip-cycle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .weight-main-grid,
+  .profile-main-grid,
+  .progress-main-grid,
+  .cycle-main-grid,
+  .forge-stat-strip-weight,
+  .forge-stat-strip-profile,
+  .forge-stat-strip-progress,
+  .forge-stat-strip-cycle,
+  .progress-analytics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .weight-hero-forge,
+  .profile-hero-forge,
+  .progress-hero-forge,
+  .cycle-hero-forge {
+    padding: 22px;
+    border-radius: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .weight-hero-forge,
+  .profile-hero-forge,
+  .progress-hero-forge,
+  .cycle-hero-forge {
+    padding: 18px;
+  }
+
+  .progress-filter-panel,
+  .progress-suggestion-panel {
+    padding: 16px;
+  }
+}

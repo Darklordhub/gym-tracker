@@ -338,56 +338,82 @@ export function CyclePage() {
 
   return (
     <main className="page-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <span className="eyebrow">Cycle</span>
+      <section className="cycle-hero-forge">
+        <div className="cycle-hero-main">
+          <span className="eyebrow">FORGE / Readiness</span>
           <h1>Cycle-Aware Training</h1>
           <p className="hero-text">
-            Keep your cycle settings, period history, and symptom logs in one place so training guidance can reflect both estimated phase and how you are actually feeling.
+            Keep settings, period history, and symptom logs in one place so guidance can reflect both estimated phase and how you are actually feeling.
           </p>
         </div>
 
-        <div className="stats-grid">
-          <article className="stat-card stat-card-emphasis">
-            <span className="stat-label">Current Phase</span>
-            <strong>
-              {cycleSettings.canPredict
-                ? cycleGuidance?.estimatedCurrentPhase ?? 'Building estimate'
-                : 'Setup incomplete'}
-            </strong>
-            <span className="stat-subtext">
-              {cycleSettings.canPredict && cycleGuidance?.currentCycleDay
-                ? `Cycle day ${cycleGuidance.currentCycleDay}`
-                : cycleSettings.setupMessage ?? 'Add enough data to estimate your current phase'}
-            </span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Next Period</span>
-            <strong>
-              {cycleGuidance?.estimatedNextPeriodStartDate
-                ? formatDate(cycleGuidance.estimatedNextPeriodStartDate)
-                : 'Not enough data'}
-            </strong>
-            <span className="stat-subtext">Estimated from your history and current settings</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Prediction Confidence</span>
-            <strong>{cycleGuidance?.predictionConfidence ?? 'Needs data'}</strong>
-            <span className="stat-subtext">More history usually improves estimates</span>
-          </article>
-          <article className="stat-card">
-            <span className="stat-label">Recent Symptom Load</span>
-            <strong>{cycleGuidance?.symptomLoadLabel ?? 'Unknown'}</strong>
-            <span className="stat-subtext">
-              {cycleGuidance?.latestSymptomLogDate
-                ? `Latest log ${formatDate(cycleGuidance.latestSymptomLogDate)}`
-                : 'No symptom log yet'}
-            </span>
+        <div className="cycle-hero-side">
+          <article className="forge-focus-card">
+            <span className="stat-label">Current recommendation</span>
+            <strong>{cycleGuidance?.guidanceHeadline ?? 'Building your setup'}</strong>
+            <p>
+              {cycleSettings.setupMessage ??
+                cycleGuidance?.guidanceMessage ??
+                'Add more cycle data to unlock a more useful estimate.'}
+            </p>
+            <div className="forge-focus-pills">
+              <span className="info-pill">
+                {cycleSettings.canPredict && cycleGuidance?.currentCycleDay
+                  ? `Cycle day ${cycleGuidance.currentCycleDay}`
+                  : 'Prediction building'}
+              </span>
+              <span className="info-pill info-pill-strength">
+                {cycleGuidance?.symptomLoadLabel ?? 'No symptom load yet'}
+              </span>
+            </div>
           </article>
         </div>
       </section>
 
-      <section className="content-grid">
+      <section className="forge-stat-strip forge-stat-strip-cycle">
+        <article className="forge-stat-card forge-stat-card-lime">
+          <div className="forge-stat-glow" aria-hidden="true" />
+          <span className="stat-label">Current phase</span>
+          <strong>
+            {cycleSettings.canPredict
+              ? cycleGuidance?.estimatedCurrentPhase ?? 'Building estimate'
+              : 'Setup incomplete'}
+          </strong>
+          <p>
+            {cycleSettings.canPredict && cycleGuidance?.currentCycleDay
+              ? `Cycle day ${cycleGuidance.currentCycleDay}`
+              : cycleSettings.setupMessage ?? 'Add enough data to estimate your current phase'}
+          </p>
+        </article>
+        <article className="forge-stat-card forge-stat-card-blue">
+          <div className="forge-stat-glow" aria-hidden="true" />
+          <span className="stat-label">Next period</span>
+          <strong>
+            {cycleGuidance?.estimatedNextPeriodStartDate
+              ? formatDate(cycleGuidance.estimatedNextPeriodStartDate)
+              : 'Not enough data'}
+          </strong>
+          <p>Estimated from your history and current settings</p>
+        </article>
+        <article className="forge-stat-card forge-stat-card-violet">
+          <div className="forge-stat-glow" aria-hidden="true" />
+          <span className="stat-label">Prediction confidence</span>
+          <strong>{cycleGuidance?.predictionConfidence ?? 'Needs data'}</strong>
+          <p>More history usually improves estimates</p>
+        </article>
+        <article className="forge-stat-card forge-stat-card-teal">
+          <div className="forge-stat-glow" aria-hidden="true" />
+          <span className="stat-label">Recent symptom load</span>
+          <strong>{cycleGuidance?.symptomLoadLabel ?? 'Unknown'}</strong>
+          <p>
+            {cycleGuidance?.latestSymptomLogDate
+              ? `Latest log ${formatDate(cycleGuidance.latestSymptomLogDate)}`
+              : 'No symptom log yet'}
+          </p>
+        </article>
+      </section>
+
+      <section className="cycle-main-grid">
         <div className="panel panel-span-2">
           <div className="panel-header">
             <div>
@@ -439,9 +465,6 @@ export function CyclePage() {
             </div>
           ) : null}
         </div>
-      </section>
-
-      <section className="content-grid cycle-page-grid">
         <div className="panel">
           <div className="panel-header">
             <div>
@@ -670,9 +693,6 @@ export function CyclePage() {
             )}
           </div>
         </div>
-      </section>
-
-      <section className="content-grid cycle-page-grid">
         <div className="panel">
           <div className="panel-header">
             <div>
