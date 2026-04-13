@@ -2095,7 +2095,7 @@
 
   .notification-panel {
     position: fixed;
-    top: 74px;
+    top: 68px;
     right: 12px;
     width: min(360px, calc(100vw - 24px));
     max-height: calc(100vh - 96px);
@@ -2716,6 +2716,20 @@
   padding: 28px;
 }
 
+.panel,
+.chart-card,
+.assistant-card,
+.workout-card,
+.template-card,
+.exercise-card,
+.entry-card,
+.weekly-average-card,
+.exercise-history-card,
+.dashboard-metric-card,
+.goal-progress-card {
+  min-width: 0;
+}
+
 .notification-center {
   position: relative;
 }
@@ -2756,6 +2770,7 @@
 .notification-panel {
   top: calc(100% + 12px);
   width: min(380px, calc(100vw - 32px));
+  max-height: min(75vh, 720px);
   padding: 18px;
   border: 1px solid var(--border-strong);
   border-radius: 24px;
@@ -2764,6 +2779,7 @@
     rgba(15, 18, 23, 0.96);
   box-shadow: var(--shadow);
   backdrop-filter: blur(24px);
+  overflow-y: auto;
 }
 
 .notification-card,
@@ -2976,6 +2992,7 @@
 .feedback {
   border-radius: 18px;
   border-color: var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .feedback.success {
@@ -3012,6 +3029,7 @@
 .state-card {
   min-height: 164px;
   border-style: solid;
+  text-align: left;
 }
 
 .state-card-badge {
@@ -3086,7 +3104,7 @@
   }
 
   .app-topbar {
-    align-items: center;
+    align-items: flex-start;
   }
 
   .topbar-breadcrumb {
@@ -3103,6 +3121,11 @@
 
   .content-container {
     padding: 20px;
+  }
+
+  .tb-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }
 
@@ -3144,6 +3167,12 @@
 
   .tb-right {
     gap: 8px;
+  }
+
+  .chart-summary,
+  .profile-meta-grid,
+  .progress-analytics-grid {
+    grid-template-columns: 1fr;
   }
 
   .content-container {
@@ -3696,6 +3725,10 @@
 
 .exercise-summary-card {
   padding: 22px;
+}
+
+.chart-card {
+  overflow: hidden;
 }
 
 .exercise-history-list,

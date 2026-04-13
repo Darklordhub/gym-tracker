@@ -311,7 +311,7 @@ export function CyclePage() {
   if (isLoading) {
     return (
       <main className="page-shell">
-        <section className="content-grid">
+        <section className="cycle-main-grid">
           <div className="panel panel-span-2">
             <StateCard title="Loading cycle guidance" description="Collecting settings, history, and recovery data." loading />
           </div>
@@ -323,7 +323,7 @@ export function CyclePage() {
   if (loadError) {
     return (
       <main className="page-shell">
-        <section className="content-grid">
+        <section className="cycle-main-grid">
           <div className="panel panel-span-2">
             <StateCard title="Cycle guidance unavailable" description={loadError} tone="error" />
           </div>

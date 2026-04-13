@@ -265,13 +265,13 @@ export function ProfilePage() {
       </section>
 
       {isLoading ? (
-        <section className="content-grid profile-grid">
+        <section className="profile-main-grid">
           <div className="panel panel-span-2">
             <StateCard title="Loading profile" description="Fetching your account details." loading />
           </div>
         </section>
       ) : loadError ? (
-        <section className="content-grid profile-grid">
+        <section className="profile-main-grid">
           <div className="panel panel-span-2">
             <StateCard title="Profile unavailable" description={loadError} tone="error" />
           </div>
