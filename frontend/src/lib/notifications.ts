@@ -1,4 +1,5 @@
 import { getWorkoutAssistantInsight } from './exerciseSuggestions'
+import { countWorkoutsInWeek, startOfWeek } from './workoutMetrics'
 import type { GoalSettings } from '../types/goals'
 import type { Workout } from '../types/workout'
 
@@ -22,10 +23,7 @@ export function generateNotifications(
   const latestWorkout = sortedWorkouts[0] ?? null
   const weekStart = startOfWeek(now)
   const weekStartKey = weekStart.toISOString().slice(0, 10)
-  const workoutsThisWeek = sortedWorkouts.filter((workout) => {
-    const workoutDate = new Date(workout.date)
-    return workoutDate >= weekStart
-  }).length
+  const workoutsThisWeek = countWorkoutsInWeek(sortedWorkouts, now)
   const assistantInsight = getWorkoutAssistantInsight(sortedWorkouts, goals, undefined, undefined, now)
 
   if (goals?.weeklyWorkoutTarget) {
@@ -86,15 +84,6 @@ export function generateNotifications(
     )
     .slice(0, 5)
     .map(({ priority, ...notification }) => notification)
-}
-
-function startOfWeek(date: Date) {
-  const result = new Date(date)
-  const day = result.getDay()
-  const diff = (day + 6) % 7
-  result.setHours(0, 0, 0, 0)
-  result.setDate(result.getDate() - diff)
-  return result
 }
 
 function getDaysSince(date: string, now: Date) {

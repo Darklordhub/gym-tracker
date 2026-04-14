@@ -8,6 +8,7 @@ import { StateCard } from '../components/StateCard'
 import { getWorkoutAssistantInsight } from '../lib/exerciseSuggestions'
 import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
+import { addDays, countWorkoutsInWeek, getWorkoutWeekStreak, startOfWeek } from '../lib/workoutMetrics'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings, GoalSettingsPayload } from '../types/goals'
 import type { ReadinessLog } from '../types/readiness'
@@ -86,7 +87,8 @@ export function DashboardPage() {
           )
         : null
 
-    const workoutStreakWeeks = getWorkoutWeekStreak(workouts)
+    const workoutsThisWeekCount = countWorkoutsInWeek(workouts, now)
+    const workoutStreakWeeks = getWorkoutWeekStreak(workouts, now)
     const latestWorkout = workouts[0] ?? null
     const latestWeightEntry = weightEntries[0] ?? null
     const bodyWeightGoalProgress = getBodyWeightGoalProgress(
@@ -95,12 +97,12 @@ export function DashboardPage() {
       goals.fitnessPhase,
     )
     const weeklyWorkoutGoalProgress = getWeeklyWorkoutGoalProgress(
-      workoutsThisWeek.length,
+      workoutsThisWeekCount,
       goals.weeklyWorkoutTarget,
     )
 
     return {
-      workoutsThisWeek: workoutsThisWeek.length,
+      workoutsThisWeek: workoutsThisWeekCount,
       exercisesThisWeek: workoutsThisWeek.reduce(
         (count, workout) => count + workout.exerciseEntries.length,
         0,
@@ -283,7 +285,7 @@ export function DashboardPage() {
           tone="lime"
           label="This week"
           value={metrics.workoutsThisWeek.toString()}
-          description="Workouts logged during the current week"
+          description="Strength and cardio sessions logged during the current week"
           trend={metrics.weeklyWorkoutGoalProgress.message}
         />
         <ForgeStatCard
@@ -297,7 +299,7 @@ export function DashboardPage() {
           tone="teal"
           label="Workout streak"
           value={metrics.workoutStreakWeeks.toString()}
-          description="Consecutive active weeks"
+          description="Consecutive weeks with strength or cardio logged"
         />
         <ForgeStatCard
           tone="violet"
@@ -790,41 +792,6 @@ function ReadinessSelector({
       </div>
     </div>
   )
-}
-
-function startOfWeek(date: Date) {
-  const result = new Date(date)
-  const day = result.getDay()
-  const diff = (day + 6) % 7
-  result.setHours(0, 0, 0, 0)
-  result.setDate(result.getDate() - diff)
-  return result
-}
-
-function addDays(date: Date, days: number) {
-  const result = new Date(date)
-  result.setDate(result.getDate() + days)
-  return result
-}
-
-function getWorkoutWeekStreak(workouts: Workout[]) {
-  if (workouts.length === 0) {
-    return 0
-  }
-
-  const uniqueWorkoutWeeks = new Set(
-    workouts.map((workout) => startOfWeek(new Date(workout.date)).toISOString().slice(0, 10)),
-  )
-
-  let streak = 0
-  let cursor = startOfWeek(new Date())
-
-  while (uniqueWorkoutWeeks.has(cursor.toISOString().slice(0, 10))) {
-    streak += 1
-    cursor = addDays(cursor, -7)
-  }
-
-  return streak
 }
 
 function getBodyWeightGoalProgress(

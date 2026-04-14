@@ -2,6 +2,7 @@ import type { Workout } from '../types/workout'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings } from '../types/goals'
 import type { ReadinessLog } from '../types/readiness'
+import { countWorkoutsInWeek } from './workoutMetrics'
 
 export type ExerciseSuggestion = {
   suggestedWeightKg: number
@@ -126,13 +127,7 @@ export function getWorkoutAssistantInsight(
   readinessLog?: ReadinessLog | null,
   now = new Date(),
 ): WorkoutAssistantInsight {
-  const weekStart = startOfWeek(now)
-  const weekEnd = addDays(weekStart, 7)
-
-  const workoutsThisWeek = workouts.filter((workout) => {
-    const workoutDate = new Date(workout.date)
-    return workoutDate >= weekStart && workoutDate < weekEnd
-  }).length
+  const workoutsThisWeek = countWorkoutsInWeek(workouts, now)
 
   const weeklyTarget = goals?.weeklyWorkoutTarget ?? null
   const weeklyNudge =
@@ -437,19 +432,4 @@ function getDaysSince(date: string, now: Date) {
   const current = new Date(now)
   current.setHours(0, 0, 0, 0)
   return Math.max(0, Math.round((current.getTime() - target.getTime()) / 86400000))
-}
-
-function startOfWeek(date: Date) {
-  const result = new Date(date)
-  const day = result.getDay()
-  const diff = (day + 6) % 7
-  result.setHours(0, 0, 0, 0)
-  result.setDate(result.getDate() - diff)
-  return result
-}
-
-function addDays(date: Date, days: number) {
-  const result = new Date(date)
-  result.setDate(result.getDate() + days)
-  return result
 }
