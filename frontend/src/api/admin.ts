@@ -1,5 +1,10 @@
 import { apiClient } from '../lib/http'
-import type { AdminUser, UpdateAdminUserRolePayload, UpdateAdminUserStatusPayload } from '../types/admin'
+import type {
+  AdminUser,
+  ResetAdminUserPasswordPayload,
+  UpdateAdminUserRolePayload,
+  UpdateAdminUserStatusPayload,
+} from '../types/admin'
 
 export async function fetchAdminUsers() {
   const response = await apiClient.get<AdminUser[]>('/admin/users')
@@ -13,5 +18,10 @@ export async function updateAdminUserRole(userId: number, payload: UpdateAdminUs
 
 export async function updateAdminUserStatus(userId: number, payload: UpdateAdminUserStatusPayload) {
   const response = await apiClient.put<AdminUser>(`/admin/users/${userId}/status`, payload)
+  return response.data
+}
+
+export async function resetAdminUserPassword(userId: number, payload: ResetAdminUserPasswordPayload) {
+  const response = await apiClient.post<{ message: string }>(`/admin/users/${userId}/reset-password`, payload)
   return response.data
 }

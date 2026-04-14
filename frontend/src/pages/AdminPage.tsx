@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
-import { fetchAdminUsers, updateAdminUserRole, updateAdminUserStatus } from '../api/admin'
+import {
+  fetchAdminUsers,
+  resetAdminUserPassword,
+  updateAdminUserRole,
+  updateAdminUserStatus,
+} from '../api/admin'
 import { StateCard } from '../components/StateCard'
 import { useAuth } from '../auth/AuthContext'
 import { formatDate } from '../lib/format'
@@ -15,6 +20,9 @@ export function AdminPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [pendingActions, setPendingActions] = useState<PendingActionMap>({})
+  const [resetPasswordUser, setResetPasswordUser] = useState<AdminUser | null>(null)
+  const [resetPasswordForm, setResetPasswordForm] = useState({ newPassword: '', confirmPassword: '' })
+  const [resetPasswordError, setResetPasswordError] = useState<string | null>(null)
 
   useEffect(() => {
     void loadUsers()
@@ -72,6 +80,58 @@ export function AdminPage() {
     } finally {
       setPendingActions((current) => ({ ...current, [actionKey]: false }))
     }
+  }
+
+  async function handleResetPasswordSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!resetPasswordUser) {
+      return
+    }
+
+    const actionKey = `password:${resetPasswordUser.id}`
+    const newPassword = resetPasswordForm.newPassword
+    const confirmPassword = resetPasswordForm.confirmPassword
+
+    if (newPassword.trim().length < 8) {
+      setResetPasswordError('Password must be at least 8 characters long.')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setResetPasswordError('New password and confirmation do not match.')
+      return
+    }
+
+    try {
+      setPendingActions((current) => ({ ...current, [actionKey]: true }))
+      setErrorMessage(null)
+      setSuccessMessage(null)
+      setResetPasswordError(null)
+
+      const response = await resetAdminUserPassword(resetPasswordUser.id, { newPassword })
+      setSuccessMessage(response.message)
+      setResetPasswordForm({ newPassword: '', confirmPassword: '' })
+      setResetPasswordUser(null)
+    } catch (error) {
+      setResetPasswordError(getRequestErrorMessage(error, 'Unable to reset password.'))
+    } finally {
+      setPendingActions((current) => ({ ...current, [actionKey]: false }))
+    }
+  }
+
+  function openResetPasswordDialog(user: AdminUser) {
+    setResetPasswordUser(user)
+    setResetPasswordForm({ newPassword: '', confirmPassword: '' })
+    setResetPasswordError(null)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+  }
+
+  function closeResetPasswordDialog() {
+    setResetPasswordUser(null)
+    setResetPasswordForm({ newPassword: '', confirmPassword: '' })
+    setResetPasswordError(null)
   }
 
   return (
@@ -153,7 +213,8 @@ export function AdminPage() {
                   {users.map((user) => {
                     const isRoleUpdating = pendingActions[`role:${user.id}`] ?? false
                     const isStatusUpdating = pendingActions[`status:${user.id}`] ?? false
-                    const isUpdating = isRoleUpdating || isStatusUpdating
+                    const isPasswordResetting = pendingActions[`password:${user.id}`] ?? false
+                    const isUpdating = isRoleUpdating || isStatusUpdating || isPasswordResetting
 
                     return (
                       <tr key={user.id} className={isUpdating ? 'admin-row admin-row-updating' : 'admin-row'}>
@@ -189,18 +250,28 @@ export function AdminPage() {
                         </td>
                         <td className="record-hint">{formatDate(user.createdAt)}</td>
                         <td>
-                          <button
-                            type="button"
-                            className={user.isActive ? 'ghost-button subtle-danger-button' : 'ghost-button'}
-                            disabled={isUpdating}
-                            onClick={() => void handleStatusToggle(user.id, !user.isActive)}
-                          >
-                            {isStatusUpdating
-                              ? 'Saving...'
-                              : user.isActive
-                                ? 'Deactivate'
-                                : 'Activate'}
-                          </button>
+                          <div className="admin-actions">
+                            <button
+                              type="button"
+                              className="ghost-button"
+                              disabled={isUpdating}
+                              onClick={() => openResetPasswordDialog(user)}
+                            >
+                              {isPasswordResetting ? 'Saving...' : 'Reset Password'}
+                            </button>
+                            <button
+                              type="button"
+                              className={user.isActive ? 'ghost-button subtle-danger-button' : 'ghost-button'}
+                              disabled={isUpdating}
+                              onClick={() => void handleStatusToggle(user.id, !user.isActive)}
+                            >
+                              {isStatusUpdating
+                                ? 'Saving...'
+                                : user.isActive
+                                  ? 'Deactivate'
+                                  : 'Activate'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -211,6 +282,68 @@ export function AdminPage() {
           )}
         </div>
       </section>
+
+      {resetPasswordUser ? (
+        <div className="modal-backdrop" role="presentation" onClick={closeResetPasswordDialog}>
+          <div
+            className="modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-password-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="panel-header modal-header">
+              <div>
+                <h2 id="reset-password-title">Reset Password</h2>
+                <p>Set a new password for {resetPasswordUser.email}. The password will not be shown again after submission.</p>
+              </div>
+            </div>
+
+            <form className="weight-form" onSubmit={handleResetPasswordSubmit}>
+              <label className="field">
+                <span>New password</span>
+                <input
+                  type="password"
+                  minLength={8}
+                  value={resetPasswordForm.newPassword}
+                  onChange={(event) =>
+                    setResetPasswordForm((current) => ({ ...current, newPassword: event.target.value }))
+                  }
+                  placeholder="At least 8 characters"
+                />
+              </label>
+
+              <label className="field">
+                <span>Confirm password</span>
+                <input
+                  type="password"
+                  minLength={8}
+                  value={resetPasswordForm.confirmPassword}
+                  onChange={(event) =>
+                    setResetPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))
+                  }
+                  placeholder="Re-enter the new password"
+                />
+              </label>
+
+              {resetPasswordError ? <p className="feedback error">{resetPasswordError}</p> : null}
+
+              <div className="action-row">
+                <button type="button" className="ghost-button" onClick={closeResetPasswordDialog}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={pendingActions[`password:${resetPasswordUser.id}`] ?? false}
+                >
+                  {pendingActions[`password:${resetPasswordUser.id}`] ?? false ? 'Resetting...' : 'Reset password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }

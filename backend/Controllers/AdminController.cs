@@ -4,6 +4,7 @@ using backend.Data;
 using backend.Extensions;
 using backend.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,10 +16,12 @@ namespace backend.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
+    private readonly PasswordHasher<AppUser> _passwordHasher;
 
-    public AdminController(AppDbContext dbContext)
+    public AdminController(AppDbContext dbContext, PasswordHasher<AppUser> passwordHasher)
     {
         _dbContext = dbContext;
+        _passwordHasher = passwordHasher;
     }
 
     [HttpGet("users")]
@@ -109,6 +112,32 @@ public class AdminController : ControllerBase
         await _dbContext.SaveChangesAsync();
 
         return Ok(MapUser(user));
+    }
+
+    [HttpPost("users/{id:int}/reset-password")]
+    public async Task<IActionResult> ResetUserPassword(int id, ResetUserPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var user = await _dbContext.Users.SingleOrDefaultAsync(currentUser => currentUser.Id == id);
+        if (user is null)
+        {
+            return NotFound(new { message = "User not found." });
+        }
+
+        var newPassword = request.NewPassword.Trim();
+        if (newPassword.Length < 8)
+        {
+            return BadRequest(new { message = "Password must be at least 8 characters long." });
+        }
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(new { message = "Password has been reset successfully." });
     }
 
     private static AdminUserResponse MapUser(AppUser user)

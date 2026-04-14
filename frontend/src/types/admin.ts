@@ -15,3 +15,7 @@ export type UpdateAdminUserRolePayload = {
 export type UpdateAdminUserStatusPayload = {
   isActive: boolean
 }
+
+export type ResetAdminUserPasswordPayload = {
+  newPassword: string
+}
