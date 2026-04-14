@@ -4616,6 +4616,466 @@
   }
 }
 
+/* Shared spacing polish */
+
+.page-shell,
+.content-grid,
+.dashboard-grid,
+.workout-grid,
+.dashboard-forge-grid,
+.workouts-main-grid,
+.weight-main-grid,
+.profile-main-grid,
+.progress-main-grid,
+.cycle-main-grid {
+  gap: var(--section-gap);
+}
+
+.hero-panel,
+.panel,
+.auth-card,
+.modal-panel {
+  padding: var(--panel-padding);
+}
+
+.panel-header,
+.section-title-row,
+.exercise-card-header,
+.workout-card-header,
+.assistant-card-header,
+.goal-progress-header,
+.notification-panel-header,
+.notification-card-header,
+.notification-card-footer {
+  gap: var(--space-4);
+}
+
+.panel-header {
+  margin-bottom: var(--space-5);
+}
+
+.panel-header h2,
+.section-title-row h3,
+.exercise-card-header h3,
+.workout-card-header h3 {
+  margin-bottom: var(--space-1);
+}
+
+.hero-text,
+.panel-header p,
+.section-note,
+.auth-supporting-text,
+.brand-subtitle,
+.topbar-title-block p,
+.notification-panel-header p,
+.state-card-copy p {
+  line-height: 1.55;
+}
+
+.stats-grid,
+.assistant-grid,
+.workout-assistant-grid,
+.dashboard-metric-list,
+.dashboard-goal-progress-grid,
+.dashboard-weekly-grid,
+.dashboard-overview-grid,
+.exercise-progress-summary-grid,
+.exercise-history-metrics,
+.chart-summary,
+.entry-list,
+.weekly-average-list,
+.exercise-list,
+.workout-list,
+.template-list,
+.records-list,
+.exercise-history-list,
+.assistant-list,
+.feedback-stack,
+.page-feedback-stack,
+.readiness-grid,
+.goal-form,
+.goal-progress-list,
+.readiness-form,
+.weight-form,
+.auth-form,
+.exercise-builder,
+.start-workout-stack,
+.cycle-history-section,
+.profile-meta-grid,
+.cycle-page-grid,
+.cycle-guidance-overview-grid,
+.cycle-overview-grid,
+.progress-analytics-grid {
+  gap: var(--stack-gap);
+}
+
+.field,
+.readiness-selector,
+.state-card-copy,
+.account-panel,
+.entry-copy,
+.entry-primary,
+.weekly-average-copy,
+.weekly-average-meta,
+.dashboard-highlight-card,
+.forge-focus-card,
+.exercise-card-heading,
+.exercise-summary-copy,
+.exercise-summary-meta {
+  gap: var(--tight-stack-gap);
+}
+
+.stat-card,
+.dashboard-highlight-card,
+.dashboard-metric-card,
+.assistant-card,
+.goal-progress-card,
+.exercise-card,
+.workout-card,
+.record-card,
+.exercise-history-card,
+.template-card,
+.entry-card,
+.weekly-average-card,
+.forge-stat-card,
+.exercise-summary-card,
+.notification-card,
+.notification-empty,
+.state-card,
+.chart-card,
+.suggestion-card {
+  padding: var(--card-padding);
+}
+
+.template-toolbar,
+.template-toolbar-workout,
+.filter-toolbar,
+.filter-toolbar-workouts,
+.exercise-builder-emphasis,
+.weight-form-panel,
+.profile-form-panel,
+.exercise-filter-card,
+.progress-filter-panel,
+.progress-suggestion-panel,
+.page-feedback-panel {
+  padding: var(--card-padding);
+}
+
+.notification-panel {
+  padding: var(--card-padding);
+}
+
+.notification-list,
+.notification-empty,
+.notification-card,
+.mobile-menu-secondary,
+.sidebar-section,
+.sidebar-nav {
+  gap: var(--tight-stack-gap);
+}
+
+.action-row,
+.toolbar-actions,
+.entry-actions,
+.workout-card-actions,
+.template-card-footer,
+.session-banner-metrics,
+.mobile-menu-actions {
+  gap: var(--tight-stack-gap);
+}
+
+.template-card-footer,
+.workout-card-actions,
+.suggestion-callout {
+  margin-top: var(--space-4);
+}
+
+.template-card-footer,
+.action-row-prominent,
+.suggestion-callout {
+  padding-top: var(--space-4);
+}
+
+.field input,
+.select-input,
+.text-area,
+.primary-button,
+.ghost-button,
+.danger-button,
+.readiness-option,
+.toggle-control,
+.notification-toggle,
+.topbar-icon-button,
+.mobile-nav-toggle,
+.mobile-menu-action,
+.nav-link {
+  min-height: 48px;
+}
+
+.info-pill,
+.status-pill,
+.pr-badge,
+.eyebrow,
+.notification-indicator {
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.toggle-row,
+.session-banner,
+.dashboard-readiness-summary,
+.user-pill {
+  padding: var(--space-4);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 15px 14px;
+}
+
+.admin-user-cell,
+.goal-progress-card,
+.dashboard-metric-card,
+.assistant-card,
+.exercise-summary-card,
+.notification-card-copy {
+  gap: var(--tight-stack-gap);
+}
+
+.modal-backdrop {
+  padding: var(--space-5);
+}
+
+@media (max-width: 1280px) {
+  .dashboard-forge-grid,
+  .workouts-main-grid,
+  .goals-grid,
+  .progress-summary-grid {
+    gap: var(--space-5);
+  }
+}
+
+@media (max-width: 900px) {
+  .app-topbar {
+    padding: 14px 16px 12px;
+  }
+
+  .content-container {
+    padding: 18px 16px 28px;
+  }
+
+  .page-shell,
+  .content-grid,
+  .dashboard-grid,
+  .workout-grid,
+  .dashboard-forge-grid,
+  .workouts-main-grid,
+  .weight-main-grid,
+  .profile-main-grid,
+  .progress-main-grid,
+  .cycle-main-grid {
+    gap: var(--mobile-section-gap);
+  }
+
+  .hero-panel,
+  .panel,
+  .auth-card,
+  .modal-panel {
+    padding: 1.125rem;
+  }
+
+  .panel-header {
+    margin-bottom: var(--space-4);
+  }
+
+  .template-toolbar,
+  .template-toolbar-workout,
+  .filter-toolbar,
+  .filter-toolbar-workouts,
+  .exercise-builder-emphasis,
+  .weight-form-panel,
+  .profile-form-panel,
+  .exercise-filter-card,
+  .progress-filter-panel,
+  .progress-suggestion-panel,
+  .page-feedback-panel {
+    padding: 0.9375rem;
+  }
+
+  .action-row,
+  .toolbar-actions,
+  .entry-actions,
+  .workout-card-actions,
+  .template-card-footer,
+  .mobile-menu-actions {
+    gap: 0.625rem;
+  }
+
+  .notification-panel {
+    padding: 0.9375rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-topbar {
+    padding: 10px 12px 8px;
+  }
+
+  .content-container {
+    padding: 10px 10px 22px;
+  }
+
+  .page-shell,
+  .content-grid,
+  .dashboard-grid,
+  .workout-grid,
+  .dashboard-forge-grid,
+  .workouts-main-grid,
+  .weight-main-grid,
+  .profile-main-grid,
+  .progress-main-grid,
+  .cycle-main-grid {
+    gap: 1rem;
+  }
+
+  .hero-panel,
+  .panel,
+  .auth-card,
+  .modal-panel {
+    padding: var(--mobile-panel-padding);
+  }
+
+  .stat-card,
+  .dashboard-highlight-card,
+  .dashboard-metric-card,
+  .assistant-card,
+  .goal-progress-card,
+  .exercise-card,
+  .workout-card,
+  .record-card,
+  .exercise-history-card,
+  .template-card,
+  .entry-card,
+  .weekly-average-card,
+  .forge-stat-card,
+  .exercise-summary-card,
+  .notification-card,
+  .notification-empty,
+  .state-card,
+  .chart-card,
+  .suggestion-card {
+    padding: 0.9375rem;
+  }
+
+  .template-toolbar,
+  .template-toolbar-workout,
+  .filter-toolbar,
+  .filter-toolbar-workouts,
+  .exercise-builder-emphasis,
+  .weight-form-panel,
+  .profile-form-panel,
+  .exercise-filter-card,
+  .progress-filter-panel,
+  .progress-suggestion-panel,
+  .page-feedback-panel {
+    padding: 0.9375rem;
+  }
+
+  .stats-grid,
+  .assistant-grid,
+  .workout-assistant-grid,
+  .exercise-list,
+  .workout-list,
+  .template-list,
+  .records-list,
+  .entry-list,
+  .weekly-average-list,
+  .exercise-history-list,
+  .dashboard-metric-list,
+  .dashboard-weekly-grid,
+  .dashboard-overview-grid,
+  .dashboard-goal-progress-grid,
+  .exercise-progress-summary-grid,
+  .exercise-history-metrics,
+  .chart-summary,
+  .feedback-stack,
+  .page-feedback-stack,
+  .goal-form,
+  .goal-progress-list,
+  .readiness-form,
+  .weight-form,
+  .auth-form,
+  .exercise-builder,
+  .start-workout-stack,
+  .cycle-history-section {
+    gap: 0.875rem;
+  }
+
+  .field,
+  .readiness-selector,
+  .state-card-copy,
+  .entry-copy,
+  .entry-primary,
+  .weekly-average-copy,
+  .weekly-average-meta,
+  .dashboard-highlight-card,
+  .forge-focus-card,
+  .exercise-card-heading,
+  .exercise-summary-copy,
+  .exercise-summary-meta,
+  .notification-card-copy {
+    gap: 0.625rem;
+  }
+
+  .panel-header,
+  .section-title-row,
+  .exercise-card-header,
+  .workout-card-header,
+  .assistant-card-header,
+  .goal-progress-header,
+  .notification-panel-header,
+  .notification-card-header,
+  .notification-card-footer {
+    gap: 0.75rem;
+  }
+
+  .panel-header {
+    margin-bottom: 0.875rem;
+  }
+
+  .action-row,
+  .toolbar-actions,
+  .entry-actions,
+  .workout-card-actions,
+  .template-card-footer,
+  .session-banner-metrics,
+  .mobile-menu-actions {
+    gap: 0.625rem;
+  }
+
+  .toggle-row,
+  .session-banner,
+  .dashboard-readiness-summary,
+  .user-pill,
+  .state-card {
+    padding: 0.9375rem;
+  }
+
+  .notification-panel {
+    padding: 0.875rem;
+  }
+
+  .notification-card,
+  .notification-empty {
+    border-radius: 18px;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 12px 10px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell-backdrop,
   .app-sidebar,
