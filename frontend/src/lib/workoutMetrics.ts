@@ -3,7 +3,7 @@ import type { Workout } from '../types/workout'
 export function startOfWeek(date: Date) {
   const result = new Date(date)
   const day = result.getDay()
-  const diff = (day + 6) % 7
+  const diff = day
   result.setHours(0, 0, 0, 0)
   result.setDate(result.getDate() - diff)
   return result
