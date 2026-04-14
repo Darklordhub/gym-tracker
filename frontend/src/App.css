@@ -3406,6 +3406,18 @@
     var(--surface-overlay);
 }
 
+.dashboard-readiness-summary-logged {
+  background:
+    linear-gradient(135deg, rgba(13, 107, 69, 0.12), transparent 70%),
+    var(--surface-overlay);
+}
+
+.dashboard-readiness-thanks {
+  display: grid;
+  gap: 16px;
+  animation: readiness-confirm-in 180ms ease-out;
+}
+
 .dashboard-readiness-score {
   display: grid;
   justify-items: end;
@@ -3443,6 +3455,18 @@
 
 .dashboard-assistant-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@keyframes readiness-confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .workouts-assistant-grid {

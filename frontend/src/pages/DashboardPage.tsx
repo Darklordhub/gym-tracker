@@ -47,6 +47,7 @@ export function DashboardPage() {
   const [isSavingReadiness, setIsSavingReadiness] = useState(false)
   const [readinessMessage, setReadinessMessage] = useState<string | null>(null)
   const [readinessErrorMessage, setReadinessErrorMessage] = useState<string | null>(null)
+  const [isEditingReadiness, setIsEditingReadiness] = useState(false)
 
   useEffect(() => {
     void loadDashboard()
@@ -162,6 +163,7 @@ export function DashboardPage() {
           motivationLevel: latestReadinessLog.motivationLevel,
           notes: latestReadinessLog.notes ?? '',
         })
+        setIsEditingReadiness(false)
       }
     } catch (error) {
       setErrorMessage(getRequestErrorMessage(error, 'Unable to load dashboard data.'))
@@ -223,7 +225,8 @@ export function DashboardPage() {
       })
 
       setReadinessLog(savedLog)
-      setReadinessMessage(hasTodayReadinessLog ? 'Today’s check-in updated.' : 'Today’s check-in saved.')
+      setReadinessMessage(hasTodayReadinessLog ? 'Today’s check-in updated.' : 'Thanks, your check-in is logged for today.')
+      setIsEditingReadiness(false)
     } catch (error) {
       setReadinessErrorMessage(getRequestErrorMessage(error, 'Unable to save today’s check-in.'))
     } finally {
@@ -454,6 +457,45 @@ export function DashboardPage() {
             <StateCard title="Loading check-in" description="Preparing today’s readiness prompt." loading />
           ) : errorMessage ? (
             <StateCard title="Check-in unavailable" description={errorMessage} tone="error" />
+          ) : hasTodayReadinessLog && readinessLog && !isEditingReadiness ? (
+            <div className="dashboard-readiness-thanks">
+              <div className="dashboard-readiness-summary dashboard-readiness-summary-logged">
+                <div>
+                  <span className="stat-label">Today</span>
+                  <strong>Thanks, your check-in is logged for today.</strong>
+                  <p className="stat-subtext">
+                    {readinessLog.readinessLabel}. Energy {readinessLog.energyLevel}/3, soreness{' '}
+                    {readinessLog.sorenessLevel}/3, sleep {readinessLog.sleepQuality}/3, motivation{' '}
+                    {readinessLog.motivationLevel}/3.
+                  </p>
+                </div>
+                <div className="dashboard-readiness-score">
+                  <span>Readiness avg</span>
+                  <strong>{readinessLog.readinessScore.toFixed(1)}</strong>
+                </div>
+              </div>
+
+              {readinessLog.notes ? (
+                <p className="feedback">Notes: {readinessLog.notes}</p>
+              ) : null}
+
+              <div className="action-row">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => {
+                    setReadinessMessage(null)
+                    setReadinessErrorMessage(null)
+                    setIsEditingReadiness(true)
+                  }}
+                >
+                  Edit today&apos;s check-in
+                </button>
+              </div>
+
+              {readinessMessage ? <p className="feedback success">{readinessMessage}</p> : null}
+              {readinessErrorMessage ? <p className="feedback error">{readinessErrorMessage}</p> : null}
+            </div>
           ) : (
             <form className="readiness-form dashboard-readiness-form" onSubmit={handleReadinessSubmit}>
               <div className="dashboard-readiness-summary">
@@ -520,23 +562,33 @@ export function DashboardPage() {
               </label>
 
               <div className="feedback-stack">
-                {hasTodayReadinessLog && readinessLog ? (
-                  <p className="feedback success">
-                    Today&apos;s status: {readinessLog.readinessLabel}. Energy {readinessLog.energyLevel}/3, soreness{' '}
-                    {readinessLog.sorenessLevel}/3, sleep {readinessLog.sleepQuality}/3, motivation{' '}
-                    {readinessLog.motivationLevel}/3.
-                  </p>
-                ) : (
-                  <p className="feedback">No check-in logged yet today. A 10-second update improves today&apos;s recommendation.</p>
-                )}
+                <p className="feedback">
+                  {isEditingReadiness
+                    ? 'Update today’s check-in only if something changed.'
+                    : 'No check-in logged yet today. A 10-second update improves today&apos;s recommendation.'}
+                </p>
                 {readinessMessage ? <p className="feedback success">{readinessMessage}</p> : null}
                 {readinessErrorMessage ? <p className="feedback error">{readinessErrorMessage}</p> : null}
               </div>
 
               <div className="action-row">
                 <button type="submit" className="primary-button" disabled={isSavingReadiness}>
-                  {isSavingReadiness ? 'Saving check-in...' : hasTodayReadinessLog ? 'Update today’s check-in' : 'Save today’s check-in'}
+                  {isSavingReadiness ? 'Saving check-in...' : isEditingReadiness ? 'Update today’s check-in' : 'Save today’s check-in'}
                 </button>
+                {isEditingReadiness && hasTodayReadinessLog ? (
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      setReadinessMessage(null)
+                      setReadinessErrorMessage(null)
+                      setIsEditingReadiness(false)
+                    }}
+                    disabled={isSavingReadiness}
+                  >
+                    Cancel
+                  </button>
+                ) : null}
               </div>
             </form>
           )}
