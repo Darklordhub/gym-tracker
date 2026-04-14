@@ -4178,3 +4178,475 @@
     padding: 16px;
   }
 }
+
+/* Mobile premium refinement */
+
+@media (max-width: 900px) {
+  .shell-backdrop {
+    background:
+      radial-gradient(circle at top right, color-mix(in srgb, var(--tone-blue) 12%, transparent), transparent 24%),
+      radial-gradient(circle at bottom left, color-mix(in srgb, var(--accent-strong) 10%, transparent), transparent 28%),
+      rgba(4, 6, 10, 0.76);
+    backdrop-filter: blur(14px) saturate(110%);
+    transition:
+      opacity 220ms ease,
+      backdrop-filter 220ms ease;
+  }
+
+  .app-sidebar {
+    transition:
+      transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 220ms ease;
+    opacity: 0.98;
+  }
+
+  .app-sidebar-open {
+    animation: mobileDrawerSlideIn 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .sidebar-inner {
+    gap: 18px;
+    padding: 20px 16px 18px;
+    border-radius: 30px;
+    background:
+      radial-gradient(circle at top right, rgba(79, 143, 255, 0.1), transparent 24%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 16%),
+      linear-gradient(180deg, rgba(212, 241, 74, 0.035), transparent 30%),
+      rgba(10, 12, 17, 0.9);
+    box-shadow:
+      0 30px 70px rgba(0, 0, 0, 0.42),
+      var(--shadow);
+  }
+
+  .sidebar-section {
+    gap: 12px;
+  }
+
+  .sidebar-link {
+    min-height: 68px;
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .sidebar-link:active {
+    transform: scale(0.985);
+  }
+
+  .sidebar-link-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+  }
+
+  .account-panel {
+    gap: 12px;
+    padding: 14px;
+    border-radius: 24px;
+  }
+
+  .sidebar-action-button {
+    min-height: 50px;
+  }
+
+  .app-topbar {
+    padding: 16px 18px 14px;
+    border-bottom-color: color-mix(in srgb, var(--border) 90%, transparent);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--header-bg) 94%, transparent), color-mix(in srgb, var(--header-bg) 88%, transparent));
+  }
+
+  .topbar-left {
+    gap: 10px;
+  }
+
+  .topbar-title-block {
+    gap: 6px;
+  }
+
+  .topbar-title-block strong {
+    line-height: 1;
+  }
+
+  .topbar-title-block p {
+    font-size: 0.95rem;
+    line-height: 1.42;
+  }
+
+  .tb-right {
+    gap: 10px;
+  }
+
+  .topbar-icon-button,
+  .mobile-nav-toggle,
+  .notification-toggle {
+    min-width: 48px;
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+  }
+
+  .mobile-nav-toggle {
+    min-width: 112px;
+    padding-inline: 16px;
+  }
+
+  .notification-panel {
+    top: 78px;
+    right: 14px;
+    width: min(380px, calc(100vw - 28px));
+    max-height: calc(100vh - 108px);
+    padding: 18px;
+    border-radius: 24px;
+    animation: mobileSheetDropIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .notification-card,
+  .notification-empty {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .content-container {
+    padding: 18px 18px 28px;
+  }
+
+  .page-shell {
+    gap: 18px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  }
+
+  .hero-panel,
+  .panel,
+  .auth-card,
+  .exercise-builder-emphasis,
+  .profile-form-panel,
+  .weight-form-panel,
+  .exercise-filter-card,
+  .template-toolbar,
+  .template-toolbar-workout,
+  .filter-toolbar-workouts,
+  .progress-filter-panel,
+  .progress-suggestion-panel {
+    border-radius: 26px;
+  }
+
+  .hero-panel,
+  .panel {
+    padding: 20px;
+  }
+
+  .stats-grid,
+  .assistant-grid,
+  .workout-assistant-grid,
+  .exercise-list,
+  .workout-list,
+  .template-list,
+  .records-list,
+  .entry-list,
+  .weekly-average-list,
+  .exercise-history-list {
+    gap: 14px;
+  }
+
+  .stat-card,
+  .dashboard-highlight-card,
+  .dashboard-metric-card,
+  .assistant-card,
+  .goal-progress-card,
+  .exercise-card,
+  .workout-card,
+  .record-card,
+  .exercise-history-card,
+  .template-card,
+  .entry-card,
+  .weekly-average-card,
+  .forge-stat-card {
+    padding: 16px;
+    border-radius: 24px;
+  }
+
+  .stat-card,
+  .assistant-card,
+  .workout-card,
+  .template-card,
+  .entry-card,
+  .exercise-history-card,
+  .record-card {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+      var(--surface-overlay);
+    box-shadow:
+      0 14px 30px rgba(0, 0, 0, 0.16),
+      var(--shadow-soft);
+  }
+
+  .panel-header {
+    margin-bottom: 16px;
+    gap: 14px;
+  }
+
+  .panel-header h2 {
+    line-height: 1.05;
+  }
+
+  .panel-header p,
+  .hero-text {
+    line-height: 1.48;
+  }
+
+  .section-note {
+    line-height: 1.5;
+  }
+
+  .field {
+    gap: 10px;
+  }
+
+  .field input,
+  .select-input {
+    min-height: 50px;
+    height: 50px;
+    padding-inline: 14px;
+    border-radius: 16px;
+  }
+
+  .text-area {
+    min-height: 116px;
+    padding: 13px 14px;
+    border-radius: 16px;
+  }
+
+  .primary-button,
+  .ghost-button,
+  .danger-button,
+  .readiness-option,
+  .mobile-menu-action {
+    min-height: 50px;
+    border-radius: 16px;
+  }
+
+  .action-row {
+    position: sticky;
+    bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    z-index: 2;
+    padding: 8px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(16px);
+  }
+
+  .action-row-prominent {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+  }
+
+  .workout-card-actions,
+  .template-card-footer,
+  .entry-actions,
+  .toolbar-actions {
+    gap: 10px;
+  }
+
+  .readiness-option-row {
+    gap: 10px;
+  }
+
+  .readiness-option {
+    justify-content: flex-start;
+    padding-inline: 14px;
+  }
+
+  .toggle-row,
+  .user-pill,
+  .session-banner,
+  .dashboard-readiness-summary {
+    border-radius: 22px;
+  }
+
+  .filter-toolbar,
+  .template-toolbar,
+  .template-toolbar-workout {
+    gap: 12px;
+    padding: 14px;
+    border-radius: 22px;
+  }
+
+  .workouts-panel-history .filter-toolbar,
+  .filter-toolbar-workouts {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent),
+      var(--surface-overlay);
+  }
+
+  .admin-table-shell {
+    margin: 0 -2px;
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    width: min(100%, calc(100% - 10px));
+    padding: 10px 0 30px;
+  }
+
+  .app-sidebar {
+    width: min(328px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+    padding: 10px;
+  }
+
+  .sidebar-inner {
+    padding: 18px 14px 16px;
+    border-radius: 26px;
+  }
+
+  .app-topbar {
+    padding: 12px 12px 10px;
+    border-radius: 20px;
+  }
+
+  .topbar-left {
+    min-width: 0;
+  }
+
+  .topbar-title-block strong {
+    font-size: 1.18rem;
+  }
+
+  .topbar-title-block p {
+    font-size: 0.9rem;
+    line-height: 1.42;
+  }
+
+  .mobile-nav-toggle {
+    min-width: 108px;
+  }
+
+  .notification-panel {
+    right: 10px;
+    left: 10px;
+    top: 72px;
+    width: auto;
+    max-height: calc(100vh - 92px);
+    border-radius: 22px;
+  }
+
+  .content-container {
+    padding: 12px 10px 22px;
+  }
+
+  .page-shell {
+    gap: 16px;
+    padding: 4px 0 20px;
+  }
+
+  .hero-panel,
+  .panel,
+  .auth-card,
+  .exercise-builder-emphasis,
+  .profile-form-panel,
+  .weight-form-panel,
+  .exercise-filter-card,
+  .template-toolbar,
+  .template-toolbar-workout,
+  .filter-toolbar-workouts,
+  .progress-filter-panel,
+  .progress-suggestion-panel {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .stats-grid,
+  .assistant-grid,
+  .workout-assistant-grid,
+  .exercise-list,
+  .workout-list,
+  .template-list,
+  .records-list,
+  .entry-list,
+  .weekly-average-list,
+  .exercise-history-list {
+    gap: 12px;
+  }
+
+  .stat-card,
+  .dashboard-highlight-card,
+  .dashboard-metric-card,
+  .assistant-card,
+  .goal-progress-card,
+  .exercise-card,
+  .workout-card,
+  .record-card,
+  .exercise-history-card,
+  .template-card,
+  .entry-card,
+  .weekly-average-card,
+  .forge-stat-card {
+    padding: 15px;
+    border-radius: 22px;
+  }
+
+  .field input,
+  .select-input,
+  .primary-button,
+  .ghost-button,
+  .danger-button,
+  .readiness-option {
+    min-height: 48px;
+  }
+
+  .text-area {
+    min-height: 104px;
+  }
+
+  .mobile-menu-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .action-row {
+    padding: 6px;
+    border-radius: 18px;
+  }
+
+  .session-banner,
+  .toggle-row,
+  .dashboard-readiness-summary,
+  .user-pill {
+    padding: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-backdrop,
+  .app-sidebar,
+  .app-sidebar-open,
+  .notification-panel,
+  .action-row {
+    transition: none;
+    animation: none;
+  }
+}
+
+@keyframes mobileDrawerSlideIn {
+  from {
+    opacity: 0.84;
+    transform: translateX(calc(-100% - 18px)) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes mobileSheetDropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
