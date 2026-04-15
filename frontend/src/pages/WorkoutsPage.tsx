@@ -1322,7 +1322,7 @@ export function WorkoutsPage() {
           </form>
         </div>
 
-        <div className="panel panel-span-2 workouts-panel-history">
+        <div className="panel workouts-panel-history">
           <div className="panel-header">
             <div>
               <h2>Recent workouts</h2>

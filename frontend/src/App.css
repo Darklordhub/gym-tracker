@@ -3393,7 +3393,7 @@
 }
 
 .workouts-main-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
 }
 
 .dashboard-goals-layout {
@@ -3546,6 +3546,19 @@
   grid-column: 1 / -1;
 }
 
+.workouts-panel-strength {
+  grid-column: span 7;
+}
+
+.workouts-panel-templates,
+.workouts-panel-cardio {
+  grid-column: span 5;
+}
+
+.workouts-panel-history {
+  grid-column: span 7;
+}
+
 .workouts-template-toolbar,
 .workouts-exercise-builder,
 .workouts-active-shell {
@@ -3608,6 +3621,11 @@
     gap: 16px;
   }
 
+  .workouts-main-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 16px;
+  }
+
   .dashboard-panel-goals {
     grid-column: span 8;
   }
@@ -3618,6 +3636,16 @@
   .dashboard-panel-weekly,
   .dashboard-panel-overview {
     grid-column: span 4;
+  }
+
+  .workouts-panel-strength,
+  .workouts-panel-history {
+    grid-column: span 5;
+  }
+
+  .workouts-panel-templates,
+  .workouts-panel-cardio {
+    grid-column: span 3;
   }
 
   .dashboard-assistant-grid,
@@ -3638,6 +3666,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .workouts-main-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .dashboard-panel-goals,
   .dashboard-panel-readiness,
   .dashboard-panel-energy,
@@ -3645,6 +3677,16 @@
   .dashboard-panel-weekly,
   .dashboard-panel-overview,
   .dashboard-panel-assistant {
+    grid-column: auto;
+  }
+
+  .workouts-panel-strength,
+  .workouts-panel-history {
+    grid-column: 1 / -1;
+  }
+
+  .workouts-panel-templates,
+  .workouts-panel-cardio {
     grid-column: auto;
   }
 
