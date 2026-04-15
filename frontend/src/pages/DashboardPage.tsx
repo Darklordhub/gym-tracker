@@ -772,7 +772,7 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div className="panel dashboard-panel-weekly">
+        <div className="panel dashboard-panel-energy">
           <div className="panel-header">
             <div>
               <h2>Energy balance</h2>
@@ -933,7 +933,7 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div className="panel dashboard-panel-weekly">
+        <div className="panel dashboard-panel-training-score">
           <div className="panel-header">
             <div>
               <h2>Training score</h2>
@@ -1133,7 +1133,7 @@ export function DashboardPage() {
           )}
         </div>
 
-        <div className="panel panel-span-2 dashboard-panel-overview">
+        <div className="panel dashboard-panel-overview">
           <div className="panel-header">
             <div>
               <h2>Overview</h2>

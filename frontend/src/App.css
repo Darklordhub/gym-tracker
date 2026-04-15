@@ -3384,15 +3384,23 @@
 .dashboard-forge-grid,
 .workouts-main-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   align-items: start;
 }
 
+.dashboard-forge-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.workouts-main-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .dashboard-goals-layout {
   display: grid;
-  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.35fr);
+  gap: 22px;
+  align-items: stretch;
 }
 
 .dashboard-goal-form,
@@ -3408,6 +3416,31 @@
 
 .dashboard-progress-card {
   min-height: 100%;
+}
+
+.dashboard-panel-goals {
+  grid-column: span 8;
+}
+
+.dashboard-panel-readiness {
+  grid-column: span 4;
+}
+
+.dashboard-panel-energy,
+.dashboard-panel-training-score {
+  grid-column: span 6;
+}
+
+.dashboard-panel-weekly {
+  grid-column: span 5;
+}
+
+.dashboard-panel-overview {
+  grid-column: span 7;
+}
+
+.dashboard-panel-assistant {
+  grid-column: 1 / -1;
 }
 
 .dashboard-progress-card-phase {
@@ -3475,6 +3508,18 @@
 .dashboard-weekly-card,
 .dashboard-overview-card {
   min-height: 148px;
+}
+
+.dashboard-panel-energy .dashboard-metric-list,
+.dashboard-panel-training-score .dashboard-metric-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-panel-energy .dashboard-metric-card,
+.dashboard-panel-training-score .dashboard-metric-card,
+.dashboard-panel-overview .dashboard-metric-card,
+.dashboard-panel-weekly .dashboard-metric-card {
+  min-height: 138px;
 }
 
 .dashboard-assistant-grid {
@@ -3558,6 +3603,23 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .dashboard-forge-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .dashboard-panel-goals {
+    grid-column: span 8;
+  }
+
+  .dashboard-panel-readiness,
+  .dashboard-panel-energy,
+  .dashboard-panel-training-score,
+  .dashboard-panel-weekly,
+  .dashboard-panel-overview {
+    grid-column: span 4;
+  }
+
   .dashboard-assistant-grid,
   .workouts-assistant-grid,
   .dashboard-goal-progress-grid {
@@ -3570,6 +3632,20 @@
   .workouts-hero-forge,
   .dashboard-goals-layout {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-forge-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-panel-goals,
+  .dashboard-panel-readiness,
+  .dashboard-panel-energy,
+  .dashboard-panel-training-score,
+  .dashboard-panel-weekly,
+  .dashboard-panel-overview,
+  .dashboard-panel-assistant {
+    grid-column: auto;
   }
 
   .forge-stat-strip-dashboard {
