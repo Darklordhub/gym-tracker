@@ -24,7 +24,7 @@ export function generateNotifications(
   const weekStart = startOfWeek(now)
   const weekStartKey = weekStart.toISOString().slice(0, 10)
   const workoutsThisWeek = countWorkoutsInWeek(sortedWorkouts, now)
-  const assistantInsight = getWorkoutAssistantInsight(sortedWorkouts, goals, undefined, undefined, now)
+  const assistantInsight = getWorkoutAssistantInsight(sortedWorkouts, goals, undefined, undefined, undefined, now)
 
   if (goals?.weeklyWorkoutTarget) {
     if (workoutsThisWeek >= goals.weeklyWorkoutTarget) {

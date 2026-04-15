@@ -53,6 +53,8 @@ public class GoalsController : ControllerBase
             : null;
         goals.WeeklyWorkoutTarget = request.WeeklyWorkoutTarget;
         goals.FitnessPhase = NormalizeFitnessPhase(request.FitnessPhase);
+        goals.DailyCalorieTarget = request.DailyCalorieTarget;
+        goals.CalorieTargetMode = NormalizeCalorieTargetMode(request.CalorieTargetMode);
 
         await _dbContext.SaveChangesAsync();
 
@@ -66,11 +68,18 @@ public class GoalsController : ControllerBase
             TargetBodyWeightKg = goals?.TargetBodyWeightKg,
             WeeklyWorkoutTarget = goals?.WeeklyWorkoutTarget,
             FitnessPhase = goals?.FitnessPhase ?? "maintain",
+            DailyCalorieTarget = goals?.DailyCalorieTarget,
+            CalorieTargetMode = string.IsNullOrWhiteSpace(goals?.CalorieTargetMode) ? "manual" : goals!.CalorieTargetMode,
         };
     }
 
     private static string NormalizeFitnessPhase(string fitnessPhase)
     {
         return fitnessPhase.Trim().ToLowerInvariant();
+    }
+
+    private static string NormalizeCalorieTargetMode(string calorieTargetMode)
+    {
+        return calorieTargetMode.Trim().ToLowerInvariant();
     }
 }

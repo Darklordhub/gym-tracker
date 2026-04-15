@@ -2,6 +2,7 @@ import type { Workout } from '../types/workout'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings } from '../types/goals'
 import type { ReadinessLog } from '../types/readiness'
+import type { DailyCalorieBalance } from './calorieBalance'
 import { countWorkoutsInWeek } from './workoutMetrics'
 
 export type ExerciseSuggestion = {
@@ -125,6 +126,7 @@ export function getWorkoutAssistantInsight(
   goals: GoalSettings | null,
   cycleGuidance?: CycleGuidance | null,
   readinessLog?: ReadinessLog | null,
+  calorieBalance?: DailyCalorieBalance | null,
   now = new Date(),
 ): WorkoutAssistantInsight {
   const workoutsThisWeek = countWorkoutsInWeek(workouts, now)
@@ -158,7 +160,7 @@ export function getWorkoutAssistantInsight(
 
   return {
     weeklyNudge,
-    todaySuggestion: getDailyTrainingSuggestion(workouts, cycleGuidance, readinessLog, now),
+    todaySuggestion: getDailyTrainingSuggestion(workouts, cycleGuidance, readinessLog, calorieBalance, now),
     prOpportunity: prOpportunity
       ? {
           exerciseName: prOpportunity.exerciseName,
@@ -177,6 +179,7 @@ export function getDailyTrainingSuggestion(
   workouts: Workout[],
   cycleGuidance?: CycleGuidance | null,
   readinessLog?: ReadinessLog | null,
+  calorieBalance?: DailyCalorieBalance | null,
   now = new Date(),
 ) {
   const recentWindowStart = new Date(now)
@@ -219,6 +222,32 @@ export function getDailyTrainingSuggestion(
       cycleGuidance.recentRecoveryFeeling >= 3)
 
   const readiness = getCurrentReadinessSignal(readinessLog, now)
+  const lowEnergyAvailability =
+    calorieBalance?.status === 'deficit' &&
+    calorieBalance.netBalanceCalories !== null &&
+    calorieBalance.netBalanceCalories <= -300
+  const energySurplus =
+    calorieBalance?.status === 'surplus' &&
+    calorieBalance.netBalanceCalories !== null &&
+    calorieBalance.netBalanceCalories >= 250
+
+  if (lowEnergyAvailability && (highTrainingLoad || highFatigueSignals || readiness?.level === 'low')) {
+    return {
+      trainingType: 'rest' as const,
+      title: 'Recovery should lead today',
+      message:
+        'You are in a deeper calorie deficit and recovery signals are already under pressure. Rest or keep movement very light instead of forcing another demanding session.',
+    }
+  }
+
+  if (lowEnergyAvailability) {
+    return {
+      trainingType: 'cardio' as const,
+      title: 'Keep training lighter today',
+      message:
+        'Today’s calorie balance is running low for harder work. Easy cardio or a shorter controlled session is a better fit than pushing intensity.',
+    }
+  }
 
   if (readiness?.level === 'low') {
     if (highTrainingLoad || highFatigueSignals) {
@@ -286,6 +315,15 @@ export function getDailyTrainingSuggestion(
         cycleGuidance?.estimatedCurrentPhase === 'Follicular' || cycleGuidance?.estimatedCurrentPhase === 'Ovulatory'
           ? 'Recovery looks solid and this phase can often tolerate harder work well. Strength or higher-intensity work is reasonable if the session feels sharp.'
           : 'Recovery looks good and recent load is manageable. A focused strength session should fit well today.',
+    }
+  }
+
+  if (energySurplus && readiness?.level === 'high') {
+    return {
+      trainingType: 'strength' as const,
+      title: 'You are well fueled for strength work',
+      message:
+        'Readiness looks strong and today’s calorie balance is supportive. A focused strength session or a higher-quality main lift should fit well.',
     }
   }
 

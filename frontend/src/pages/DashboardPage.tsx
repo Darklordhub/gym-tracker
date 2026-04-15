@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { fetchLatestCalorieLog, upsertCalorieLog } from '../api/calories'
 import { fetchLatestReadinessLog, upsertReadinessLog } from '../api/readiness'
 import { fetchCycleGuidance } from '../api/cycle'
 import { fetchGoals, updateGoals } from '../api/goals'
 import { fetchWeightEntries } from '../api/weightEntries'
 import { fetchWorkouts } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
+import { buildDailyCalorieBalance } from '../lib/calorieBalance'
 import { getWorkoutAssistantInsight } from '../lib/exerciseSuggestions'
 import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import { addDays, countWorkoutsInWeek, getWorkoutWeekStreak, startOfWeek } from '../lib/workoutMetrics'
+import type { CalorieLog } from '../types/calories'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings, GoalSettingsPayload } from '../types/goals'
 import type { ReadinessLog } from '../types/readiness'
@@ -23,6 +26,10 @@ const initialReadinessForm = {
   notes: '',
 }
 
+const initialCalorieForm = {
+  caloriesConsumed: '',
+}
+
 export function DashboardPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([])
@@ -30,11 +37,15 @@ export function DashboardPage() {
     targetBodyWeightKg: null,
     weeklyWorkoutTarget: null,
     fitnessPhase: 'maintain',
+    dailyCalorieTarget: null,
+    calorieTargetMode: 'manual',
   })
   const [goalForm, setGoalForm] = useState({
     targetBodyWeightKg: '',
     weeklyWorkoutTarget: '',
     fitnessPhase: 'maintain',
+    dailyCalorieTarget: '',
+    calorieTargetMode: 'manual' as GoalSettings['calorieTargetMode'],
   })
   const [isLoading, setIsLoading] = useState(true)
   const [isSavingGoals, setIsSavingGoals] = useState(false)
@@ -48,6 +59,12 @@ export function DashboardPage() {
   const [readinessMessage, setReadinessMessage] = useState<string | null>(null)
   const [readinessErrorMessage, setReadinessErrorMessage] = useState<string | null>(null)
   const [isEditingReadiness, setIsEditingReadiness] = useState(false)
+  const [calorieLog, setCalorieLog] = useState<CalorieLog | null>(null)
+  const [calorieForm, setCalorieForm] = useState(initialCalorieForm)
+  const [isSavingCalories, setIsSavingCalories] = useState(false)
+  const [calorieMessage, setCalorieMessage] = useState<string | null>(null)
+  const [calorieErrorMessage, setCalorieErrorMessage] = useState<string | null>(null)
+  const [isEditingCalories, setIsEditingCalories] = useState(false)
 
   useEffect(() => {
     void loadDashboard()
@@ -120,18 +137,29 @@ export function DashboardPage() {
     }
   }, [goals, weightEntries, workouts])
 
-  const assistantInsight = useMemo(
-    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog),
-    [cycleGuidance, goals, readinessLog, workouts],
-  )
-
   const hasTodayReadinessLog = readinessLog?.date === getTodayDateValue()
+  const hasTodayCalorieLog = calorieLog?.date === getTodayDateValue()
   const readinessAverage =
     (readinessForm.energyLevel +
       readinessForm.sorenessLevel +
       readinessForm.sleepQuality +
       readinessForm.motivationLevel) /
     4
+  const calorieBalance = useMemo(
+    () =>
+      buildDailyCalorieBalance(
+        workouts,
+        goals,
+        calorieLog,
+        getTodayDateValue(),
+        metrics.latestWeightEntry?.weightKg ?? null,
+      ),
+    [calorieLog, goals, metrics.latestWeightEntry, workouts],
+  )
+  const assistantInsight = useMemo(
+    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog, calorieBalance),
+    [calorieBalance, cycleGuidance, goals, readinessLog, workouts],
+  )
 
   async function loadDashboard() {
     try {
@@ -141,13 +169,17 @@ export function DashboardPage() {
       setGoalErrorMessage(null)
       setReadinessMessage(null)
       setReadinessErrorMessage(null)
+      setCalorieMessage(null)
+      setCalorieErrorMessage(null)
 
-      const [workoutData, weightData, goalsData, cycleGuidanceData, latestReadinessLog] = await Promise.all([
+      const [workoutData, weightData, goalsData, cycleGuidanceData, latestReadinessLog, latestCalorieLog] =
+        await Promise.all([
         fetchWorkouts(),
         fetchWeightEntries(),
         fetchGoals(),
         fetchCycleGuidance().catch(() => null),
         fetchLatestReadinessLog().catch(() => null),
+        fetchLatestCalorieLog().catch(() => null),
       ])
 
       setWorkouts(workoutData)
@@ -155,6 +187,7 @@ export function DashboardPage() {
       applyGoalState(goalsData)
       setCycleGuidance(cycleGuidanceData)
       setReadinessLog(latestReadinessLog)
+      setCalorieLog(latestCalorieLog)
       if (latestReadinessLog?.date === getTodayDateValue()) {
         setReadinessForm({
           energyLevel: latestReadinessLog.energyLevel,
@@ -164,6 +197,12 @@ export function DashboardPage() {
           notes: latestReadinessLog.notes ?? '',
         })
         setIsEditingReadiness(false)
+      }
+      if (latestCalorieLog?.date === getTodayDateValue()) {
+        setCalorieForm({
+          caloriesConsumed: latestCalorieLog.caloriesConsumed.toString(),
+        })
+        setIsEditingCalories(false)
       }
     } catch (error) {
       setErrorMessage(getRequestErrorMessage(error, 'Unable to load dashboard data.'))
@@ -179,6 +218,8 @@ export function DashboardPage() {
       targetBodyWeightKg: goalForm.targetBodyWeightKg === '' ? null : Number(goalForm.targetBodyWeightKg),
       weeklyWorkoutTarget: goalForm.weeklyWorkoutTarget === '' ? null : Number(goalForm.weeklyWorkoutTarget),
       fitnessPhase: goalForm.fitnessPhase as GoalSettings['fitnessPhase'],
+      dailyCalorieTarget: goalForm.dailyCalorieTarget === '' ? null : Number(goalForm.dailyCalorieTarget),
+      calorieTargetMode: goalForm.calorieTargetMode,
     }
 
     try {
@@ -204,6 +245,9 @@ export function DashboardPage() {
       weeklyWorkoutTarget:
         nextGoals.weeklyWorkoutTarget === null ? '' : nextGoals.weeklyWorkoutTarget.toString(),
       fitnessPhase: nextGoals.fitnessPhase,
+      dailyCalorieTarget:
+        nextGoals.dailyCalorieTarget === null ? '' : nextGoals.dailyCalorieTarget.toString(),
+      calorieTargetMode: nextGoals.calorieTargetMode,
     })
   }
 
@@ -231,6 +275,36 @@ export function DashboardPage() {
       setReadinessErrorMessage(getRequestErrorMessage(error, 'Unable to save today’s check-in.'))
     } finally {
       setIsSavingReadiness(false)
+    }
+  }
+
+  async function handleCalorieSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const caloriesConsumed = Number(calorieForm.caloriesConsumed)
+
+    if (!Number.isFinite(caloriesConsumed) || caloriesConsumed < 0) {
+      setCalorieErrorMessage('Enter a valid calorie total for today.')
+      return
+    }
+
+    try {
+      setIsSavingCalories(true)
+      setCalorieMessage(null)
+      setCalorieErrorMessage(null)
+
+      const savedLog = await upsertCalorieLog({
+        date: getTodayDateValue(),
+        caloriesConsumed,
+      })
+
+      setCalorieLog(savedLog)
+      setCalorieMessage(hasTodayCalorieLog ? 'Today’s calories updated.' : 'Calories logged for today.')
+      setIsEditingCalories(false)
+    } catch (error) {
+      setCalorieErrorMessage(getRequestErrorMessage(error, 'Unable to save today’s calories.'))
+    } finally {
+      setIsSavingCalories(false)
     }
   }
 
@@ -388,6 +462,52 @@ export function DashboardPage() {
                     <option value="maintain">Maintain</option>
                     <option value="bulk">Bulk</option>
                   </select>
+                </label>
+
+                <label className="field">
+                  <span>Calorie target mode</span>
+                  <select
+                    className="select-input"
+                    value={goalForm.calorieTargetMode}
+                    onChange={(event) =>
+                      setGoalForm((current) => ({
+                        ...current,
+                        calorieTargetMode: event.target.value as GoalSettings['calorieTargetMode'],
+                      }))
+                    }
+                  >
+                    <option value="manual">Manual target</option>
+                    <option value="goal-based">Goal-based estimate</option>
+                  </select>
+                  <small>
+                    {goalForm.calorieTargetMode === 'manual'
+                      ? 'Use a fixed daily calorie target.'
+                      : 'Estimate target calories from your weight target and current phase.'}
+                  </small>
+                </label>
+
+                <label className="field">
+                  <span>Daily calorie target</span>
+                  <input
+                    type="number"
+                    min="800"
+                    max="6000"
+                    step="25"
+                    value={goalForm.dailyCalorieTarget}
+                    onChange={(event) =>
+                      setGoalForm((current) => ({
+                        ...current,
+                        dailyCalorieTarget: event.target.value,
+                      }))
+                    }
+                    placeholder="e.g. 2400"
+                    disabled={goalForm.calorieTargetMode !== 'manual'}
+                  />
+                  <small>
+                    {goalForm.calorieTargetMode === 'manual'
+                      ? 'Used as the daily calorie target for balance and recovery guidance.'
+                      : 'Manual target is disabled while goal-based estimation is active.'}
+                  </small>
                 </label>
 
                 <div className="action-row">
@@ -585,6 +705,147 @@ export function DashboardPage() {
                       setIsEditingReadiness(false)
                     }}
                     disabled={isSavingReadiness}
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          )}
+        </div>
+
+        <div className="panel dashboard-panel-weekly">
+          <div className="panel-header">
+            <div>
+              <h2>Energy balance</h2>
+              <p>Log one daily calorie total, then compare it with estimated training burn and your target.</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <StateCard title="Loading calorie balance" description="Preparing today’s intake and burn summary." loading />
+          ) : errorMessage ? (
+            <StateCard title="Energy balance unavailable" description={errorMessage} tone="error" />
+          ) : hasTodayCalorieLog && calorieLog && !isEditingCalories ? (
+            <div className="dashboard-readiness-thanks">
+              <div className="dashboard-readiness-summary dashboard-readiness-summary-logged">
+                <div>
+                  <span className="stat-label">Today</span>
+                  <strong>Calories logged for today.</strong>
+                  <p className="stat-subtext">
+                    {calorieBalance.statusMessage}
+                  </p>
+                </div>
+                <div className="dashboard-readiness-score">
+                  <span>Status</span>
+                  <strong>{calorieBalance.statusLabel}</strong>
+                </div>
+              </div>
+
+              <div className="dashboard-metric-list dashboard-weekly-grid">
+                <div className="dashboard-metric-card dashboard-weekly-card">
+                  <span className="stat-label">Consumed</span>
+                  <strong>{calorieBalance.caloriesConsumed ?? 'No data'}</strong>
+                  <span className="stat-subtext">Logged total calories today</span>
+                </div>
+                <div className="dashboard-metric-card dashboard-weekly-card">
+                  <span className="stat-label">Burned</span>
+                  <strong>{calorieBalance.caloriesBurned}</strong>
+                  <span className="stat-subtext">Estimated from today&apos;s workouts</span>
+                </div>
+                <div className="dashboard-metric-card dashboard-weekly-card">
+                  <span className="stat-label">Target</span>
+                  <strong>{calorieBalance.targetCalories ?? 'Not set'}</strong>
+                  <span className="stat-subtext">
+                    {calorieBalance.targetSource === 'goal-based' ? 'Goal-based estimate' : 'Current daily target'}
+                  </span>
+                </div>
+                <div className="dashboard-metric-card dashboard-weekly-card">
+                  <span className="stat-label">Net balance</span>
+                  <strong>
+                    {calorieBalance.netBalanceCalories === null
+                      ? 'Pending'
+                      : `${calorieBalance.netBalanceCalories > 0 ? '+' : ''}${calorieBalance.netBalanceCalories}`}
+                  </strong>
+                  <span className="stat-subtext">Relative to target after estimated burn</span>
+                </div>
+              </div>
+
+              <div className="action-row">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => {
+                    setCalorieMessage(null)
+                    setCalorieErrorMessage(null)
+                    setIsEditingCalories(true)
+                  }}
+                >
+                  Edit today&apos;s calories
+                </button>
+              </div>
+
+              {calorieMessage ? <p className="feedback success">{calorieMessage}</p> : null}
+              {calorieErrorMessage ? <p className="feedback error">{calorieErrorMessage}</p> : null}
+            </div>
+          ) : (
+            <form className="readiness-form dashboard-readiness-form" onSubmit={handleCalorieSubmit}>
+              <div className="dashboard-readiness-summary">
+                <div>
+                  <span className="stat-label">Today</span>
+                  <strong>{hasTodayCalorieLog ? 'Update calories' : 'Log daily calories'}</strong>
+                  <p className="stat-subtext">
+                    {calorieBalance.targetCalories === null
+                      ? 'Set a manual calorie target or switch on goal-based estimation first.'
+                      : `${calorieBalance.caloriesBurned} kcal estimated burned from today’s training. ${calorieBalance.statusMessage}`}
+                  </p>
+                </div>
+                <div className="dashboard-readiness-score">
+                  <span>Target</span>
+                  <strong>{calorieBalance.targetCalories ?? 'Unset'}</strong>
+                </div>
+              </div>
+
+              <label className="field">
+                <span>Calories consumed today</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="15000"
+                  step="10"
+                  value={calorieForm.caloriesConsumed}
+                  onChange={(event) =>
+                    setCalorieForm({
+                      caloriesConsumed: event.target.value,
+                    })
+                  }
+                  placeholder="e.g. 2300"
+                />
+                <small>Single daily total only. No food database or meal breakdown needed.</small>
+              </label>
+
+              <div className="feedback-stack">
+                <p className="feedback">
+                  Estimated burn is derived from today&apos;s strength and cardio sessions using simple duration and set-count heuristics.
+                </p>
+                {calorieMessage ? <p className="feedback success">{calorieMessage}</p> : null}
+                {calorieErrorMessage ? <p className="feedback error">{calorieErrorMessage}</p> : null}
+              </div>
+
+              <div className="action-row">
+                <button type="submit" className="primary-button" disabled={isSavingCalories}>
+                  {isSavingCalories ? 'Saving calories...' : hasTodayCalorieLog ? 'Update today’s calories' : 'Save today’s calories'}
+                </button>
+                {isEditingCalories && hasTodayCalorieLog ? (
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      setCalorieMessage(null)
+                      setCalorieErrorMessage(null)
+                      setIsEditingCalories(false)
+                    }}
+                    disabled={isSavingCalories}
                   >
                     Cancel
                   </button>

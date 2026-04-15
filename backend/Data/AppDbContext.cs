@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
     public DbSet<UserCycleEntry> UserCycleEntries => Set<UserCycleEntry>();
     public DbSet<UserCycleSymptomLog> UserCycleSymptomLogs => Set<UserCycleSymptomLog>();
     public DbSet<UserReadinessLog> UserReadinessLogs => Set<UserReadinessLog>();
+    public DbSet<UserCalorieLog> UserCalorieLogs => Set<UserCalorieLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -81,6 +82,11 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserReadinessLog>()
             .Property(log => log.Notes)
             .HasMaxLength(500);
+
+        modelBuilder.Entity<GoalSettings>()
+            .Property(goalSettings => goalSettings.CalorieTargetMode)
+            .HasMaxLength(20)
+            .HasDefaultValue("manual");
 
         modelBuilder.Entity<WeightEntry>()
             .HasOne(weightEntry => weightEntry.User)
@@ -148,6 +154,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(log => log.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<UserCalorieLog>()
+            .HasOne(log => log.User)
+            .WithMany(user => user.CalorieLogs)
+            .HasForeignKey(log => log.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<GoalSettings>()
             .HasIndex(goalSettings => goalSettings.UserId)
             .IsUnique();
@@ -164,6 +176,10 @@ public class AppDbContext : DbContext
             .HasIndex(log => new { log.UserId, log.Date });
 
         modelBuilder.Entity<UserReadinessLog>()
+            .HasIndex(log => new { log.UserId, log.Date })
+            .IsUnique();
+
+        modelBuilder.Entity<UserCalorieLog>()
             .HasIndex(log => new { log.UserId, log.Date })
             .IsUnique();
 

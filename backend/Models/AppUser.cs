@@ -23,6 +23,7 @@ public class AppUser
     public List<UserCycleEntry> CycleEntries { get; set; } = new();
     public List<UserCycleSymptomLog> CycleSymptomLogs { get; set; } = new();
     public List<UserReadinessLog> ReadinessLogs { get; set; } = new();
+    public List<UserCalorieLog> CalorieLogs { get; set; } = new();
     public string Role { get; set; } = AppRoles.User;
     public bool IsActive { get; set; } = true;
 }

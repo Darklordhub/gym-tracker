@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchCycleGuidance } from '../api/cycle'
+import { fetchLatestCalorieLog } from '../api/calories'
 import { fetchGoals } from '../api/goals'
 import { fetchLatestReadinessLog } from '../api/readiness'
 import {
@@ -16,9 +17,11 @@ import {
 } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
 import { getWorkoutAssistantInsight, getSuggestedNextWeight } from '../lib/exerciseSuggestions'
+import { buildDailyCalorieBalance } from '../lib/calorieBalance'
 import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { CycleGuidance } from '../types/cycle'
+import type { CalorieLog } from '../types/calories'
 import type { GoalSettings } from '../types/goals'
 import type { ReadinessLog } from '../types/readiness'
 import type {
@@ -239,6 +242,7 @@ export function WorkoutsPage() {
   const [goals, setGoals] = useState<GoalSettings | null>(null)
   const [cycleGuidance, setCycleGuidance] = useState<CycleGuidance | null>(null)
   const [readinessLog, setReadinessLog] = useState<ReadinessLog | null>(null)
+  const [calorieLog, setCalorieLog] = useState<CalorieLog | null>(null)
   const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null)
   const [activeForm, setActiveForm] = useState<WorkoutFormState>(initialActiveFormState)
   const [activeErrors, setActiveErrors] = useState<WorkoutFormErrors>({ exercises: [] })
@@ -318,9 +322,14 @@ export function WorkoutsPage() {
     }
   }, [activeForm.exerciseEntries])
 
+  const calorieBalance = useMemo(
+    () => buildDailyCalorieBalance(workouts, goals, calorieLog, getTodayDateValue()),
+    [calorieLog, goals, workouts],
+  )
+
   const assistantInsight = useMemo(
-    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog),
-    [cycleGuidance, goals, readinessLog, workouts],
+    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog, calorieBalance),
+    [calorieBalance, cycleGuidance, goals, readinessLog, workouts],
   )
 
   async function loadData() {
@@ -328,13 +337,14 @@ export function WorkoutsPage() {
       setIsLoading(true)
       setErrorMessage(null)
 
-      const [workoutData, templateData, currentActiveSession, goalData, cycleGuidanceData, latestReadinessLog] = await Promise.all([
+      const [workoutData, templateData, currentActiveSession, goalData, cycleGuidanceData, latestReadinessLog, latestCalorieLog] = await Promise.all([
         fetchWorkouts(),
         fetchWorkoutTemplates(),
         fetchActiveWorkoutSession(),
         fetchGoals().catch(() => null),
         fetchCycleGuidance().catch(() => null),
         fetchLatestReadinessLog().catch(() => null),
+        fetchLatestCalorieLog().catch(() => null),
       ])
 
       setWorkouts(workoutData)
@@ -342,6 +352,7 @@ export function WorkoutsPage() {
       setGoals(goalData)
       setCycleGuidance(cycleGuidanceData)
       setReadinessLog(latestReadinessLog)
+      setCalorieLog(latestCalorieLog)
       setActiveSession(currentActiveSession)
       setActiveForm(currentActiveSession ? mapSessionToForm(currentActiveSession) : initialActiveFormState())
     } catch (error) {
