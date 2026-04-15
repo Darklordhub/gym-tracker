@@ -14,6 +14,13 @@ export async function fetchLatestCalorieLog() {
   }
 }
 
+export async function fetchRecentCalorieLogs(days = 7) {
+  const response = await apiClient.get<CalorieLog[]>('/Calories/recent', {
+    params: { days },
+  })
+  return response.data
+}
+
 export async function upsertCalorieLog(payload: CalorieLogPayload) {
   const response = await apiClient.post<CalorieLog>('/Calories', payload)
   return response.data

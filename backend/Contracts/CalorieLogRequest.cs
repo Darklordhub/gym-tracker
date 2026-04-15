@@ -10,6 +10,9 @@ public class CalorieLogRequest : IValidatableObject
     [Range(0, 15000)]
     public int CaloriesConsumed { get; set; }
 
+    [MaxLength(500)]
+    public string? Notes { get; set; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (Date > DateOnly.FromDateTime(DateTime.UtcNow))

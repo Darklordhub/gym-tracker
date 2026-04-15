@@ -39,6 +39,22 @@ public class CaloriesController : ControllerBase
         return Ok(MapLog(log));
     }
 
+    [HttpGet("recent")]
+    public async Task<ActionResult<IEnumerable<CalorieLogResponse>>> GetRecent([FromQuery] int days = 7)
+    {
+        var normalizedDays = Math.Clamp(days, 1, 60);
+        var userId = User.GetRequiredUserId();
+        var startDate = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(-(normalizedDays - 1)));
+        var logs = await _dbContext.UserCalorieLogs
+            .AsNoTracking()
+            .Where(entry => entry.UserId == userId && entry.Date >= startDate)
+            .OrderByDescending(entry => entry.Date)
+            .ThenByDescending(entry => entry.UpdatedAt)
+            .ToListAsync();
+
+        return Ok(logs.Select(MapLog));
+    }
+
     [HttpPost]
     public async Task<ActionResult<CalorieLogResponse>> UpsertLog(CalorieLogRequest request)
     {
@@ -59,6 +75,7 @@ public class CaloriesController : ControllerBase
                 UserId = userId,
                 Date = request.Date,
                 CaloriesConsumed = request.CaloriesConsumed,
+                Notes = NormalizeOptionalText(request.Notes),
                 CreatedAt = now,
                 UpdatedAt = now,
             };
@@ -70,6 +87,7 @@ public class CaloriesController : ControllerBase
         }
 
         existingLog.CaloriesConsumed = request.CaloriesConsumed;
+        existingLog.Notes = NormalizeOptionalText(request.Notes);
         existingLog.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync();
@@ -84,8 +102,19 @@ public class CaloriesController : ControllerBase
             Id = log.Id,
             Date = log.Date,
             CaloriesConsumed = log.CaloriesConsumed,
+            Notes = log.Notes,
             CreatedAt = log.CreatedAt,
             UpdatedAt = log.UpdatedAt,
         };
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim();
     }
 }

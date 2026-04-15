@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { fetchLatestCalorieLog, upsertCalorieLog } from '../api/calories'
-import { fetchLatestReadinessLog, upsertReadinessLog } from '../api/readiness'
+import { fetchLatestCalorieLog, fetchRecentCalorieLogs, upsertCalorieLog } from '../api/calories'
+import { fetchLatestReadinessLog, fetchRecentReadinessLogs, upsertReadinessLog } from '../api/readiness'
 import { fetchCycleGuidance } from '../api/cycle'
 import { fetchGoals, updateGoals } from '../api/goals'
 import { fetchWeightEntries } from '../api/weightEntries'
@@ -10,6 +10,7 @@ import { buildDailyCalorieBalance } from '../lib/calorieBalance'
 import { getWorkoutAssistantInsight } from '../lib/exerciseSuggestions'
 import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
+import { buildDailyTrainingScore, buildWeeklyTrainingScoreSummary } from '../lib/trainingScore'
 import { addDays, countWorkoutsInWeek, getWorkoutWeekStreak, startOfWeek } from '../lib/workoutMetrics'
 import type { CalorieLog } from '../types/calories'
 import type { CycleGuidance } from '../types/cycle'
@@ -28,6 +29,7 @@ const initialReadinessForm = {
 
 const initialCalorieForm = {
   caloriesConsumed: '',
+  notes: '',
 }
 
 export function DashboardPage() {
@@ -60,6 +62,8 @@ export function DashboardPage() {
   const [readinessErrorMessage, setReadinessErrorMessage] = useState<string | null>(null)
   const [isEditingReadiness, setIsEditingReadiness] = useState(false)
   const [calorieLog, setCalorieLog] = useState<CalorieLog | null>(null)
+  const [recentCalorieLogs, setRecentCalorieLogs] = useState<CalorieLog[]>([])
+  const [recentReadinessLogs, setRecentReadinessLogs] = useState<ReadinessLog[]>([])
   const [calorieForm, setCalorieForm] = useState(initialCalorieForm)
   const [isSavingCalories, setIsSavingCalories] = useState(false)
   const [calorieMessage, setCalorieMessage] = useState<string | null>(null)
@@ -156,9 +160,33 @@ export function DashboardPage() {
       ),
     [calorieLog, goals, metrics.latestWeightEntry, workouts],
   )
+  const trainingScore = useMemo(
+    () =>
+      buildDailyTrainingScore({
+        workouts,
+        goals,
+        calorieLog,
+        readinessLog,
+        cycleGuidance,
+        date: getTodayDateValue(),
+        referenceWeightKg: metrics.latestWeightEntry?.weightKg ?? null,
+      }).score,
+    [calorieLog, cycleGuidance, goals, metrics.latestWeightEntry, readinessLog, workouts],
+  )
+  const weeklyTrainingScore = useMemo(
+    () =>
+      buildWeeklyTrainingScoreSummary({
+        workouts,
+        goals,
+        calorieLogs: recentCalorieLogs,
+        readinessLogs: recentReadinessLogs,
+        referenceWeightKg: metrics.latestWeightEntry?.weightKg ?? null,
+      }),
+    [goals, metrics.latestWeightEntry, recentCalorieLogs, recentReadinessLogs, workouts],
+  )
   const assistantInsight = useMemo(
-    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog, calorieBalance),
-    [calorieBalance, cycleGuidance, goals, readinessLog, workouts],
+    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog, calorieBalance, trainingScore),
+    [calorieBalance, cycleGuidance, goals, readinessLog, trainingScore, workouts],
   )
 
   async function loadDashboard() {
@@ -172,7 +200,16 @@ export function DashboardPage() {
       setCalorieMessage(null)
       setCalorieErrorMessage(null)
 
-      const [workoutData, weightData, goalsData, cycleGuidanceData, latestReadinessLog, latestCalorieLog] =
+      const [
+        workoutData,
+        weightData,
+        goalsData,
+        cycleGuidanceData,
+        latestReadinessLog,
+        latestCalorieLog,
+        recentReadinessData,
+        recentCalorieData,
+      ] =
         await Promise.all([
         fetchWorkouts(),
         fetchWeightEntries(),
@@ -180,6 +217,8 @@ export function DashboardPage() {
         fetchCycleGuidance().catch(() => null),
         fetchLatestReadinessLog().catch(() => null),
         fetchLatestCalorieLog().catch(() => null),
+        fetchRecentReadinessLogs(7).catch(() => []),
+        fetchRecentCalorieLogs(7).catch(() => []),
       ])
 
       setWorkouts(workoutData)
@@ -188,6 +227,8 @@ export function DashboardPage() {
       setCycleGuidance(cycleGuidanceData)
       setReadinessLog(latestReadinessLog)
       setCalorieLog(latestCalorieLog)
+      setRecentReadinessLogs(recentReadinessData)
+      setRecentCalorieLogs(recentCalorieData)
       if (latestReadinessLog?.date === getTodayDateValue()) {
         setReadinessForm({
           energyLevel: latestReadinessLog.energyLevel,
@@ -201,6 +242,7 @@ export function DashboardPage() {
       if (latestCalorieLog?.date === getTodayDateValue()) {
         setCalorieForm({
           caloriesConsumed: latestCalorieLog.caloriesConsumed.toString(),
+          notes: latestCalorieLog.notes ?? '',
         })
         setIsEditingCalories(false)
       }
@@ -269,6 +311,10 @@ export function DashboardPage() {
       })
 
       setReadinessLog(savedLog)
+      setRecentReadinessLogs((current) => {
+        const next = current.filter((log) => log.date !== savedLog.date)
+        return [savedLog, ...next].sort((left, right) => right.date.localeCompare(left.date)).slice(0, 7)
+      })
       setReadinessMessage(hasTodayReadinessLog ? 'Today’s check-in updated.' : 'Thanks, your check-in is logged for today.')
       setIsEditingReadiness(false)
     } catch (error) {
@@ -296,9 +342,14 @@ export function DashboardPage() {
       const savedLog = await upsertCalorieLog({
         date: getTodayDateValue(),
         caloriesConsumed,
+        notes: calorieForm.notes.trim() === '' ? null : calorieForm.notes.trim(),
       })
 
       setCalorieLog(savedLog)
+      setRecentCalorieLogs((current) => {
+        const next = current.filter((log) => log.date !== savedLog.date)
+        return [savedLog, ...next].sort((left, right) => right.date.localeCompare(left.date)).slice(0, 7)
+      })
       setCalorieMessage(hasTodayCalorieLog ? 'Today’s calories updated.' : 'Calories logged for today.')
       setIsEditingCalories(false)
     } catch (error) {
@@ -377,6 +428,13 @@ export function DashboardPage() {
           label="Workout streak"
           value={metrics.workoutStreakWeeks.toString()}
           description="Consecutive weeks with strength or cardio logged"
+        />
+        <ForgeStatCard
+          tone="amber"
+          label="Training score"
+          value={trainingScore.score.toString()}
+          description={trainingScore.label}
+          trend={trainingScore.summary}
         />
         <ForgeStatCard
           tone="violet"
@@ -742,6 +800,8 @@ export function DashboardPage() {
                 </div>
               </div>
 
+              {calorieLog.notes ? <p className="feedback">Notes: {calorieLog.notes}</p> : null}
+
               <div className="dashboard-metric-list dashboard-weekly-grid">
                 <div className="dashboard-metric-card dashboard-weekly-card">
                   <span className="stat-label">Consumed</span>
@@ -815,13 +875,31 @@ export function DashboardPage() {
                   step="10"
                   value={calorieForm.caloriesConsumed}
                   onChange={(event) =>
-                    setCalorieForm({
+                    setCalorieForm((current) => ({
+                      ...current,
                       caloriesConsumed: event.target.value,
-                    })
+                    }))
                   }
                   placeholder="e.g. 2300"
                 />
                 <small>Single daily total only. No food database or meal breakdown needed.</small>
+              </label>
+
+              <label className="field">
+                <span>Notes (optional)</span>
+                <textarea
+                  className="text-area"
+                  rows={3}
+                  maxLength={500}
+                  value={calorieForm.notes}
+                  onChange={(event) =>
+                    setCalorieForm((current) => ({
+                      ...current,
+                      notes: event.target.value,
+                    }))
+                  }
+                  placeholder="Short context if today’s intake was unusual."
+                />
               </label>
 
               <div className="feedback-stack">
@@ -852,6 +930,67 @@ export function DashboardPage() {
                 ) : null}
               </div>
             </form>
+          )}
+        </div>
+
+        <div className="panel dashboard-panel-weekly">
+          <div className="panel-header">
+            <div>
+              <h2>Training score</h2>
+              <p>Daily and weekly score built from activity, recovery, fueling, and goal alignment.</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <StateCard title="Loading training score" description="Scoring activity, recovery, and fueling alignment." loading />
+          ) : errorMessage ? (
+            <StateCard title="Training score unavailable" description={errorMessage} tone="error" />
+          ) : (
+            <>
+              <div className="dashboard-readiness-summary dashboard-readiness-summary-logged">
+                <div>
+                  <span className="stat-label">Today</span>
+                  <strong>{trainingScore.score}/100 • {trainingScore.label}</strong>
+                  <p className="stat-subtext">{trainingScore.summary}</p>
+                </div>
+                <div className="dashboard-readiness-score">
+                  <span>Week</span>
+                  <strong>{weeklyTrainingScore.averageScore}/100</strong>
+                </div>
+              </div>
+
+              <div className="dashboard-metric-list dashboard-weekly-grid">
+                <div className="dashboard-metric-card dashboard-weekly-card">
+                  <span className="stat-label">Activity</span>
+                  <strong>{trainingScore.breakdown.activity}</strong>
+                  <span className="stat-subtext">Training or smart rest for today</span>
+                </div>
+                <div className="dashboard-metric-card dashboard-weekly-card">
+                  <span className="stat-label">Recovery</span>
+                  <strong>{trainingScore.breakdown.recovery}</strong>
+                  <span className="stat-subtext">Readiness and fatigue alignment</span>
+                </div>
+                <div className="dashboard-metric-card dashboard-weekly-card">
+                  <span className="stat-label">Fueling</span>
+                  <strong>{trainingScore.breakdown.fueling}</strong>
+                  <span className="stat-subtext">Calorie balance against today&apos;s workload</span>
+                </div>
+                <div className="dashboard-metric-card dashboard-weekly-card">
+                  <span className="stat-label">Goal alignment</span>
+                  <strong>{trainingScore.breakdown.alignment}</strong>
+                  <span className="stat-subtext">Consistency against your current phase and weekly target</span>
+                </div>
+              </div>
+
+              <div className="assistant-list">
+                {trainingScore.highlights.map((highlight, index) => (
+                  <div key={`${index}-${highlight}`} className="assistant-list-item">
+                    <strong>{weeklyTrainingScore.label}</strong>
+                    <span>{highlight}</span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
@@ -1050,7 +1189,7 @@ function ForgeStatCard({
   description,
   trend,
 }: {
-  tone: 'lime' | 'blue' | 'teal' | 'violet'
+  tone: 'lime' | 'blue' | 'teal' | 'violet' | 'amber'
   label: string
   value: string
   unit?: string

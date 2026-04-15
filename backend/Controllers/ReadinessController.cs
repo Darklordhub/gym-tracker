@@ -39,6 +39,22 @@ public class ReadinessController : ControllerBase
         return Ok(MapLog(log));
     }
 
+    [HttpGet("recent")]
+    public async Task<ActionResult<IEnumerable<ReadinessLogResponse>>> GetRecent([FromQuery] int days = 7)
+    {
+        var normalizedDays = Math.Clamp(days, 1, 60);
+        var userId = User.GetRequiredUserId();
+        var startDate = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(-(normalizedDays - 1)));
+        var logs = await _dbContext.UserReadinessLogs
+            .AsNoTracking()
+            .Where(entry => entry.UserId == userId && entry.Date >= startDate)
+            .OrderByDescending(entry => entry.Date)
+            .ThenByDescending(entry => entry.UpdatedAt)
+            .ToListAsync();
+
+        return Ok(logs.Select(MapLog));
+    }
+
     [HttpPost]
     public async Task<ActionResult<ReadinessLogResponse>> UpsertLog(ReadinessLogRequest request)
     {

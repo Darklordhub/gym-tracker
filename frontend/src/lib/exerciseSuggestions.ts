@@ -3,6 +3,7 @@ import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings } from '../types/goals'
 import type { ReadinessLog } from '../types/readiness'
 import type { DailyCalorieBalance } from './calorieBalance'
+import type { DailyTrainingScore } from './trainingScore'
 import { countWorkoutsInWeek } from './workoutMetrics'
 
 export type ExerciseSuggestion = {
@@ -127,6 +128,7 @@ export function getWorkoutAssistantInsight(
   cycleGuidance?: CycleGuidance | null,
   readinessLog?: ReadinessLog | null,
   calorieBalance?: DailyCalorieBalance | null,
+  trainingScore?: DailyTrainingScore | null,
   now = new Date(),
 ): WorkoutAssistantInsight {
   const workoutsThisWeek = countWorkoutsInWeek(workouts, now)
@@ -160,7 +162,7 @@ export function getWorkoutAssistantInsight(
 
   return {
     weeklyNudge,
-    todaySuggestion: getDailyTrainingSuggestion(workouts, cycleGuidance, readinessLog, calorieBalance, now),
+    todaySuggestion: getDailyTrainingSuggestion(workouts, cycleGuidance, readinessLog, calorieBalance, trainingScore, now),
     prOpportunity: prOpportunity
       ? {
           exerciseName: prOpportunity.exerciseName,
@@ -180,6 +182,7 @@ export function getDailyTrainingSuggestion(
   cycleGuidance?: CycleGuidance | null,
   readinessLog?: ReadinessLog | null,
   calorieBalance?: DailyCalorieBalance | null,
+  trainingScore?: DailyTrainingScore | null,
   now = new Date(),
 ) {
   const recentWindowStart = new Date(now)
@@ -232,133 +235,150 @@ export function getDailyTrainingSuggestion(
     calorieBalance.netBalanceCalories >= 250
 
   if (lowEnergyAvailability && (highTrainingLoad || highFatigueSignals || readiness?.level === 'low')) {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'rest' as const,
       title: 'Recovery should lead today',
       message:
         'You are in a deeper calorie deficit and recovery signals are already under pressure. Rest or keep movement very light instead of forcing another demanding session.',
-    }
+    }, trainingScore)
   }
 
   if (lowEnergyAvailability) {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'cardio' as const,
       title: 'Keep training lighter today',
       message:
         'Today’s calorie balance is running low for harder work. Easy cardio or a shorter controlled session is a better fit than pushing intensity.',
-    }
+    }, trainingScore)
   }
 
   if (readiness?.level === 'low') {
     if (highTrainingLoad || highFatigueSignals) {
-      return {
+      return appendTrainingScoreContext({
         trainingType: 'rest' as const,
         title: 'Recovery should lead today',
         message:
           'Today’s check-in points to low readiness, and your broader recovery signals are not asking for more stress. Rest or keep movement very light.',
-      }
+      }, trainingScore)
     }
 
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'cardio' as const,
       title: 'Keep it easy today',
       message:
         'Today’s check-in points to lower readiness. Easy cardio or a short walk is a better fit than a demanding strength session.',
-    }
+    }, trainingScore)
   }
 
   if (highFatigueSignals && highTrainingLoad) {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'rest' as const,
       title: 'Rest or keep movement very light',
       message:
         readiness?.level === 'high'
           ? 'You feel ready, but recent load and fatigue signals are still pointing toward recovery. Keep today light rather than forcing another hard session.'
           : 'Recent load is already high and your recovery signals look strained. A full rest day or a short easy walk is the better call today.',
-    }
+    }, trainingScore)
   }
 
   if (highFatigueSignals) {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'cardio' as const,
       title: 'Low-intensity cardio fits better today',
       message:
         readiness?.level === 'high'
           ? 'Your check-in looks solid, but broader fatigue signals still favor a walk, easy cycle, or other low-intensity cardio over a hard strength session.'
           : 'Recovery signals look softer today. A walk, easy cycle, or other low-intensity cardio session is likely a better fit than another hard strength workout.',
-    }
+    }, trainingScore)
   }
 
   if (readiness?.level === 'medium' && moderateTrainingLoad) {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'cardio' as const,
       title: 'Choose a moderate day',
       message:
         'Today’s check-in is steady rather than sharp, and recent load is already building. Recovery cardio or a controlled strength session would both make sense.',
-    }
+    }, trainingScore)
   }
 
   if (moderateTrainingLoad) {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'cardio' as const,
       title: 'Recovery cardio is a solid option',
       message:
         'Recent strength load is building. Low-intensity cardio can keep you moving without stacking another demanding lifting session.',
-    }
+    }, trainingScore)
   }
 
   if (lowFatigueSignals) {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'strength' as const,
       title: 'Strength work looks well supported',
       message:
         cycleGuidance?.estimatedCurrentPhase === 'Follicular' || cycleGuidance?.estimatedCurrentPhase === 'Ovulatory'
           ? 'Recovery looks solid and this phase can often tolerate harder work well. Strength or higher-intensity work is reasonable if the session feels sharp.'
           : 'Recovery looks good and recent load is manageable. A focused strength session should fit well today.',
-    }
+    }, trainingScore)
   }
 
   if (energySurplus && readiness?.level === 'high') {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'strength' as const,
       title: 'You are well fueled for strength work',
       message:
         'Readiness looks strong and today’s calorie balance is supportive. A focused strength session or a higher-quality main lift should fit well.',
-    }
+    }, trainingScore)
   }
 
   if (readiness?.level === 'high') {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'strength' as const,
       title: 'You look ready for strength work',
       message:
         'Today’s check-in looks strong and recent load is manageable. A focused strength session or a higher-quality main lift should fit well.',
-    }
+    }, trainingScore)
   }
 
   if (readiness?.level === 'medium') {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'cardio' as const,
       title: 'A balanced session fits best',
       message:
         'Today’s check-in looks steady. Moderate cardio or a controlled strength session both fit, but there is no strong case for pushing hard.',
-    }
+    }, trainingScore)
   }
 
   if (recentWorkouts.length === 0) {
-    return {
+    return appendTrainingScoreContext({
       trainingType: 'strength' as const,
       title: 'Start with a manageable session',
       message:
         'You do not have much recent training load yet. A straightforward strength session is a good default if energy feels normal.',
-    }
+    }, trainingScore)
   }
 
-  return {
+  return appendTrainingScoreContext({
     trainingType: 'cardio' as const,
     title: 'Cardio is the balanced option today',
     message:
       'Recent load is manageable, and cardio is a balanced way to stay active without asking for as much recovery as another full strength day.',
+  }, trainingScore)
+}
+
+function appendTrainingScoreContext(
+  result: { trainingType: 'strength' | 'cardio' | 'rest'; title: string; message: string },
+  trainingScore?: DailyTrainingScore | null,
+) {
+  if (!trainingScore) {
+    return result
+  }
+
+  const scorePrefix = `Training score ${trainingScore.score}/100.`
+  const reason = trainingScore.highlights[0]
+
+  return {
+    ...result,
+    message: `${scorePrefix} ${result.message}${reason ? ` ${reason}` : ''}`,
   }
 }
 

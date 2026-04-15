@@ -83,6 +83,10 @@ public class AppDbContext : DbContext
             .Property(log => log.Notes)
             .HasMaxLength(500);
 
+        modelBuilder.Entity<UserCalorieLog>()
+            .Property(log => log.Notes)
+            .HasMaxLength(500);
+
         modelBuilder.Entity<GoalSettings>()
             .Property(goalSettings => goalSettings.CalorieTargetMode)
             .HasMaxLength(20)

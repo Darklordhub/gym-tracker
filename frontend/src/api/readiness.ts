@@ -14,6 +14,13 @@ export async function fetchLatestReadinessLog() {
   }
 }
 
+export async function fetchRecentReadinessLogs(days = 7) {
+  const response = await apiClient.get<ReadinessLog[]>('/Readiness/recent', {
+    params: { days },
+  })
+  return response.data
+}
+
 export async function upsertReadinessLog(payload: ReadinessLogPayload) {
   const response = await apiClient.post<ReadinessLog>('/Readiness', payload)
   return response.data

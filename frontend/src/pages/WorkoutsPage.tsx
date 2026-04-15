@@ -20,6 +20,7 @@ import { getWorkoutAssistantInsight, getSuggestedNextWeight } from '../lib/exerc
 import { buildDailyCalorieBalance } from '../lib/calorieBalance'
 import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
+import { buildDailyTrainingScore } from '../lib/trainingScore'
 import type { CycleGuidance } from '../types/cycle'
 import type { CalorieLog } from '../types/calories'
 import type { GoalSettings } from '../types/goals'
@@ -326,10 +327,22 @@ export function WorkoutsPage() {
     () => buildDailyCalorieBalance(workouts, goals, calorieLog, getTodayDateValue()),
     [calorieLog, goals, workouts],
   )
+  const trainingScore = useMemo(
+    () =>
+      buildDailyTrainingScore({
+        workouts,
+        goals,
+        calorieLog,
+        readinessLog,
+        cycleGuidance,
+        date: getTodayDateValue(),
+      }).score,
+    [calorieLog, cycleGuidance, goals, readinessLog, workouts],
+  )
 
   const assistantInsight = useMemo(
-    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog, calorieBalance),
-    [calorieBalance, cycleGuidance, goals, readinessLog, workouts],
+    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog, calorieBalance, trainingScore),
+    [calorieBalance, cycleGuidance, goals, readinessLog, trainingScore, workouts],
   )
 
   async function loadData() {
