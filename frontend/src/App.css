@@ -4178,10 +4178,7 @@
 
 @media (max-width: 900px) {
   .shell-backdrop {
-    background:
-      radial-gradient(circle at top right, color-mix(in srgb, var(--tone-blue) 12%, transparent), transparent 24%),
-      radial-gradient(circle at bottom left, color-mix(in srgb, var(--accent-strong) 10%, transparent), transparent 28%),
-      rgba(4, 6, 10, 0.76);
+    background: var(--mobile-backdrop-bg);
     backdrop-filter: blur(14px) saturate(110%);
     transition:
       opacity 220ms ease,
@@ -4203,14 +4200,8 @@
     gap: 18px;
     padding: 20px 16px 18px;
     border-radius: 30px;
-    background:
-      radial-gradient(circle at top right, rgba(79, 143, 255, 0.1), transparent 24%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 16%),
-      linear-gradient(180deg, rgba(212, 241, 74, 0.035), transparent 30%),
-      rgba(10, 12, 17, 0.9);
-    box-shadow:
-      0 30px 70px rgba(0, 0, 0, 0.42),
-      var(--shadow);
+    background: var(--mobile-sidebar-bg);
+    box-shadow: var(--mobile-sidebar-shadow);
   }
 
   .sidebar-section {
@@ -4221,16 +4212,37 @@
     min-height: 68px;
     padding: 14px;
     border-radius: 20px;
+    background: var(--mobile-sidebar-link-bg);
   }
 
   .sidebar-link:active {
     transform: scale(0.985);
   }
 
+  .sidebar-link:hover {
+    border-color: var(--mobile-sidebar-link-hover-border);
+    background: var(--mobile-sidebar-link-hover-bg);
+  }
+
+  .sidebar-link-active {
+    border-color: var(--mobile-sidebar-link-active-border);
+    background: var(--mobile-sidebar-link-active-bg);
+    box-shadow: var(--mobile-sidebar-link-active-shadow);
+  }
+
   .sidebar-link-icon {
     width: 44px;
     height: 44px;
     border-radius: 16px;
+    border-color: var(--mobile-sidebar-icon-border);
+    background: var(--mobile-sidebar-icon-bg);
+    color: var(--mobile-sidebar-icon-color);
+  }
+
+  .sidebar-link-active .sidebar-link-icon {
+    border-color: var(--mobile-sidebar-icon-active-border);
+    background: var(--mobile-sidebar-icon-active-bg);
+    color: var(--mobile-sidebar-icon-active-color);
   }
 
   .account-panel {

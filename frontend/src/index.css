@@ -79,6 +79,32 @@
   --notification-indicator-ring: rgba(7, 8, 10, 0.92);
   --auth-shell-glow-primary: rgba(212, 241, 74, 0.08);
   --auth-shell-glow-secondary: rgba(79, 143, 255, 0.08);
+  --mobile-backdrop-bg:
+    radial-gradient(circle at top right, rgba(79, 143, 255, 0.12), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(212, 241, 74, 0.1), transparent 28%),
+    rgba(4, 6, 10, 0.76);
+  --mobile-sidebar-bg:
+    radial-gradient(circle at top right, rgba(79, 143, 255, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 16%),
+    linear-gradient(180deg, rgba(212, 241, 74, 0.035), transparent 30%),
+    rgba(10, 12, 17, 0.9);
+  --mobile-sidebar-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.42),
+    0 30px 80px rgba(0, 0, 0, 0.45);
+  --mobile-sidebar-link-bg: transparent;
+  --mobile-sidebar-link-hover-bg: rgba(255, 255, 255, 0.04);
+  --mobile-sidebar-link-hover-border: rgba(255, 255, 255, 0.08);
+  --mobile-sidebar-link-active-bg:
+    linear-gradient(135deg, rgba(212, 241, 74, 0.14), transparent 72%),
+    rgba(255, 255, 255, 0.04);
+  --mobile-sidebar-link-active-border: rgba(212, 241, 74, 0.22);
+  --mobile-sidebar-link-active-shadow: inset 0 0 0 1px rgba(212, 241, 74, 0.06);
+  --mobile-sidebar-icon-bg: rgba(255, 255, 255, 0.06);
+  --mobile-sidebar-icon-border: rgba(255, 255, 255, 0.08);
+  --mobile-sidebar-icon-color: #f5f7fb;
+  --mobile-sidebar-icon-active-bg: rgba(212, 241, 74, 0.12);
+  --mobile-sidebar-icon-active-border: rgba(212, 241, 74, 0.2);
+  --mobile-sidebar-icon-active-color: #d4f14a;
   --space-1: 0.375rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -188,6 +214,33 @@
   --notification-indicator-ring: rgba(247, 250, 253, 0.94);
   --auth-shell-glow-primary: rgba(181, 211, 39, 0.1);
   --auth-shell-glow-secondary: rgba(53, 111, 216, 0.08);
+  --mobile-backdrop-bg:
+    radial-gradient(circle at top right, rgba(53, 111, 216, 0.08), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(181, 211, 39, 0.08), transparent 28%),
+    rgba(18, 28, 39, 0.28);
+  --mobile-sidebar-bg:
+    radial-gradient(circle at top right, rgba(53, 111, 216, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 249, 253, 0.94)),
+    rgba(246, 250, 253, 0.96);
+  --mobile-sidebar-shadow:
+    0 26px 56px rgba(33, 50, 72, 0.18),
+    0 10px 24px rgba(33, 50, 72, 0.09);
+  --mobile-sidebar-link-bg: transparent;
+  --mobile-sidebar-link-hover-bg: rgba(39, 56, 77, 0.05);
+  --mobile-sidebar-link-hover-border: rgba(29, 42, 58, 0.12);
+  --mobile-sidebar-link-active-bg:
+    linear-gradient(135deg, rgba(181, 211, 39, 0.16), rgba(53, 111, 216, 0.04) 78%),
+    rgba(255, 255, 255, 0.92);
+  --mobile-sidebar-link-active-border: rgba(181, 211, 39, 0.28);
+  --mobile-sidebar-link-active-shadow:
+    inset 0 0 0 1px rgba(181, 211, 39, 0.12),
+    0 10px 24px rgba(33, 50, 72, 0.08);
+  --mobile-sidebar-icon-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(243, 248, 252, 0.9));
+  --mobile-sidebar-icon-border: rgba(29, 42, 58, 0.14);
+  --mobile-sidebar-icon-color: #223140;
+  --mobile-sidebar-icon-active-bg: rgba(181, 211, 39, 0.14);
+  --mobile-sidebar-icon-active-border: rgba(181, 211, 39, 0.24);
+  --mobile-sidebar-icon-active-color: #7a9713;
   background:
     radial-gradient(circle at top left, var(--page-glow-warm), transparent 28%),
     radial-gradient(circle at bottom right, var(--page-glow-cool), transparent 30%),
