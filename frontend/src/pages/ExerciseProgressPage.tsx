@@ -486,9 +486,10 @@ export function ExerciseProgressPage() {
                 <strong>
                   {isLoadingOverloadRecommendation
                     ? 'Loading...'
-                    : overloadRecommendation?.recommendedWeightKg !== null &&
-                        overloadRecommendation?.recommendedWeightKg !== undefined
-                      ? `${overloadRecommendation.recommendedWeightKg} kg`
+                    : overloadRecommendation
+                      ? overloadRecommendation.recommendedWeightKg !== null
+                        ? `${overloadRecommendation.recommendedWeightKg} kg`
+                        : 'No target yet'
                       : suggestion
                         ? `${suggestion.suggestedWeightKg} kg`
                         : 'No suggestion yet'}

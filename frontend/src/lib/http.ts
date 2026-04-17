@@ -76,11 +76,6 @@ export function getRequestErrorMessage(error: unknown, fallbackMessage: string) 
       return apiMessage
     }
 
-    const apiTitle = error.response?.data?.title
-    if (typeof apiTitle === 'string' && apiTitle.trim()) {
-      return apiTitle
-    }
-
     const apiErrors = error.response?.data?.errors
 
     if (apiErrors && typeof apiErrors === 'object') {
@@ -88,6 +83,11 @@ export function getRequestErrorMessage(error: unknown, fallbackMessage: string) 
       if (typeof firstError === 'string') {
         return firstError
       }
+    }
+
+    const apiTitle = error.response?.data?.title
+    if (typeof apiTitle === 'string' && apiTitle.trim()) {
+      return apiTitle
     }
   }
 

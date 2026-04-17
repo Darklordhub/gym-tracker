@@ -31,27 +31,34 @@ public class ProgressiveOverloadService
             .Where(entry =>
                 entry.Workout != null &&
                 entry.Workout.UserId == userId &&
-                entry.Workout.WorkoutType != "cardio" &&
+                entry.Workout.WorkoutType.ToLower() != "cardio" &&
                 entry.ExerciseName.ToUpper() == normalizedExerciseName)
             .Include(entry => entry.Workout)
             .Include(entry => entry.Sets)
             .OrderByDescending(entry => entry.Workout!.Date)
             .ThenByDescending(entry => entry.WorkoutId)
-            .Take(5)
+            .Take(20)
             .ToListAsync();
 
         var sessions = entries
             .Where(entry => entry.Workout is not null && entry.Sets.Count > 0)
-            .Select(entry => new ExerciseSession(
-                entry.WorkoutId,
-                entry.Workout!.Date,
-                entry.Sets.Max(set => set.WeightKg),
-                entry.Sets
-                    .Where(set => set.WeightKg == entry.Sets.Max(currentSet => currentSet.WeightKg))
-                    .Max(set => set.Reps),
-                entry.Sets.Sum(set => set.Reps * set.WeightKg)))
+            .GroupBy(entry => entry.WorkoutId)
+            .Select(group =>
+            {
+                var workout = group.First().Workout!;
+                var sets = group.SelectMany(entry => entry.Sets).ToList();
+                var topWeight = sets.Max(set => set.WeightKg);
+
+                return new ExerciseSession(
+                    group.Key,
+                    workout.Date,
+                    topWeight,
+                    sets.Where(set => set.WeightKg == topWeight).Max(set => set.Reps),
+                    sets.Sum(set => set.Reps * set.WeightKg));
+            })
             .OrderByDescending(session => session.Date)
             .ThenByDescending(session => session.WorkoutId)
+            .Take(5)
             .ToList();
 
         if (sessions.Count == 0)
@@ -84,6 +91,7 @@ public class ProgressiveOverloadService
             latest.TopWeightKg < previous.Min(session => session.TopWeightKg) * 0.95m ||
             latest.Volume < previousAverageVolume * 0.85m;
         var consistentlySuccessful =
+            latest.TopWeightKg > 0m &&
             latest.TopWeightKg >= previous.Max(session => session.TopWeightKg) &&
             latest.TopReps >= 8 &&
             recentThree.Count(session => session.TopReps >= 8) >= 2;
@@ -164,12 +172,18 @@ public class ProgressiveOverloadService
 
     private static decimal GetConservativeIncrement(decimal weightKg)
     {
+        if (weightKg < 10m)
+        {
+            return 1m;
+        }
+
         return weightKg >= 100m ? 5m : 2.5m;
     }
 
     private static decimal RoundToNearestIncrement(decimal weightKg)
     {
-        return decimal.Round(weightKg / 2.5m, 0, MidpointRounding.AwayFromZero) * 2.5m;
+        var increment = weightKg < 10m ? 0.5m : 2.5m;
+        return decimal.Round(weightKg / increment, 0, MidpointRounding.AwayFromZero) * increment;
     }
 
     private static string NormalizeExerciseName(string? exerciseName)

@@ -15,7 +15,9 @@ public class CalorieLogRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (Date > DateOnly.FromDateTime(DateTime.UtcNow))
+        var latestAllowedDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+
+        if (Date > latestAllowedDate)
         {
             yield return new ValidationResult("Calorie log date cannot be in the future.", [nameof(Date)]);
         }
