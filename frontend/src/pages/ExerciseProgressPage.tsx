@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { fetchProgressiveOverloadRecommendation } from '../api/progressiveOverload'
 import { fetchWorkouts } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
 import { getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
+import type { ProgressiveOverloadRecommendation } from '../types/progressiveOverload'
 import type { CardioActivityType, CardioIntensity, Workout } from '../types/workout'
 
 type ProgressMode = 'strength' | 'cardio'
@@ -39,11 +41,25 @@ export function ExerciseProgressPage() {
   const [historyDateFrom, setHistoryDateFrom] = useState('')
   const [historyDateTo, setHistoryDateTo] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingOverloadRecommendation, setIsLoadingOverloadRecommendation] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [overloadRecommendation, setOverloadRecommendation] = useState<ProgressiveOverloadRecommendation | null>(null)
+  const [overloadErrorMessage, setOverloadErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     void loadWorkouts()
   }, [])
+
+  useEffect(() => {
+    if (selectedMode !== 'strength' || !selectedItem) {
+      setOverloadRecommendation(null)
+      setOverloadErrorMessage(null)
+      setIsLoadingOverloadRecommendation(false)
+      return
+    }
+
+    void loadOverloadRecommendation(selectedItem)
+  }, [selectedItem, selectedMode])
 
   const strengthExerciseNames = useMemo(
     () =>
@@ -293,6 +309,19 @@ export function ExerciseProgressPage() {
     }
   }
 
+  async function loadOverloadRecommendation(exerciseName: string) {
+    try {
+      setIsLoadingOverloadRecommendation(true)
+      setOverloadErrorMessage(null)
+      setOverloadRecommendation(await fetchProgressiveOverloadRecommendation(exerciseName))
+    } catch (error) {
+      setOverloadRecommendation(null)
+      setOverloadErrorMessage(getRequestErrorMessage(error, 'Unable to load progressive overload guidance.'))
+    } finally {
+      setIsLoadingOverloadRecommendation(false)
+    }
+  }
+
   const currentChartDescription =
     selectedMode === 'strength'
       ? 'Weight lifted over time for the selected exercise.'
@@ -453,10 +482,26 @@ export function ExerciseProgressPage() {
               </div>
 
               <div className="suggestion-card hero-suggestion-card progress-suggestion-panel">
-                <span className="stat-label">Suggested next weight</span>
-                <strong>{suggestion ? `${suggestion.suggestedWeightKg} kg` : 'No suggestion yet'}</strong>
+                <span className="stat-label">Progressive overload target</span>
+                <strong>
+                  {isLoadingOverloadRecommendation
+                    ? 'Loading...'
+                    : overloadRecommendation?.recommendedWeightKg !== null &&
+                        overloadRecommendation?.recommendedWeightKg !== undefined
+                      ? `${overloadRecommendation.recommendedWeightKg} kg`
+                      : suggestion
+                        ? `${suggestion.suggestedWeightKg} kg`
+                        : 'No suggestion yet'}
+                </strong>
                 <span className="stat-subtext">
-                  {suggestion ? suggestion.reason : 'Log this exercise to generate a recommendation.'}
+                  {overloadErrorMessage ??
+                    overloadRecommendation?.shortReason ??
+                    (suggestion ? suggestion.reason : 'Log this exercise to generate a recommendation.')}
+                </span>
+                <span className="record-hint">
+                  {overloadRecommendation
+                    ? `${formatProgressionStatus(overloadRecommendation.progressionStatus)} • ${overloadRecommendation.recommendedRepTarget}`
+                    : suggestion?.confidenceLabel ?? 'Uses recent exercise history.'}
                 </span>
               </div>
             </div>
@@ -984,6 +1029,17 @@ function getTrendClassName(change: number | null) {
   }
 
   return change > 0 ? 'trend-up' : 'trend-down'
+}
+
+function formatProgressionStatus(status: ProgressiveOverloadRecommendation['progressionStatus']) {
+  switch (status) {
+    case 'increase':
+      return 'Increase'
+    case 'deload':
+      return 'Deload'
+    case 'hold':
+      return 'Hold'
+  }
 }
 
 function formatCardioActivityType(activityType: CardioActivityType) {

@@ -45,6 +45,7 @@ builder.Services.AddSingleton<PasswordHasher<AppUser>>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<LegacyDataMigrationService>();
 builder.Services.AddScoped<TrainingIntelligenceService>();
+builder.Services.AddScoped<ProgressiveOverloadService>();
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>
