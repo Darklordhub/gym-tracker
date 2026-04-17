@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchCycleGuidance } from '../api/cycle'
 import { fetchLatestCalorieLog } from '../api/calories'
 import { fetchGoals } from '../api/goals'
+import { fetchProgressiveOverloadRecommendation } from '../api/progressiveOverload'
 import { fetchLatestReadinessLog } from '../api/readiness'
 import {
   completeActiveWorkoutSession,
@@ -24,6 +25,7 @@ import { buildDailyTrainingScore } from '../lib/trainingScore'
 import type { CycleGuidance } from '../types/cycle'
 import type { CalorieLog } from '../types/calories'
 import type { GoalSettings } from '../types/goals'
+import type { ProgressiveOverloadRecommendation } from '../types/progressiveOverload'
 import type { ReadinessLog } from '../types/readiness'
 import type {
   ActiveWorkoutSession,
@@ -67,6 +69,12 @@ type WorkoutFormErrors = {
 
 type TemplateFormErrors = {
   name?: string
+}
+
+type OverloadRecommendationState = {
+  status: 'loading' | 'loaded' | 'error'
+  recommendation: ProgressiveOverloadRecommendation | null
+  errorMessage?: string
 }
 
 type CardioFormState = {
@@ -203,6 +211,10 @@ function toExercisePayload(exerciseEntries: ExerciseFormState[]): ExerciseEntryP
   }))
 }
 
+function normalizeExerciseName(exerciseName: string) {
+  return exerciseName.trim().toUpperCase()
+}
+
 function mapSessionToForm(session: ActiveWorkoutSession): WorkoutFormState {
   return {
     date: session.startedAtUtc.slice(0, 10),
@@ -267,6 +279,9 @@ export function WorkoutsPage() {
   const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [overloadRecommendations, setOverloadRecommendations] = useState<
+    Record<string, OverloadRecommendationState>
+  >({})
 
   useEffect(() => {
     void loadData()
@@ -344,6 +359,89 @@ export function WorkoutsPage() {
     () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog, calorieBalance, trainingScore),
     [calorieBalance, cycleGuidance, goals, readinessLog, trainingScore, workouts],
   )
+
+  const selectedExerciseRequests = useMemo(() => {
+    const requests = new Map<string, string>()
+
+    for (const exercise of [...quickLogForm.exerciseEntries, ...activeForm.exerciseEntries]) {
+      const exerciseName = exercise.exerciseName.trim()
+      const key = normalizeExerciseName(exerciseName)
+
+      if (key.length >= 3 && !requests.has(key)) {
+        requests.set(key, exerciseName)
+      }
+    }
+
+    return Array.from(requests, ([key, exerciseName]) => ({ key, exerciseName }))
+  }, [activeForm.exerciseEntries, quickLogForm.exerciseEntries])
+
+  useEffect(() => {
+    let isCancelled = false
+    const pendingRequests = selectedExerciseRequests.filter(
+      ({ key }) => overloadRecommendations[key] === undefined,
+    )
+
+    if (pendingRequests.length === 0) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      for (const { key, exerciseName } of pendingRequests) {
+        setOverloadRecommendations((current) => {
+          if (current[key]) {
+            return current
+          }
+
+          return {
+            ...current,
+            [key]: {
+              status: 'loading',
+              recommendation: null,
+            },
+          }
+        })
+
+        void fetchProgressiveOverloadRecommendation(exerciseName)
+          .then((recommendation) => {
+            if (isCancelled) {
+              return
+            }
+
+            setOverloadRecommendations((current) => ({
+              ...current,
+              [key]: {
+                status: 'loaded',
+                recommendation,
+              },
+            }))
+          })
+          .catch((error) => {
+            if (isCancelled) {
+              return
+            }
+
+            setOverloadRecommendations((current) => ({
+              ...current,
+              [key]: {
+                status: 'error',
+                recommendation: null,
+                errorMessage: getRequestErrorMessage(error, 'Progressive overload guidance is unavailable.'),
+              },
+            }))
+          })
+      }
+    }, 350)
+
+    return () => {
+      isCancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [overloadRecommendations, selectedExerciseRequests])
+
+  function getOverloadRecommendationState(exerciseName: string) {
+    const key = normalizeExerciseName(exerciseName)
+    return key ? overloadRecommendations[key] : undefined
+  }
 
   async function loadData() {
     try {
@@ -942,6 +1040,7 @@ export function WorkoutsPage() {
                           exercise={exercise}
                           errors={activeErrors.exercises[exerciseIndex]}
                           workouts={workouts}
+                          overloadState={getOverloadRecommendationState(exercise.exerciseName)}
                           onExerciseChange={(field, value) =>
                             updateExercise('active', exerciseIndex, field, value)
                           }
@@ -1093,6 +1192,7 @@ export function WorkoutsPage() {
                       exercise={exercise}
                       errors={quickLogErrors.exercises[exerciseIndex]}
                       workouts={workouts}
+                      overloadState={getOverloadRecommendationState(exercise.exerciseName)}
                       onExerciseChange={(field, value) =>
                         updateExercise('quick', exerciseIndex, field, value)
                       }
@@ -1573,6 +1673,7 @@ function ExerciseEditorCard({
   exercise,
   errors,
   workouts,
+  overloadState,
   onExerciseChange,
   onSetChange,
   onAddSet,
@@ -1584,6 +1685,7 @@ function ExerciseEditorCard({
   exercise: ExerciseFormState
   errors?: ExerciseFieldErrors
   workouts: Workout[]
+  overloadState?: OverloadRecommendationState
   onExerciseChange: (field: keyof ExerciseFormState, value: string) => void
   onSetChange: (setIndex: number, field: keyof ExerciseSetFormState, value: string) => void
   onAddSet: () => void
@@ -1617,6 +1719,13 @@ function ExerciseEditorCard({
         {errors?.exerciseName ? <small className="field-error">{errors.exerciseName}</small> : null}
       </label>
 
+      {normalizeExerciseName(exercise.exerciseName).length >= 3 ? (
+        <ExerciseSuggestionNotice
+          overloadState={overloadState}
+          fallbackSuggestion={getSuggestedNextWeight(workouts, exercise.exerciseName, null, null)}
+        />
+      ) : null}
+
       <div className="section-title-row compact-row">
         <div>
           <h3>Sets</h3>
@@ -1647,17 +1756,6 @@ function ExerciseEditorCard({
                 </button>
               ) : null}
             </div>
-
-            {exercise.exerciseName.trim() ? (
-              <ExerciseSuggestionNotice
-                suggestion={getSuggestedNextWeight(
-                  workouts,
-                  exercise.exerciseName,
-                  setIndex + 1,
-                  !set.reps.trim() || Number.isNaN(Number(set.reps)) ? null : Number(set.reps),
-                )}
-              />
-            ) : null}
 
             <div className="exercise-fields">
               <label className="field">
@@ -1705,14 +1803,62 @@ function ExerciseEditorCard({
 }
 
 function ExerciseSuggestionNotice({
-  suggestion,
+  overloadState,
+  fallbackSuggestion,
 }: {
-  suggestion: ReturnType<typeof getSuggestedNextWeight>
+  overloadState?: OverloadRecommendationState
+  fallbackSuggestion: ReturnType<typeof getSuggestedNextWeight>
 }) {
-  if (!suggestion) {
+  if (!overloadState || overloadState.status === 'loading') {
     return (
       <div className="suggestion-card">
-        <span className="stat-label">Next Weight Suggestion</span>
+        <span className="stat-label">Progressive overload guidance</span>
+        <strong>Loading target...</strong>
+        <span className="stat-subtext">Checking your recent saved sessions for this exercise.</span>
+      </div>
+    )
+  }
+
+  if (overloadState?.status === 'loaded' && overloadState.recommendation) {
+    const recommendation = overloadState.recommendation
+
+    return (
+      <div className="suggestion-card">
+        <span className="stat-label">Progressive overload guidance</span>
+        <strong>
+          {recommendation.recommendedWeightKg !== null
+            ? `${recommendation.recommendedWeightKg} kg`
+            : 'No target yet'}
+        </strong>
+        <span className="stat-subtext">{recommendation.shortReason}</span>
+        <span className="record-hint">
+          {formatProgressionStatus(recommendation.progressionStatus)} • {recommendation.recommendedRepTarget}
+        </span>
+      </div>
+    )
+  }
+
+  if (overloadState?.status === 'error') {
+    return (
+      <div className="suggestion-card">
+        <span className="stat-label">Progressive overload guidance</span>
+        <strong>Guidance unavailable</strong>
+        <span className="stat-subtext">
+          {fallbackSuggestion
+            ? fallbackSuggestion.reason
+            : overloadState.errorMessage ?? 'Workout logging is still available.'}
+        </span>
+        {fallbackSuggestion?.confidenceLabel ? (
+          <span className="record-hint">Fallback: {fallbackSuggestion.confidenceLabel}</span>
+        ) : null}
+      </div>
+    )
+  }
+
+  if (!fallbackSuggestion) {
+    return (
+      <div className="suggestion-card">
+        <span className="stat-label">Progressive overload guidance</span>
         <strong>No history yet</strong>
         <span className="stat-subtext">Save this exercise once to get a recommendation.</span>
       </div>
@@ -1721,23 +1867,34 @@ function ExerciseSuggestionNotice({
 
   return (
     <div className="suggestion-card">
-      <span className="stat-label">Next Weight Suggestion</span>
-      <strong>{suggestion.suggestedWeightKg} kg</strong>
-      <span className="stat-subtext">{suggestion.reason}</span>
-      {suggestion.confidenceLabel ? (
-        <span className="record-hint">Confidence: {suggestion.confidenceLabel}</span>
+      <span className="stat-label">Progressive overload guidance</span>
+      <strong>{fallbackSuggestion.suggestedWeightKg} kg</strong>
+      <span className="stat-subtext">{fallbackSuggestion.reason}</span>
+      {fallbackSuggestion.confidenceLabel ? (
+        <span className="record-hint">Fallback: {fallbackSuggestion.confidenceLabel}</span>
       ) : null}
-      {suggestion.prOpportunity ? (
+      {fallbackSuggestion.prOpportunity ? (
         <div className="suggestion-callout">
           <span className="pr-badge">PR window</span>
           <span className="stat-subtext">
-            {suggestion.prOpportunity.message}
-            {suggestion.prOpportunity.targetWeightKg
-              ? ` Target ${suggestion.prOpportunity.targetWeightKg} kg.`
+            {fallbackSuggestion.prOpportunity.message}
+            {fallbackSuggestion.prOpportunity.targetWeightKg
+              ? ` Target ${fallbackSuggestion.prOpportunity.targetWeightKg} kg.`
               : ''}
           </span>
         </div>
       ) : null}
     </div>
   )
+}
+
+function formatProgressionStatus(status: ProgressiveOverloadRecommendation['progressionStatus']) {
+  switch (status) {
+    case 'increase':
+      return 'Increase'
+    case 'deload':
+      return 'Deload'
+    case 'hold':
+      return 'Hold'
+  }
 }
