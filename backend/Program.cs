@@ -44,6 +44,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddSingleton<PasswordHasher<AppUser>>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<LegacyDataMigrationService>();
+builder.Services.AddScoped<TrainingIntelligenceService>();
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>

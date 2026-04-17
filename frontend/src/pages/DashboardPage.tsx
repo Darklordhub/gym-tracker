@@ -3,6 +3,7 @@ import { fetchLatestCalorieLog, fetchRecentCalorieLogs, upsertCalorieLog } from 
 import { fetchLatestReadinessLog, fetchRecentReadinessLogs, upsertReadinessLog } from '../api/readiness'
 import { fetchCycleGuidance } from '../api/cycle'
 import { fetchGoals, updateGoals } from '../api/goals'
+import { fetchDailyTrainingRecommendation } from '../api/trainingIntelligence'
 import { fetchWeightEntries } from '../api/weightEntries'
 import { fetchWorkouts } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
@@ -16,6 +17,7 @@ import type { CalorieLog } from '../types/calories'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings, GoalSettingsPayload } from '../types/goals'
 import type { ReadinessLog } from '../types/readiness'
+import type { TrainingRecommendation } from '../types/trainingIntelligence'
 import type { WeightEntry } from '../types/weight'
 import type { Workout } from '../types/workout'
 
@@ -69,6 +71,7 @@ export function DashboardPage() {
   const [calorieMessage, setCalorieMessage] = useState<string | null>(null)
   const [calorieErrorMessage, setCalorieErrorMessage] = useState<string | null>(null)
   const [isEditingCalories, setIsEditingCalories] = useState(false)
+  const [trainingRecommendation, setTrainingRecommendation] = useState<TrainingRecommendation | null>(null)
 
   useEffect(() => {
     void loadDashboard()
@@ -209,6 +212,7 @@ export function DashboardPage() {
         latestCalorieLog,
         recentReadinessData,
         recentCalorieData,
+        dailyTrainingRecommendation,
       ] =
         await Promise.all([
         fetchWorkouts(),
@@ -219,6 +223,7 @@ export function DashboardPage() {
         fetchLatestCalorieLog().catch(() => null),
         fetchRecentReadinessLogs(7).catch(() => []),
         fetchRecentCalorieLogs(7).catch(() => []),
+        fetchDailyTrainingRecommendation().catch(() => null),
       ])
 
       setWorkouts(workoutData)
@@ -229,6 +234,7 @@ export function DashboardPage() {
       setCalorieLog(latestCalorieLog)
       setRecentReadinessLogs(recentReadinessData)
       setRecentCalorieLogs(recentCalorieData)
+      setTrainingRecommendation(dailyTrainingRecommendation)
       if (latestReadinessLog?.date === getTodayDateValue()) {
         setReadinessForm({
           energyLevel: latestReadinessLog.energyLevel,
@@ -253,6 +259,14 @@ export function DashboardPage() {
     }
   }
 
+  async function refreshTrainingRecommendation() {
+    try {
+      setTrainingRecommendation(await fetchDailyTrainingRecommendation())
+    } catch {
+      setTrainingRecommendation(null)
+    }
+  }
+
   async function handleGoalSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -271,6 +285,7 @@ export function DashboardPage() {
 
       const savedGoals = await updateGoals(payload)
       applyGoalState(savedGoals)
+      await refreshTrainingRecommendation()
       setGoalMessage('Goals updated.')
     } catch (error) {
       setGoalErrorMessage(getRequestErrorMessage(error, 'Unable to update goals.'))
@@ -317,6 +332,7 @@ export function DashboardPage() {
       })
       setReadinessMessage(hasTodayReadinessLog ? 'Today’s check-in updated.' : 'Thanks, your check-in is logged for today.')
       setIsEditingReadiness(false)
+      await refreshTrainingRecommendation()
     } catch (error) {
       setReadinessErrorMessage(getRequestErrorMessage(error, 'Unable to save today’s check-in.'))
     } finally {
@@ -352,6 +368,7 @@ export function DashboardPage() {
       })
       setCalorieMessage(hasTodayCalorieLog ? 'Today’s calories updated.' : 'Calories logged for today.')
       setIsEditingCalories(false)
+      await refreshTrainingRecommendation()
     } catch (error) {
       setCalorieErrorMessage(getRequestErrorMessage(error, 'Unable to save today’s calories.'))
     } finally {
@@ -1062,12 +1079,21 @@ export function DashboardPage() {
               </article>
 
               <article className="assistant-card">
-                <span className="stat-label">Today&apos;s training suggestion</span>
-                <strong>{assistantInsight.todaySuggestion.title}</strong>
-                <p>{assistantInsight.todaySuggestion.message}</p>
+                <span className="stat-label">Today&apos;s training intelligence</span>
+                <strong>
+                  {trainingRecommendation
+                    ? `${formatRecommendationType(trainingRecommendation.recommendedSessionType)} • ${formatRecommendationIntensity(trainingRecommendation.intensity)}`
+                    : assistantInsight.todaySuggestion.title}
+                </strong>
+                <p>{trainingRecommendation?.shortReason ?? assistantInsight.todaySuggestion.message}</p>
                 <span className="record-hint">
-                  Recommended focus: {assistantInsight.todaySuggestion.trainingType}
+                  {trainingRecommendation
+                    ? `Fatigue: ${formatRecommendationIntensity(trainingRecommendation.fatigueLevel)} • Load score: ${trainingRecommendation.weeklyLoadScore}/100`
+                    : `Recommended focus: ${assistantInsight.todaySuggestion.trainingType}`}
                 </span>
+                {trainingRecommendation ? (
+                  <span className="record-hint">{trainingRecommendation.goalContext}</span>
+                ) : null}
               </article>
 
               <article className="assistant-card">
@@ -1327,6 +1353,21 @@ function getWeeklyWorkoutGoalProgress(workoutCount: number, weeklyWorkoutTarget:
 
 function formatPhase(fitnessPhase: GoalSettings['fitnessPhase']) {
   return fitnessPhase.charAt(0).toUpperCase() + fitnessPhase.slice(1)
+}
+
+function formatRecommendationType(recommendedSessionType: TrainingRecommendation['recommendedSessionType']) {
+  switch (recommendedSessionType) {
+    case 'strength':
+      return 'Strength'
+    case 'cardio':
+      return 'Cardio'
+    case 'rest':
+      return 'Rest'
+  }
+}
+
+function formatRecommendationIntensity(value: TrainingRecommendation['intensity'] | TrainingRecommendation['fatigueLevel']) {
+  return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 function getDashboardStatus(workoutsThisWeek: number, weeklyWorkoutTarget: number | null) {
