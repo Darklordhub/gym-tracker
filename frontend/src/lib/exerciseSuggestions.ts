@@ -130,6 +130,7 @@ export function getWorkoutAssistantInsight(
   calorieBalance?: DailyCalorieBalance | null,
   trainingScore?: DailyTrainingScore | null,
   now = new Date(),
+  options?: { includeTodaySuggestion?: boolean },
 ): WorkoutAssistantInsight {
   const workoutsThisWeek = countWorkoutsInWeek(workouts, now)
 
@@ -162,7 +163,14 @@ export function getWorkoutAssistantInsight(
 
   return {
     weeklyNudge,
-    todaySuggestion: getDailyTrainingSuggestion(workouts, cycleGuidance, readinessLog, calorieBalance, trainingScore, now),
+    todaySuggestion:
+      options?.includeTodaySuggestion === false
+        ? {
+            trainingType: 'rest',
+            title: 'Training intelligence loading',
+            message: 'Backend training intelligence will provide today’s recommendation.',
+          }
+        : getDailyTrainingSuggestion(workouts, cycleGuidance, readinessLog, calorieBalance, trainingScore, now),
     prOpportunity: prOpportunity
       ? {
           exerciseName: prOpportunity.exerciseName,

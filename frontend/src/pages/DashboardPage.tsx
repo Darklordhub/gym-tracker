@@ -188,7 +188,10 @@ export function DashboardPage() {
     [goals, metrics.latestWeightEntry, recentCalorieLogs, recentReadinessLogs, workouts],
   )
   const assistantInsight = useMemo(
-    () => getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog, calorieBalance, trainingScore),
+    () =>
+      getWorkoutAssistantInsight(workouts, goals, cycleGuidance, readinessLog, calorieBalance, trainingScore, new Date(), {
+        includeTodaySuggestion: false,
+      }),
     [calorieBalance, cycleGuidance, goals, readinessLog, trainingScore, workouts],
   )
 
