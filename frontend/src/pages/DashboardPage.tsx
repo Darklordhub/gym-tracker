@@ -380,7 +380,7 @@ export function DashboardPage() {
   }
 
   return (
-    <main className="page-shell">
+    <main className="page-shell dashboard-os">
       <section className="dashboard-hero-forge">
         <div className="dashboard-hero-main">
           <span className="eyebrow">FORGE / Overview</span>
