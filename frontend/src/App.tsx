@@ -280,7 +280,10 @@ function AppLayout({
     <div className="forge-shell">
       <div className={isMobileNavOpen ? 'shell-backdrop shell-backdrop-visible' : 'shell-backdrop'} onClick={() => setIsMobileNavOpen(false)} aria-hidden="true" />
 
-      <aside className={isMobileNavOpen ? 'app-sidebar app-sidebar-open' : 'app-sidebar'}>
+      <aside
+        id="primary-navigation"
+        className={isMobileNavOpen ? 'app-sidebar app-sidebar-open' : 'app-sidebar'}
+      >
         <div className="sidebar-inner">
           <div className="sidebar-brand">
             <div className="brand-mark" aria-hidden="true">
@@ -303,6 +306,7 @@ function AppLayout({
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  title={item.label}
                   className={({ isActive }) => (isActive ? 'sidebar-link sidebar-link-active' : 'sidebar-link')}
                 >
                   <span className="sidebar-link-icon" aria-hidden="true">

@@ -6269,3 +6269,440 @@
     border-radius: 18px;
   }
 }
+
+/* Training OS shell refinement */
+
+.forge-shell {
+  --shell-sidebar-width: 244px;
+  --shell-sidebar-rail: 82px;
+  background:
+    radial-gradient(circle at 78% 0%, rgba(212, 241, 74, 0.055), transparent 28rem),
+    radial-gradient(circle at 10% 12%, rgba(45, 217, 184, 0.045), transparent 24rem),
+    var(--page-bg);
+}
+
+.app-sidebar {
+  width: var(--shell-sidebar-width);
+  flex-basis: var(--shell-sidebar-width);
+  padding: 10px 8px 10px 10px;
+}
+
+.app-main {
+  margin-left: var(--shell-sidebar-width);
+}
+
+.sidebar-inner {
+  gap: 12px;
+  padding: 14px 10px 12px;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent 34%),
+    rgba(10, 12, 17, 0.82);
+  box-shadow: none;
+}
+
+.sidebar-brand {
+  min-height: 46px;
+  padding: 0 4px 10px;
+}
+
+.sidebar-brand .brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.sidebar-brand .brand-name {
+  font-size: 1.04rem;
+}
+
+.sidebar-section-header {
+  padding: 0 5px;
+}
+
+.sidebar-section-count,
+.sidebar-section-secondary .status-pill {
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+}
+
+.sidebar-link {
+  position: relative;
+  min-height: 44px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sidebar-link::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background-color 160ms ease;
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-link-active {
+  background: rgba(212, 241, 74, 0.075);
+  color: var(--text-strong);
+  box-shadow: none;
+}
+
+.sidebar-link-active::before {
+  background: var(--accent-strong);
+}
+
+.sidebar-link-icon {
+  width: 29px;
+  height: 29px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.sidebar-link-active .sidebar-link-icon {
+  background: rgba(212, 241, 74, 0.11);
+}
+
+.sidebar-section-secondary .account-panel,
+.sidebar-section-secondary .user-pill {
+  border: 0;
+  background: rgba(255, 255, 255, 0.028);
+  box-shadow: none;
+}
+
+.app-topbar {
+  align-items: center;
+  padding: 16px 24px 14px;
+  background:
+    linear-gradient(180deg, rgba(10, 12, 17, 0.86), rgba(10, 12, 17, 0.7)),
+    var(--header-bg);
+}
+
+.topbar-title-block {
+  gap: 2px;
+}
+
+.topbar-title-block strong {
+  font-size: clamp(1.25rem, 2.2vw, 1.8rem);
+}
+
+.topbar-title-block p {
+  font-size: 0.94rem;
+}
+
+.content-container {
+  width: min(1440px, 100%);
+  padding: 22px 24px 32px;
+}
+
+.dashboard-os {
+  gap: 16px;
+  padding: 16px;
+  border-radius: 22px;
+}
+
+.dashboard-os .dashboard-hero-forge,
+.dashboard-os .panel {
+  border-radius: 18px;
+}
+
+.dashboard-os .dashboard-hero-forge {
+  gap: 14px;
+  padding: 20px;
+}
+
+.dashboard-os .dashboard-hero-main h1 {
+  font-size: clamp(2.4rem, 5.8vw, 4.9rem);
+}
+
+.dashboard-os .dashboard-hero-actions,
+.dashboard-os .forge-stat-strip-dashboard,
+.dashboard-os .dashboard-forge-grid,
+.dashboard-os .dashboard-goals-layout {
+  gap: 12px;
+}
+
+.dashboard-os .forge-stat-card,
+.dashboard-os .dashboard-metric-card,
+.dashboard-os .goal-progress-card,
+.dashboard-os .assistant-card,
+.dashboard-os .dashboard-readiness-summary,
+.dashboard-os .hero-inline-stat,
+.dashboard-os .forge-focus-card {
+  border-radius: 14px;
+}
+
+.dashboard-os .panel {
+  padding: 16px;
+}
+
+.dashboard-os .panel-header {
+  margin-bottom: 12px;
+}
+
+.dashboard-os .dashboard-goals-layout {
+  grid-template-columns: minmax(260px, 0.82fr) minmax(0, 1.18fr);
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .app-sidebar {
+    width: var(--shell-sidebar-rail);
+    flex-basis: var(--shell-sidebar-rail);
+    padding: 10px 8px;
+  }
+
+  .app-main {
+    margin-left: var(--shell-sidebar-rail);
+  }
+
+  .sidebar-inner {
+    align-items: center;
+    padding: 14px 8px 12px;
+  }
+
+  .sidebar-brand {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding-bottom: 12px;
+  }
+
+  .sidebar-brand-copy,
+  .sidebar-section-header,
+  .sidebar-link-copy,
+  .sidebar-section-secondary .account-panel {
+    display: none;
+  }
+
+  .sidebar-section,
+  .sidebar-nav {
+    width: 100%;
+  }
+
+  .sidebar-link {
+    display: flex;
+    justify-content: center;
+    min-height: 46px;
+    padding: 8px;
+  }
+
+  .sidebar-link::before {
+    left: 3px;
+  }
+
+  .sidebar-link-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .content-container {
+    padding: 18px;
+  }
+
+  .app-topbar {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .topbar-title-block p {
+    max-width: 34rem;
+  }
+}
+
+@media (max-width: 1280px) {
+  .dashboard-os .forge-stat-strip-dashboard {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard-os .dashboard-goals-layout,
+  .dashboard-os .dashboard-goal-progress-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .dashboard-os {
+    padding: 14px;
+  }
+
+  .dashboard-os .dashboard-hero-forge {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-os .dashboard-forge-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-os .dashboard-panel-goals,
+  .dashboard-os .dashboard-panel-assistant {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .shell-backdrop {
+    display: block;
+    background: rgba(4, 6, 10, 0.64);
+  }
+
+  .app-sidebar {
+    width: min(306px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    padding: 10px;
+    transform: translateX(calc(-100% - 18px));
+    transition: transform 200ms ease;
+  }
+
+  .app-sidebar-open {
+    transform: translateX(0);
+  }
+
+  .app-main {
+    margin-left: 0;
+  }
+
+  .sidebar-inner {
+    align-items: stretch;
+    gap: 13px;
+    padding: 14px 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.095);
+    border-radius: 18px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 24%),
+      rgba(10, 12, 17, 0.96);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+  }
+
+  .sidebar-brand {
+    display: grid;
+  }
+
+  .sidebar-brand-copy,
+  .sidebar-section-header,
+  .sidebar-link-copy,
+  .sidebar-section-secondary .account-panel {
+    display: grid;
+  }
+
+  .app-topbar {
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .topbar-left {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+
+  .topbar-title-block p,
+  .topbar-kicker {
+    display: none;
+  }
+
+  .topbar-title-block strong {
+    font-size: 1.18rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tb-right {
+    flex-wrap: nowrap;
+  }
+
+  .content-container {
+    padding: 14px;
+  }
+
+  .dashboard-os,
+  .dashboard-os .dashboard-forge-grid,
+  .dashboard-os .forge-stat-strip-dashboard,
+  .dashboard-os .dashboard-hero-actions,
+  .dashboard-os .dashboard-weekly-grid,
+  .dashboard-os .dashboard-overview-grid,
+  .dashboard-os .dashboard-panel-energy .dashboard-metric-list,
+  .dashboard-os .dashboard-panel-training-score .dashboard-metric-list,
+  .dashboard-os .assistant-grid.dashboard-assistant-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-os .dashboard-panel-goals,
+  .dashboard-os .dashboard-panel-readiness,
+  .dashboard-os .dashboard-panel-energy,
+  .dashboard-os .dashboard-panel-training-score,
+  .dashboard-os .dashboard-panel-weekly,
+  .dashboard-os .dashboard-panel-overview,
+  .dashboard-os .dashboard-panel-assistant {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-sidebar {
+    width: min(292px, calc(100vw - 18px));
+    max-width: calc(100vw - 18px);
+    padding: 9px;
+  }
+
+  .topbar-icon-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .content-container {
+    padding: 10px 10px 18px;
+  }
+
+  .dashboard-os {
+    gap: 12px;
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .dashboard-os .dashboard-hero-forge,
+  .dashboard-os .panel {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .dashboard-os .dashboard-hero-main h1 {
+    font-size: clamp(2.05rem, 15vw, 3.25rem);
+  }
+
+  .dashboard-os .hero-text {
+    font-size: 0.94rem;
+  }
+
+  .dashboard-os .forge-stat-card strong,
+  .dashboard-os .dashboard-readiness-score strong {
+    font-size: 1.7rem;
+  }
+
+  .dashboard-os .action-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
