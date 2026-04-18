@@ -5998,7 +5998,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.brand-mark {
+.sidebar-brand .brand-mark {
   width: 34px;
   height: 34px;
   border-radius: 10px;
@@ -6101,7 +6101,7 @@
   line-height: 1.2;
 }
 
-.account-panel {
+.sidebar-section-secondary .account-panel {
   gap: 9px;
   padding: 10px;
   border-radius: 16px;
@@ -6110,28 +6110,28 @@
     rgba(255, 255, 255, 0.02);
 }
 
-.user-pill {
+.sidebar-section-secondary .user-pill {
   gap: 9px;
   padding: 8px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.035);
 }
 
-.avatar-ring {
+.sidebar-section-secondary .avatar-ring {
   width: 32px;
   height: 32px;
   padding: 1px;
 }
 
-.avatar-inner {
+.sidebar-section-secondary .avatar-inner {
   font-size: 0.68rem;
 }
 
-.user-copy strong {
+.sidebar-section-secondary .user-copy strong {
   font-size: 0.86rem;
 }
 
-.user-copy span {
+.sidebar-section-secondary .user-copy span {
   font-size: 0.74rem;
 }
 
@@ -6193,8 +6193,8 @@
   background: rgba(181, 211, 39, 0.12);
 }
 
-:root[data-theme='light'] .account-panel,
-:root[data-theme='light'] .user-pill {
+:root[data-theme='light'] .sidebar-section-secondary .account-panel,
+:root[data-theme='light'] .sidebar-section-secondary .user-pill {
   border-color: rgba(29, 42, 58, 0.12);
   background: rgba(255, 255, 255, 0.62);
 }
@@ -6248,7 +6248,7 @@
     display: block;
   }
 
-  .account-panel {
+  .sidebar-section-secondary .account-panel {
     border-radius: 16px;
   }
 
