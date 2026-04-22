@@ -5813,23 +5813,34 @@
   }
 }
 
-/* Keep the Training OS dashboard dark and balanced regardless of global theme overrides. */
+/* Theme-aware Training OS dashboard overrides. */
 
-:root[data-theme='light'] .dashboard-os,
-:root[data-theme='light'] .dashboard-os .dashboard-hero-forge,
-:root[data-theme='light'] .dashboard-os .hero-inline-stat,
-:root[data-theme='light'] .dashboard-os .forge-focus-card,
-:root[data-theme='light'] .dashboard-os .panel,
-:root[data-theme='light'] .dashboard-os .forge-stat-card,
-:root[data-theme='light'] .dashboard-os .dashboard-metric-card,
-:root[data-theme='light'] .dashboard-os .goal-progress-card,
-:root[data-theme='light'] .dashboard-os .assistant-card,
-:root[data-theme='light'] .dashboard-os .dashboard-readiness-summary,
-:root[data-theme='light'] .dashboard-os .state-card {
+:root[data-theme='light'] .dashboard-os {
+  --dashboard-bg: #edf3f8;
+  --dashboard-surface: rgba(255, 255, 255, 0.86);
+  --dashboard-surface-hover: #f9fbfd;
+  --dashboard-surface-soft: rgba(244, 248, 252, 0.92);
+  --dashboard-border: rgba(29, 42, 58, 0.12);
+  --dashboard-border-strong: rgba(181, 211, 39, 0.34);
+  --dashboard-text: var(--text-strong);
+  --dashboard-muted: var(--muted);
+  --dashboard-muted-strong: var(--text);
+  --dashboard-accent: var(--accent-strong);
+  --dashboard-accent-soft: var(--accent-surface);
+  --dashboard-accent-glow: rgba(181, 211, 39, 0.16);
+  --dashboard-shadow: 0 20px 46px rgba(33, 50, 72, 0.1);
+  border-color: var(--dashboard-border);
+  background:
+    radial-gradient(circle at 82% 4%, rgba(181, 211, 39, 0.14), transparent 28%),
+    radial-gradient(circle at 12% 16%, rgba(53, 111, 216, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 30%),
+    var(--dashboard-bg);
   color: var(--dashboard-text);
+  box-shadow: var(--dashboard-shadow);
 }
 
 :root[data-theme='light'] .dashboard-os .panel,
+:root[data-theme='light'] .dashboard-os .dashboard-hero-forge,
 :root[data-theme='light'] .dashboard-os .hero-inline-stat,
 :root[data-theme='light'] .dashboard-os .forge-focus-card,
 :root[data-theme='light'] .dashboard-os .forge-stat-card,
@@ -5840,7 +5851,7 @@
 :root[data-theme='light'] .dashboard-os .state-card {
   border-color: var(--dashboard-border);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), transparent),
     var(--dashboard-surface);
   box-shadow: none;
 }
@@ -5851,36 +5862,45 @@
   border-color: var(--dashboard-border-strong);
   background:
     radial-gradient(circle at top right, var(--dashboard-accent-glow), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), transparent),
     var(--dashboard-surface);
 }
 
 :root[data-theme='light'] .dashboard-os .dashboard-hero-forge {
   border-color: var(--dashboard-border);
   background:
-    linear-gradient(135deg, rgba(212, 255, 0, 0.13), transparent 52%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent),
+    linear-gradient(135deg, rgba(181, 211, 39, 0.15), transparent 52%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent),
     var(--dashboard-surface);
+}
+
+:root[data-theme='light'] .dashboard-os .dashboard-hero-forge::after {
+  color: rgba(181, 211, 39, 0.08);
 }
 
 :root[data-theme='light'] .dashboard-os .field input,
 :root[data-theme='light'] .dashboard-os .select-input,
 :root[data-theme='light'] .dashboard-os .text-area {
   border-color: var(--dashboard-border);
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--dashboard-text);
   box-shadow: none;
 }
 
 :root[data-theme='light'] .dashboard-os .field input::placeholder,
 :root[data-theme='light'] .dashboard-os .text-area::placeholder {
-  color: rgba(247, 247, 242, 0.42);
+  color: var(--dashboard-muted);
+}
+
+:root[data-theme='light'] .dashboard-os .field input:disabled {
+  background: rgba(244, 248, 252, 0.86);
+  color: var(--dashboard-muted);
 }
 
 :root[data-theme='light'] .dashboard-os .primary-button {
   background: var(--dashboard-accent);
   color: #101206;
-  box-shadow: 0 10px 28px rgba(212, 255, 0, 0.16);
+  box-shadow: 0 10px 28px rgba(181, 211, 39, 0.2);
 }
 
 :root[data-theme='light'] .dashboard-os .primary-button:hover {
@@ -5890,7 +5910,7 @@
 :root[data-theme='light'] .dashboard-os .ghost-button,
 :root[data-theme='light'] .dashboard-os .readiness-option {
   border-color: var(--dashboard-border);
-  background: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--dashboard-text);
   box-shadow: none;
 }
@@ -5899,6 +5919,32 @@
   border-color: var(--dashboard-border-strong);
   background: var(--dashboard-accent);
   color: #101206;
+}
+
+:root[data-theme='light'] .dashboard-os .info-pill,
+:root[data-theme='light'] .dashboard-os .status-pill,
+:root[data-theme='light'] .dashboard-os .pr-badge,
+:root[data-theme='light'] .dashboard-os .assistant-list-item,
+:root[data-theme='light'] .dashboard-os .feedback {
+  border-color: var(--dashboard-border);
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--dashboard-muted-strong);
+}
+
+:root[data-theme='light'] .dashboard-os .progress-track {
+  background: rgba(29, 42, 58, 0.08);
+}
+
+:root[data-theme='light'] .dashboard-os .feedback.success {
+  border-color: rgba(21, 159, 134, 0.22);
+  background: rgba(21, 159, 134, 0.1);
+  color: #126f61;
+}
+
+:root[data-theme='light'] .dashboard-os .feedback.error {
+  border-color: rgba(213, 80, 120, 0.24);
+  background: rgba(213, 80, 120, 0.1);
+  color: #9f2f55;
 }
 
 @media (max-width: 1440px) {
