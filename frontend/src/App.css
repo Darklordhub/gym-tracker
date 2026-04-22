@@ -6319,8 +6319,8 @@
 /* Training OS shell refinement */
 
 .forge-shell {
-  --shell-sidebar-width: 244px;
-  --shell-sidebar-rail: 82px;
+  --shell-sidebar-width: 238px;
+  --shell-sidebar-rail: 76px;
   background:
     radial-gradient(circle at 78% 0%, rgba(212, 241, 74, 0.055), transparent 28rem),
     radial-gradient(circle at 10% 12%, rgba(45, 217, 184, 0.045), transparent 24rem),
@@ -6330,7 +6330,7 @@
 .app-sidebar {
   width: var(--shell-sidebar-width);
   flex-basis: var(--shell-sidebar-width);
-  padding: 10px 8px 10px 10px;
+  padding: 10px 6px 10px 10px;
 }
 
 .app-main {
@@ -6338,22 +6338,26 @@
 }
 
 .sidebar-inner {
-  gap: 12px;
-  padding: 14px 10px 12px;
+  gap: 11px;
+  padding: 14px 9px 12px;
   border-top: 0;
   border-bottom: 0;
   border-left: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.075);
+  border-right: 1px solid var(--border);
   border-radius: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent 34%),
-    rgba(10, 12, 17, 0.82);
+    linear-gradient(180deg, var(--surface-overlay-muted), transparent 34%),
+    var(--sidebar-bg);
   box-shadow: none;
+  backdrop-filter: blur(22px);
 }
 
 .sidebar-brand {
-  min-height: 46px;
-  padding: 0 4px 10px;
+  min-height: 42px;
+  gap: 9px;
+  align-items: center;
+  padding: 0 5px 10px;
+  border-bottom: 1px solid var(--border);
 }
 
 .sidebar-brand .brand-mark {
@@ -6364,7 +6368,16 @@
 }
 
 .sidebar-brand .brand-name {
-  font-size: 1.04rem;
+  font-size: 1rem;
+}
+
+.sidebar-brand .brand-kicker {
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+}
+
+.sidebar-brand .brand-subtitle {
+  display: none;
 }
 
 .sidebar-section-header {
@@ -6376,13 +6389,14 @@
   min-height: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-overlay-subtle);
   color: var(--muted);
 }
 
 .sidebar-link {
   position: relative;
   min-height: 44px;
+  gap: 8px;
   padding: 7px 8px;
   border: 0;
   border-radius: 10px;
@@ -6403,11 +6417,12 @@
 }
 
 .sidebar-link:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-overlay-muted);
+  color: var(--text-strong);
 }
 
 .sidebar-link-active {
-  background: rgba(212, 241, 74, 0.075);
+  background: var(--accent-surface);
   color: var(--text-strong);
   box-shadow: none;
 }
@@ -6421,26 +6436,72 @@
   height: 29px;
   border: 0;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--surface-overlay-muted);
+  color: var(--muted);
 }
 
 .sidebar-link-active .sidebar-link-icon {
-  background: rgba(212, 241, 74, 0.11);
+  background: var(--accent-surface-strong);
+  color: var(--accent-strong);
+}
+
+.sidebar-link-label {
+  font-size: 0.9rem;
+}
+
+.sidebar-link-meta {
+  font-size: 0.72rem;
+  line-height: 1.22;
 }
 
 .sidebar-section-secondary .account-panel,
 .sidebar-section-secondary .user-pill {
   border: 0;
-  background: rgba(255, 255, 255, 0.028);
+  background: var(--surface-overlay-subtle);
   box-shadow: none;
+}
+
+.sidebar-section-secondary .account-panel {
+  gap: 8px;
+  padding: 9px;
+  border-radius: 14px;
+}
+
+.sidebar-section-secondary .user-pill {
+  gap: 8px;
+  padding: 7px;
+  border-radius: 10px;
+}
+
+.sidebar-section-secondary .avatar-ring {
+  width: 30px;
+  height: 30px;
+  padding: 1px;
+}
+
+.sidebar-section-secondary .avatar-inner {
+  font-size: 0.66rem;
+}
+
+.sidebar-actions {
+  gap: 6px;
+}
+
+.sidebar-action-button {
+  min-height: 38px;
+  padding: 8px 9px;
+  border-radius: 10px;
+  font-size: 0.84rem;
 }
 
 .app-topbar {
   align-items: center;
-  padding: 16px 24px 14px;
+  padding: 15px 24px 13px;
+  border-bottom-color: var(--header-border);
   background:
-    linear-gradient(180deg, rgba(10, 12, 17, 0.86), rgba(10, 12, 17, 0.7)),
+    linear-gradient(180deg, color-mix(in srgb, var(--header-bg) 96%, transparent), color-mix(in srgb, var(--header-bg) 82%, transparent)),
     var(--header-bg);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--page-bg) 34%, transparent);
 }
 
 .topbar-title-block {
@@ -6507,6 +6568,82 @@
 
 .dashboard-os .dashboard-goals-layout {
   grid-template-columns: minmax(260px, 0.82fr) minmax(0, 1.18fr);
+}
+
+.tb-right {
+  gap: 8px;
+}
+
+.topbar-icon-button {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+}
+
+.topbar-user {
+  padding: 7px 10px 7px 7px;
+  border-radius: 14px;
+}
+
+.content-container {
+  width: min(1460px, 100%);
+  padding: 22px 24px 30px;
+}
+
+.dashboard-os {
+  gap: 15px;
+  padding: 15px;
+  border-radius: 22px;
+}
+
+:root[data-theme='light'] .forge-shell {
+  background:
+    radial-gradient(circle at 78% 0%, rgba(181, 211, 39, 0.07), transparent 28rem),
+    radial-gradient(circle at 10% 12%, rgba(53, 111, 216, 0.06), transparent 24rem),
+    var(--page-bg);
+}
+
+:root[data-theme='light'] .sidebar-inner {
+  border-right-color: var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), transparent 36%),
+    var(--sidebar-bg);
+}
+
+:root[data-theme='light'] .sidebar-link:hover {
+  background: rgba(39, 56, 77, 0.045);
+}
+
+:root[data-theme='light'] .sidebar-link-active {
+  background: rgba(181, 211, 39, 0.12);
+}
+
+:root[data-theme='light'] .sidebar-link-icon,
+:root[data-theme='light'] .sidebar-section-secondary .account-panel,
+:root[data-theme='light'] .sidebar-section-secondary .user-pill {
+  background: rgba(39, 56, 77, 0.045);
+}
+
+:root[data-theme='light'] .app-topbar {
+  box-shadow: 0 10px 24px rgba(33, 50, 72, 0.06);
+}
+
+.dashboard-os .dashboard-hero-forge {
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--dashboard-bg) 70%, transparent);
+}
+
+.dashboard-os .panel,
+.dashboard-os .forge-stat-card,
+.dashboard-os .dashboard-metric-card,
+.dashboard-os .goal-progress-card,
+.dashboard-os .assistant-card,
+.dashboard-os .dashboard-readiness-summary,
+.dashboard-os .hero-inline-stat,
+.dashboard-os .forge-focus-card {
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 
 @media (min-width: 901px) and (max-width: 1180px) {
@@ -6607,7 +6744,7 @@
 @media (max-width: 900px) {
   .shell-backdrop {
     display: block;
-    background: rgba(4, 6, 10, 0.64);
+    background: var(--mobile-backdrop-bg);
   }
 
   .app-sidebar {
@@ -6630,12 +6767,10 @@
     align-items: stretch;
     gap: 13px;
     padding: 14px 10px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.095);
+    border: 1px solid var(--border);
     border-radius: 18px;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 24%),
-      rgba(10, 12, 17, 0.96);
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+    background: var(--mobile-sidebar-bg);
+    box-shadow: var(--mobile-sidebar-shadow);
   }
 
   .sidebar-brand {
