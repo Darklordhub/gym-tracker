@@ -82,6 +82,8 @@ const routeMeta: Record<string, { title: string; eyebrow: string; description: s
 
 const THEME_STORAGE_KEY = 'gym-tracker-theme'
 const NOTIFICATION_READ_STORAGE_KEY = 'gym-tracker-notifications-read'
+const APP_BRAND_NAME = 'GYM Tracker'
+const APP_BRAND_SHORT = 'GYM Tracker'
 
 function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => getPreferredTheme())
@@ -171,7 +173,7 @@ function AppLayout({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const notificationCenterRef = useRef<HTMLDivElement | null>(null)
   const topbarMeta = routeMeta[location.pathname] ?? {
-    title: 'Training OS',
+    title: APP_BRAND_NAME,
     eyebrow: 'Navigation',
     description: 'Shared shell, theme, and layout foundation for the training workspace.',
   }
@@ -299,8 +301,8 @@ function AppLayout({
             </div>
             <div className="sidebar-brand-copy">
               <span className="brand-kicker">FORGE</span>
-              <strong className="brand-name">Training OS</strong>
-              <p className="brand-subtitle">A controlled command layer for tracking, recovery, and progression.</p>
+              <strong className="brand-name">{APP_BRAND_NAME}</strong>
+              <p className="brand-subtitle">Track training, recovery, and progress in one controlled workspace.</p>
             </div>
           </div>
 
@@ -380,7 +382,7 @@ function AppLayout({
             </button>
 
             <div className="topbar-breadcrumb">
-              <span>FORGE</span>
+              <span>{APP_BRAND_SHORT}</span>
               <span className="sep">/</span>
               <span>{topbarMeta.eyebrow}</span>
               <span className="sep">/</span>

@@ -31,8 +31,8 @@ export function ExerciseLibraryPage() {
       return
     }
 
-    if (!items.some((item) => item.id === selectedId)) {
-      setSelectedId(items[0]?.id ?? null)
+    if (selectedId !== null && !items.some((item) => item.id === selectedId)) {
+      setSelectedId(null)
     }
   }, [items, selectedId])
 
@@ -44,6 +44,21 @@ export function ExerciseLibraryPage() {
     }
 
     void loadCatalogItem(selectedId)
+  }, [selectedId])
+
+  useEffect(() => {
+    if (selectedId === null) {
+      return
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setSelectedId(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedId])
 
   const activeMuscles = useMemo(() => {
@@ -111,11 +126,11 @@ export function ExerciseLibraryPage() {
       </section>
 
       <section className="exercise-library-grid">
-        <section className="panel exercise-library-panel">
+        <section className="panel exercise-library-panel exercise-library-panel-full">
           <div className="panel-header">
             <div>
               <h2>Directory</h2>
-              <p>Search by exercise name, equipment, or target muscle group.</p>
+              <p>Search by exercise name, equipment, or target muscle group, then open the exercise details popup.</p>
             </div>
           </div>
 
@@ -147,18 +162,27 @@ export function ExerciseLibraryPage() {
           ) : (
             <div className="exercise-library-list list-scroll-region">
               {items.map((item) => {
-                const isActive = item.id === selectedId
+                const previewText = item.description ?? item.instructions ?? 'Open details for muscles, equipment, and instructions.'
 
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    className={isActive ? 'exercise-library-item exercise-library-item-active' : 'exercise-library-item'}
+                    className={item.id === selectedId ? 'exercise-library-item exercise-library-item-active' : 'exercise-library-item'}
                     onClick={() => setSelectedId(item.id)}
                   >
+                    {item.thumbnailUrl ? (
+                      <div className="exercise-library-item-media">
+                        <img src={item.thumbnailUrl} alt={item.name} />
+                      </div>
+                    ) : (
+                      <div className="exercise-library-item-media exercise-library-item-media-fallback" aria-hidden="true">
+                        <span>{item.name.slice(0, 1).toUpperCase()}</span>
+                      </div>
+                    )}
                     <div className="exercise-library-item-copy">
                       <strong>{item.name}</strong>
-                      <p>{item.description ?? item.instructions ?? 'Catalog details available in the exercise view.'}</p>
+                      <p>{previewText}</p>
                     </div>
                     <div className="exercise-library-item-meta">
                       {item.primaryMuscle ? <span className="info-pill">{formatLabel(item.primaryMuscle)}</span> : null}
@@ -171,81 +195,120 @@ export function ExerciseLibraryPage() {
             </div>
           )}
         </section>
+      </section>
 
-        <aside className="panel exercise-library-panel exercise-library-details">
-          <div className="panel-header">
-            <div>
-              <h2>Exercise Details</h2>
-              <p>Catalog metadata is stored locally and ready for future provider sync.</p>
-            </div>
+      {selectedId !== null ? (
+        <ExerciseLibraryDetailsModal
+          item={selectedItem}
+          isLoading={isLoadingDetails}
+          errorMessage={detailsErrorMessage}
+          activeMuscles={activeMuscles}
+          onClose={() => setSelectedId(null)}
+        />
+      ) : null}
+    </main>
+  )
+}
+
+function ExerciseLibraryDetailsModal({
+  item,
+  isLoading,
+  errorMessage,
+  activeMuscles,
+  onClose,
+}: {
+  item: ExerciseCatalogItem | null
+  isLoading: boolean
+  errorMessage: string | null
+  activeMuscles: string[]
+  onClose: () => void
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="modal-panel exercise-library-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="exercise-library-modal-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modal-header exercise-library-modal-header">
+          <div>
+            <span className="stat-label">Exercise details</span>
+            <h2 id="exercise-library-modal-title">{item?.name ?? 'Loading exercise'}</h2>
+            <p className="record-hint">Local catalog data with provider sync support.</p>
           </div>
+          <button type="button" className="ghost-button compact-button" onClick={onClose}>
+            Close
+          </button>
+        </div>
 
-          {detailsErrorMessage ? (
-            <StateCard title="Details unavailable" description={detailsErrorMessage} tone="error" />
-          ) : isLoadingDetails ? (
-            <StateCard title="Loading exercise" description="Pulling the latest local catalog details." loading />
-          ) : !selectedItem ? (
-            <StateCard title="Select an exercise" description="Choose an item from the library to review its details." />
-          ) : (
-            <div className="exercise-library-detail-card">
-              {selectedItem.thumbnailUrl ? (
-                <div className="exercise-library-detail-media">
-                  <img src={selectedItem.thumbnailUrl} alt={selectedItem.name} />
-                </div>
-              ) : null}
+        {errorMessage ? (
+          <StateCard title="Details unavailable" description={errorMessage} tone="error" />
+        ) : isLoading ? (
+          <StateCard title="Loading exercise" description="Pulling the latest local catalog details." loading />
+        ) : !item ? (
+          <StateCard title="Exercise unavailable" description="This exercise could not be loaded." />
+        ) : (
+          <div className="exercise-library-modal-body">
+            {item.thumbnailUrl ? (
+              <div className="exercise-library-detail-media exercise-library-modal-media">
+                <img src={item.thumbnailUrl} alt={item.name} />
+              </div>
+            ) : null}
 
-              <div className="exercise-library-detail-copy">
-                <div className="exercise-library-detail-heading">
-                  <span className="eyebrow">Catalog Entry</span>
-                  <h3>{selectedItem.name}</h3>
-                  <p>{selectedItem.description ?? 'This catalog entry is ready for richer descriptions later.'}</p>
-                </div>
+            <div className="exercise-library-detail-copy">
+              <div className="exercise-library-detail-heading">
+                <span className="eyebrow">Catalog Entry</span>
+                <h3>{item.name}</h3>
+                <p>{item.description ?? 'This catalog entry is ready for richer descriptions later.'}</p>
+              </div>
 
-                <div className="exercise-library-detail-pills">
-                  <span className="info-pill">{selectedItem.source}</span>
-                  {selectedItem.equipment ? <span className="info-pill">{formatLabel(selectedItem.equipment)}</span> : null}
-                  {selectedItem.difficulty ? <span className="info-pill">{formatLabel(selectedItem.difficulty)}</span> : null}
-                  {selectedItem.isActive ? <span className="info-pill info-pill-strength">Active</span> : null}
-                </div>
+              <div className="exercise-library-detail-pills">
+                <span className="info-pill">{item.source}</span>
+                {item.equipment ? <span className="info-pill">{formatLabel(item.equipment)}</span> : null}
+                {item.difficulty ? <span className="info-pill">{formatLabel(item.difficulty)}</span> : null}
+                {item.isActive ? <span className="info-pill info-pill-strength">Active</span> : null}
+              </div>
 
-                <div className="exercise-library-detail-grid">
-                  <div className="exercise-library-detail-section">
-                    <span className="stat-label">Muscles</span>
-                    <div className="exercise-library-detail-pills">
-                      {activeMuscles.length > 0 ? (
-                        activeMuscles.map((muscle) => (
-                          <span key={muscle} className="info-pill">
-                            {formatLabel(muscle)}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="record-hint">No muscle tags yet.</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="exercise-library-detail-section">
-                    <span className="stat-label">Instructions</span>
-                    <p>{selectedItem.instructions ?? 'Instruction steps can be added as the catalog grows.'}</p>
+              <div className="exercise-library-detail-grid">
+                <div className="exercise-library-detail-section">
+                  <span className="stat-label">Muscles</span>
+                  <div className="exercise-library-detail-pills">
+                    {activeMuscles.length > 0 ? (
+                      activeMuscles.map((muscle) => (
+                        <span key={muscle} className="info-pill">
+                          {formatLabel(muscle)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="record-hint">No muscle tags yet.</span>
+                    )}
                   </div>
                 </div>
 
-                <div className="exercise-library-detail-footer">
-                  {selectedItem.videoUrl ? (
-                    <a className="ghost-button compact-button" href={selectedItem.videoUrl} target="_blank" rel="noreferrer">
-                      Open video
-                    </a>
-                  ) : null}
-                  <span className="record-hint">
-                    Updated {formatDate(selectedItem.updatedAt)}{selectedItem.lastSyncedAt ? ` · Synced ${formatDate(selectedItem.lastSyncedAt)}` : ''}
-                  </span>
+                <div className="exercise-library-detail-section">
+                  <span className="stat-label">Instructions</span>
+                  <p>{item.instructions ?? 'Instruction steps can be added as the catalog grows.'}</p>
                 </div>
               </div>
+
+              <div className="exercise-library-detail-footer">
+                {item.videoUrl ? (
+                  <a className="ghost-button compact-button" href={item.videoUrl} target="_blank" rel="noreferrer">
+                    Watch demo
+                  </a>
+                ) : null}
+                <span className="record-hint">
+                  Updated {formatDate(item.updatedAt)}
+                  {item.lastSyncedAt ? ` · Synced ${formatDate(item.lastSyncedAt)}` : ''}
+                </span>
+              </div>
             </div>
-          )}
-        </aside>
-      </section>
-    </main>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
