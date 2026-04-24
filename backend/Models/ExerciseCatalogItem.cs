@@ -9,15 +9,21 @@ public class ExerciseCatalogItem
     public string Slug { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? Instructions { get; set; }
+    public string? LocalNameOverride { get; set; }
+    public string? LocalInstructionsOverride { get; set; }
     public string? PrimaryMuscle { get; set; }
     public string SecondaryMuscles { get; set; } = string.Empty;
     public string? Equipment { get; set; }
     public string? Difficulty { get; set; }
     public string? VideoUrl { get; set; }
     public string? ThumbnailUrl { get; set; }
+    public string? LocalVideoUrlOverride { get; set; }
+    public string? LocalThumbnailUrlOverride { get; set; }
     public string? LocalMediaPath { get; set; }
     public bool IsActive { get; set; } = true;
+    public bool IsManuallyEdited { get; set; }
     public DateTime? LastSyncedAt { get; set; }
+    public DateTime? LastEditedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

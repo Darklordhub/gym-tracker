@@ -1048,6 +1048,29 @@
   min-width: 136px;
 }
 
+.admin-catalog-modal {
+  max-width: 720px;
+}
+
+.admin-catalog-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.field-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.field-checkbox input {
+  width: 18px;
+  height: 18px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

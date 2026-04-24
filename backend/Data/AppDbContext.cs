@@ -113,6 +113,14 @@ public class AppDbContext : DbContext
             .HasMaxLength(6000);
 
         modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.LocalNameOverride)
+            .HasMaxLength(160);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.LocalInstructionsOverride)
+            .HasMaxLength(6000);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
             .Property(item => item.PrimaryMuscle)
             .HasMaxLength(80);
 
@@ -137,12 +145,24 @@ public class AppDbContext : DbContext
             .HasMaxLength(500);
 
         modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.LocalVideoUrlOverride)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.LocalThumbnailUrlOverride)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
             .Property(item => item.LocalMediaPath)
             .HasMaxLength(500);
 
         modelBuilder.Entity<ExerciseCatalogItem>()
             .Property(item => item.IsActive)
             .HasDefaultValue(true);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.IsManuallyEdited)
+            .HasDefaultValue(false);
 
         modelBuilder.Entity<GoalSettings>()
             .Property(goalSettings => goalSettings.CalorieTargetMode)

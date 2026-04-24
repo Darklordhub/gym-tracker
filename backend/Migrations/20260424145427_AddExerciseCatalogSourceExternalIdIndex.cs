@@ -10,19 +10,29 @@ namespace backend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateIndex(
-                name: "IX_ExerciseCatalogItems_Source_ExternalId",
-                table: "ExerciseCatalogItems",
-                columns: new[] { "Source", "ExternalId" },
-                unique: true);
+            migrationBuilder.Sql("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_indexes
+                        WHERE schemaname = 'public'
+                          AND indexname = 'IX_ExerciseCatalogItems_Source_ExternalId'
+                    ) THEN
+                        CREATE UNIQUE INDEX "IX_ExerciseCatalogItems_Source_ExternalId"
+                        ON "ExerciseCatalogItems" ("Source", "ExternalId");
+                    END IF;
+                END
+                $$;
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_ExerciseCatalogItems_Source_ExternalId",
-                table: "ExerciseCatalogItems");
+            migrationBuilder.Sql("""
+                DROP INDEX IF EXISTS "IX_ExerciseCatalogItems_Source_ExternalId";
+                """);
         }
     }
 }

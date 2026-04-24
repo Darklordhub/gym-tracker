@@ -19,15 +19,18 @@ public class AdminController : ControllerBase
     private readonly AppDbContext _dbContext;
     private readonly PasswordHasher<AppUser> _passwordHasher;
     private readonly IWgerExerciseCatalogSyncService _wgerExerciseCatalogSyncService;
+    private readonly ExerciseCatalogService _exerciseCatalogService;
 
     public AdminController(
         AppDbContext dbContext,
         PasswordHasher<AppUser> passwordHasher,
-        IWgerExerciseCatalogSyncService wgerExerciseCatalogSyncService)
+        IWgerExerciseCatalogSyncService wgerExerciseCatalogSyncService,
+        ExerciseCatalogService exerciseCatalogService)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
         _wgerExerciseCatalogSyncService = wgerExerciseCatalogSyncService;
+        _exerciseCatalogService = exerciseCatalogService;
     }
 
     [HttpGet("users")]
@@ -159,6 +162,81 @@ public class AdminController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("exercise-catalog")]
+    public async Task<ActionResult<IReadOnlyList<AdminExerciseCatalogItemResponse>>> GetExerciseCatalog([FromQuery] string? q)
+    {
+        var items = await _exerciseCatalogService.GetAdminItemsAsync(q);
+        return Ok(items);
+    }
+
+    [HttpPut("exercise-catalog/{id:int}")]
+    public async Task<ActionResult<AdminExerciseCatalogItemResponse>> UpdateExerciseCatalogItem(int id, UpdateExerciseCatalogItemRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var item = await _dbContext.ExerciseCatalogItems.SingleOrDefaultAsync(entry => entry.Id == id);
+        if (item is null)
+        {
+            return NotFound(new { message = "Exercise catalog item not found." });
+        }
+
+        var normalizedName = request.Name.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedName))
+        {
+            return BadRequest(new { message = "Name is required." });
+        }
+
+        if (!IsValidOptionalUrl(request.ThumbnailUrl))
+        {
+            return BadRequest(new { message = "Thumbnail URL must be a valid absolute HTTP or HTTPS URL." });
+        }
+
+        if (!IsValidOptionalUrl(request.VideoUrl))
+        {
+            return BadRequest(new { message = "Video URL must be a valid absolute HTTP or HTTPS URL." });
+        }
+
+        item.LocalNameOverride = string.Equals(normalizedName, item.Name, StringComparison.Ordinal) ? null : normalizedName;
+        item.LocalInstructionsOverride = NormalizeOptionalText(request.Instructions, item.Instructions);
+        item.LocalThumbnailUrlOverride = NormalizeOptionalText(request.ThumbnailUrl, item.ThumbnailUrl);
+        item.LocalVideoUrlOverride = NormalizeOptionalText(request.VideoUrl, item.VideoUrl);
+        item.IsActive = request.IsActive;
+        item.IsManuallyEdited = HasOverrides(item);
+        item.LastEditedAt = item.IsManuallyEdited ? DateTime.UtcNow : null;
+        item.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync();
+
+        var response = await _exerciseCatalogService.GetAdminItemByIdAsync(item.Id);
+        return response is null ? NotFound() : Ok(response);
+    }
+
+    [HttpPost("exercise-catalog/{id:int}/reset-provider")]
+    public async Task<ActionResult<AdminExerciseCatalogItemResponse>> ResetExerciseCatalogItemToProvider(int id)
+    {
+        var item = await _dbContext.ExerciseCatalogItems.SingleOrDefaultAsync(entry => entry.Id == id);
+        if (item is null)
+        {
+            return NotFound(new { message = "Exercise catalog item not found." });
+        }
+
+        item.LocalNameOverride = null;
+        item.LocalInstructionsOverride = null;
+        item.LocalThumbnailUrlOverride = null;
+        item.LocalVideoUrlOverride = null;
+        item.IsManuallyEdited = false;
+        item.LastEditedAt = null;
+        item.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync();
+
+        var response = await _exerciseCatalogService.GetAdminItemByIdAsync(item.Id);
+        return response is null ? NotFound() : Ok(response);
+    }
+
     private static AdminUserResponse MapUser(AppUser user)
     {
         return new AdminUserResponse
@@ -171,5 +249,31 @@ public class AdminController : ControllerBase
             IsActive = user.IsActive,
             CreatedAt = user.CreatedAt,
         };
+    }
+
+    private static bool HasOverrides(ExerciseCatalogItem item)
+    {
+        return !string.IsNullOrWhiteSpace(item.LocalNameOverride)
+            || !string.IsNullOrWhiteSpace(item.LocalInstructionsOverride)
+            || !string.IsNullOrWhiteSpace(item.LocalThumbnailUrlOverride)
+            || !string.IsNullOrWhiteSpace(item.LocalVideoUrlOverride);
+    }
+
+    private static string? NormalizeOptionalText(string? value, string? providerValue)
+    {
+        var normalizedValue = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        var normalizedProvider = string.IsNullOrWhiteSpace(providerValue) ? null : providerValue.Trim();
+        return string.Equals(normalizedValue, normalizedProvider, StringComparison.Ordinal) ? null : normalizedValue;
+    }
+
+    private static bool IsValidOptionalUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        return Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 }
