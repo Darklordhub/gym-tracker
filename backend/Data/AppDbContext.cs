@@ -248,6 +248,10 @@ public class AppDbContext : DbContext
             .HasIndex(item => item.Slug)
             .IsUnique();
 
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .HasIndex(item => new { item.Source, item.ExternalId })
+            .IsUnique();
+
         modelBuilder.Entity<WeightEntry>()
             .HasIndex(weightEntry => new { weightEntry.UserId, weightEntry.Date });
 

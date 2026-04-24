@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var enableHttpsRedirection = builder.Configuration.GetValue("Http:UseHttpsRedirection", false);
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+var wgerOptions = builder.Configuration.GetSection(WgerOptions.SectionName).Get<WgerOptions>() ?? new WgerOptions();
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()?
@@ -35,6 +36,7 @@ if (string.IsNullOrWhiteSpace(jwtOptions.SigningKey) || jwtOptions.SigningKey.Le
 }
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.Configure<WgerOptions>(builder.Configuration.GetSection(WgerOptions.SectionName));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -48,6 +50,12 @@ builder.Services.AddScoped<TrainingIntelligenceService>();
 builder.Services.AddScoped<ProgressiveOverloadService>();
 builder.Services.AddScoped<ExerciseCatalogService>();
 builder.Services.AddScoped<ExerciseCatalogSeedService>();
+builder.Services.AddHttpClient<IWgerExerciseCatalogSyncService, WgerExerciseCatalogSyncService>(httpClient =>
+{
+    httpClient.BaseAddress = new Uri(wgerOptions.BaseUrl.EndsWith('/') ? wgerOptions.BaseUrl : $"{wgerOptions.BaseUrl}/");
+    httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+    httpClient.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>

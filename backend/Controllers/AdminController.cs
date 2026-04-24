@@ -3,6 +3,7 @@ using backend.Contracts;
 using backend.Data;
 using backend.Extensions;
 using backend.Models;
+using backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -17,11 +18,16 @@ public class AdminController : ControllerBase
 {
     private readonly AppDbContext _dbContext;
     private readonly PasswordHasher<AppUser> _passwordHasher;
+    private readonly IWgerExerciseCatalogSyncService _wgerExerciseCatalogSyncService;
 
-    public AdminController(AppDbContext dbContext, PasswordHasher<AppUser> passwordHasher)
+    public AdminController(
+        AppDbContext dbContext,
+        PasswordHasher<AppUser> passwordHasher,
+        IWgerExerciseCatalogSyncService wgerExerciseCatalogSyncService)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
+        _wgerExerciseCatalogSyncService = wgerExerciseCatalogSyncService;
     }
 
     [HttpGet("users")]
@@ -138,6 +144,19 @@ public class AdminController : ControllerBase
         await _dbContext.SaveChangesAsync();
 
         return Ok(new { message = "Password has been reset successfully." });
+    }
+
+    [HttpPost("exercise-catalog/sync-wger")]
+    public async Task<ActionResult<ExerciseCatalogSyncResponse>> SyncExerciseCatalogFromWger(CancellationToken cancellationToken)
+    {
+        var result = await _wgerExerciseCatalogSyncService.SyncAsync(cancellationToken);
+
+        if (!result.IsEnabled)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
     }
 
     private static AdminUserResponse MapUser(AppUser user)
