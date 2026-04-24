@@ -697,7 +697,7 @@ export function ExerciseProgressPage() {
                 description="Adjust the date filters to see more entries."
               />
             ) : (
-              <div className="exercise-history-list" role="list">
+              <div className="exercise-history-list list-scroll-region" role="list">
                 {[...filteredStrengthHistory]
                   .sort(
                     (left, right) =>
@@ -755,7 +755,7 @@ export function ExerciseProgressPage() {
               description="Adjust the date filters to see more entries."
             />
           ) : (
-            <div className="exercise-history-list" role="list">
+            <div className="exercise-history-list list-scroll-region" role="list">
               {[...filteredCardioHistory]
                 .sort(
                   (left, right) =>

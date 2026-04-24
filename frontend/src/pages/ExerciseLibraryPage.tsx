@@ -145,7 +145,7 @@ export function ExerciseLibraryPage() {
               }
             />
           ) : (
-            <div className="exercise-library-list">
+            <div className="exercise-library-list list-scroll-region">
               {items.map((item) => {
                 const isActive = item.id === selectedId
 

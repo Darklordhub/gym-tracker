@@ -343,7 +343,7 @@ export function AdminPage() {
           ) : users.length === 0 ? (
             <StateCard title="No users found" description="User accounts will appear here once people start registering." />
           ) : (
-            <div className="admin-table-shell">
+            <div className="admin-table-shell panel-scroll-region">
               <table className="admin-table">
                 <caption className="sr-only">User administration table with role and account status controls.</caption>
                 <thead>
@@ -454,7 +454,7 @@ export function AdminPage() {
           ) : catalogItems.length === 0 ? (
             <StateCard title="No catalog items found" description="Sync or seed the exercise catalog to manage it here." />
           ) : (
-            <div className="admin-table-shell">
+            <div className="admin-table-shell panel-scroll-region">
               <table className="admin-table">
                 <caption className="sr-only">Exercise catalog management table.</caption>
                 <thead>

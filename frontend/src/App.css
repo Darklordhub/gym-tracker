@@ -1,3 +1,14 @@
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
 .app-shell {
   width: min(1240px, calc(100% - 32px));
   margin: 0 auto;
@@ -299,7 +310,9 @@
   display: grid;
   place-items: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 24px;
+  overflow-y: auto;
 }
 
 .auth-card {
@@ -2554,7 +2567,10 @@
 .forge-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
   position: relative;
+  overflow: hidden;
 }
 
 .shell-backdrop {
@@ -2840,7 +2856,13 @@
 .app-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   margin-left: 280px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .app-topbar {
@@ -2951,13 +2973,21 @@
 }
 
 .app-content {
+  flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .content-container {
   width: min(1480px, 100%);
   margin: 0 auto;
   padding: 28px;
+  min-height: 100%;
+  min-width: 0;
+  display: grid;
+  align-content: start;
 }
 
 .panel,
@@ -3079,6 +3109,25 @@
 .page-shell {
   gap: 24px;
   padding: 0;
+  min-width: 0;
+}
+
+.panel-scroll-region,
+.list-scroll-region {
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+
+.panel-scroll-region {
+  max-height: min(62vh, 780px);
+  overflow: auto;
+}
+
+.list-scroll-region {
+  max-height: min(58vh, 760px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
 }
 
 .eyebrow,
@@ -4232,6 +4281,7 @@
   max-height: min(70vh, 1040px);
   overflow-y: auto;
   padding-right: 6px;
+  min-height: 0;
 }
 
 .workout-card-clickable {
@@ -5970,6 +6020,21 @@
 }
 
 @media (max-width: 640px) {
+  body {
+    overflow: auto;
+  }
+
+  .forge-shell,
+  .app-main {
+    min-height: auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-content {
+    overflow: visible;
+  }
+
   .app-topbar {
     padding: 10px 12px 8px;
   }
@@ -6710,6 +6775,10 @@
   align-items: start;
 }
 
+.exercise-library-grid > * {
+  min-height: 0;
+}
+
 .exercise-library-panel,
 .exercise-library-detail-card {
   display: grid;
@@ -6793,6 +6862,7 @@
 .exercise-library-details {
   display: grid;
   gap: 1rem;
+  min-height: 0;
 }
 
 .exercise-library-detail-media {
@@ -7416,6 +7486,13 @@
     padding: 14px;
   }
 
+  .panel-scroll-region,
+  .list-scroll-region,
+  .workout-list-scroll {
+    max-height: none;
+    padding-right: 0;
+  }
+
   .dashboard-os,
   .dashboard-os .dashboard-forge-grid,
   .dashboard-os .forge-stat-strip-dashboard,
@@ -7485,4 +7562,16 @@
     display: grid;
     grid-template-columns: 1fr;
   }
+}
+
+/* App-level scroll control */
+
+.admin-table-shell.panel-scroll-region {
+  overflow: auto;
+}
+
+.exercise-library-list.list-scroll-region,
+.exercise-history-list.list-scroll-region,
+.entry-list.list-scroll-region {
+  min-height: 0;
 }

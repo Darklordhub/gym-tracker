@@ -1531,7 +1531,7 @@ export function WorkoutsPage() {
               description="Try widening the date range or changing the search term."
             />
           ) : (
-            <div className="workout-list-scroll">
+            <div className="workout-list-scroll list-scroll-region">
               <div className="workout-list" role="list">
               {filteredWorkouts.map((workout) => (
                 <article

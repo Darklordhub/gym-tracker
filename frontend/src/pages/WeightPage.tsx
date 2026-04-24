@@ -405,7 +405,7 @@ export function WeightPage() {
               description="Add your first body-weight entry to start building history."
             />
           ) : (
-            <div className="entry-list" role="list">
+            <div className="entry-list list-scroll-region" role="list">
               {entries.map((entry) => (
                 <article key={entry.id} className="entry-card entry-card-weight" role="listitem">
                   <div className="entry-primary">
