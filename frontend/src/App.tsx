@@ -19,7 +19,18 @@ import { formatDate } from './lib/format'
 import { generateNotifications, type AppNotification } from './lib/notifications'
 
 type ThemeMode = 'light' | 'dark'
-type IconName = 'dashboard' | 'weight' | 'workouts' | 'progress' | 'cycle' | 'profile' | 'admin' | 'library'
+type IconName =
+  | 'dashboard'
+  | 'weight'
+  | 'workouts'
+  | 'progress'
+  | 'cycle'
+  | 'profile'
+  | 'admin'
+  | 'library'
+  | 'moon'
+  | 'sun'
+  | 'logout'
 
 type NavItem = {
   to: string
@@ -177,6 +188,8 @@ function AppLayout({
     eyebrow: 'Navigation',
     description: 'Shared shell, theme, and layout foundation for the training workspace.',
   }
+  const themeToggleLabel = `Switch to ${theme === 'light' ? 'dark' : 'light'} mode`
+  const themeButtonLabel = theme === 'light' ? 'Dark mode' : 'Light mode'
 
   useEffect(() => {
     setIsMobileNavOpen(false)
@@ -352,14 +365,21 @@ function AppLayout({
                   type="button"
                   className="ghost-button sidebar-action-button"
                   onClick={onToggleTheme}
-                  aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                  aria-label={themeToggleLabel}
+                  title={themeToggleLabel}
                 >
-                  <AppIcon name={theme === 'light' ? 'cycle' : 'dashboard'} />
-                  {theme === 'light' ? 'Dark mode' : 'Light mode'}
+                  <AppIcon name={theme === 'light' ? 'moon' : 'sun'} />
+                  <span className="sidebar-action-label">{themeButtonLabel}</span>
                 </button>
-                <button type="button" className="ghost-button sidebar-action-button" onClick={logout}>
-                  <AppIcon name="profile" />
-                  Log out
+                <button
+                  type="button"
+                  className="ghost-button sidebar-action-button"
+                  onClick={logout}
+                  aria-label="Log out"
+                  title="Log out"
+                >
+                  <AppIcon name="logout" />
+                  <span className="sidebar-action-label">Log out</span>
                 </button>
               </div>
             </div>
@@ -412,8 +432,8 @@ function AppLayout({
               type="button"
               className="topbar-icon-button"
               onClick={onToggleTheme}
-              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-              title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+              aria-label={themeToggleLabel}
+              title={themeToggleLabel}
             >
               <ThemeIcon theme={theme} />
             </button>
@@ -469,25 +489,7 @@ function NotificationCenter({
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
         onClick={onToggle}
       >
-        <span className="notification-bell" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path
-              d="M12 3a4 4 0 0 0-4 4v1.1a7 7 0 0 1-1.6 4.5L5 14.3V16h14v-1.7l-1.4-1.7A7 7 0 0 1 16 8.1V7a4 4 0 0 0-4-4Z"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-            />
-            <path
-              d="M10 18a2 2 0 0 0 4 0"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeWidth="1.8"
-            />
-          </svg>
-        </span>
+        <span className="notification-bell" aria-hidden="true"><BellIcon /></span>
         {unreadCount > 0 ? <span className="notification-indicator">{unreadCount}</span> : null}
       </button>
 
@@ -647,89 +649,125 @@ function getInitials(value?: string) {
   return parts || value.slice(0, 2).toUpperCase()
 }
 
+function IconBase({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.85"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      focusable="false"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  )
+}
+
 function AppIcon({ name }: { name: IconName }) {
   switch (name) {
     case 'dashboard':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="M4 13.5h6.5V20H4zM13.5 4H20v9h-6.5zM13.5 15.5H20V20h-6.5zM4 4h6.5v7H4z" />
-        </svg>
+        <IconBase>
+          <path d="M4 5.5h6v6H4zM14 5.5h6v9h-6zM4 15.5h6V19H4zM14 17h6v2h-6z" />
+        </IconBase>
       )
     case 'weight':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-          <path d="M4 10h3m10 0h3M7 8v4m10-4v4M9.5 10h5M4 10v5a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-5" />
-          <path d="M10 7a2 2 0 1 1 4 0" />
-        </svg>
+        <IconBase>
+          <path d="M6 8.5h12l1 8.7A2 2 0 0 1 17 19.5H7a2 2 0 0 1-2-2.3Z" />
+          <path d="M8.5 8.5a3.5 3.5 0 0 1 7 0" />
+          <path d="m12 12 1.4-2.4" />
+        </IconBase>
       )
     case 'workouts':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-          <path d="M5 10v4m14-4v4M3 9h2v6H3zm16 0h2v6h-2zM8 9h8v6H8z" />
-        </svg>
+        <IconBase>
+          <path d="M4 10v4M7 8.5v7M17 8.5v7M20 10v4M9.5 10h5M9.5 14h5" />
+          <path d="M7 12h2.5M14.5 12H17" />
+        </IconBase>
       )
     case 'progress':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 18 10 12l4 4 6-8" />
-          <path d="M4 6v12h16" />
-        </svg>
+        <IconBase>
+          <path d="M4 18h16" />
+          <path d="M6 15.5 10 11l3.5 3.5L18 8.5" />
+          <path d="M18 8.5V13" />
+        </IconBase>
       )
     case 'library':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <IconBase>
           <path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v16H7.5A2.5 2.5 0 0 0 5 21z" />
           <path d="M5 5.5V21" />
-          <path d="M9 7h6M9 11h6M9 15h4" />
-        </svg>
+          <path d="M9 7.5h6M9 11.5h6M9 15.5h4" />
+        </IconBase>
       )
     case 'cycle':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-          <path d="M12 3a9 9 0 1 0 9 9" />
-          <path d="M12 3a9 9 0 0 1 7.8 4.5" />
-          <path d="m19 4 1 4-4-1" />
-        </svg>
+        <IconBase>
+          <path d="M20 7h-4V3" />
+          <path d="M20 12a8 8 0 1 1-2.3-5.7L20 7" />
+        </IconBase>
       )
     case 'profile':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-          <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" />
-          <path d="M5 20a7 7 0 0 1 14 0" />
-        </svg>
+        <IconBase>
+          <path d="M12 12a3.75 3.75 0 1 0-3.75-3.75A3.75 3.75 0 0 0 12 12Z" />
+          <path d="M5 19a7 7 0 0 1 14 0" />
+        </IconBase>
       )
     case 'admin':
       return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="m12 3 2.2 2.2 3.1-.5.9 3 2.8 1.5-1.5 2.8.5 3-3 .9L12 21l-2.2-2.2-3.1.5-.9-3-2.8-1.5 1.5-2.8-.5-3 3-.9z" />
-          <path d="M12 9.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Z" />
-        </svg>
+        <IconBase>
+          <path d="M12 3 5 6v5c0 4.2 2.4 7.3 7 10 4.6-2.7 7-5.8 7-10V6Z" />
+          <path d="m9.8 12 1.4 1.4 3-3.2" />
+        </IconBase>
+      )
+    case 'moon':
+      return (
+        <IconBase>
+          <path d="M20 14.5A7.5 7.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" />
+        </IconBase>
+      )
+    case 'sun':
+      return (
+        <IconBase>
+          <path d="M12 3v2.2M12 18.8V21M5.64 5.64l1.56 1.56M16.8 16.8l1.56 1.56M3 12h2.2M18.8 12H21M5.64 18.36 7.2 16.8M16.8 7.2l1.56-1.56" />
+          <circle cx="12" cy="12" r="4.25" />
+        </IconBase>
+      )
+    case 'logout':
+      return (
+        <IconBase>
+          <path d="M14 7V5.5A1.5 1.5 0 0 0 12.5 4h-6A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20h6a1.5 1.5 0 0 0 1.5-1.5V17" />
+          <path d="M10 12h10" />
+          <path d="m17 8 4 4-4 4" />
+        </IconBase>
       )
   }
 }
 
 function ThemeIcon({ theme }: { theme: ThemeMode }) {
-  if (theme === 'light') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-        <path d="M12 3v2.2M12 18.8V21M5.64 5.64l1.56 1.56M16.8 16.8l1.56 1.56M3 12h2.2M18.8 12H21M5.64 18.36 7.2 16.8M16.8 7.2l1.56-1.56" />
-        <circle cx="12" cy="12" r="4.4" />
-      </svg>
-    )
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M20 14.5A7.5 7.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" />
-    </svg>
-  )
+  return <AppIcon name={theme === 'light' ? 'moon' : 'sun'} />
 }
 
 function HamburgerIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <IconBase>
       <path d="M4 7h16M4 12h16M4 17h16" />
-    </svg>
+    </IconBase>
+  )
+}
+
+function BellIcon() {
+  return (
+    <IconBase>
+      <path d="M12 4a4 4 0 0 0-4 4v1.1a7 7 0 0 1-1.6 4.5L5 15.3V17h14v-1.7l-1.4-1.7A7 7 0 0 1 16 9.1V8a4 4 0 0 0-4-4Z" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+    </IconBase>
   )
 }
 
