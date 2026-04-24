@@ -2,6 +2,9 @@ html,
 body,
 #root {
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -7581,6 +7584,9 @@ body {
 .forge-shell {
   --shell-sidebar-width: 220px;
   --shell-sidebar-rail: 72px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .app-sidebar {
@@ -7589,6 +7595,8 @@ body {
 
 .app-main {
   margin-left: var(--shell-sidebar-width);
+  width: 100%;
+  max-width: 100%;
 }
 
 .sidebar-inner {
@@ -7796,6 +7804,11 @@ body {
     width: min(286px, calc(100vw - 18px));
     max-width: calc(100vw - 18px);
     padding: 10px 8px 12px;
+  }
+
+  .app-main {
+    margin-left: 0;
+    width: 100%;
   }
 
   .sidebar-inner {
