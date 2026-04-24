@@ -1623,6 +1623,15 @@
   align-items: center;
 }
 
+.exercise-help-card .suggestion-card {
+  margin: 0;
+}
+
+.suggestion-card-compact {
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+}
+
 .add-set-footer-button {
   min-width: 160px;
 }

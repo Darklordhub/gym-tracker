@@ -1754,9 +1754,13 @@ function ExerciseEditorCard({
         onCatalogSelect={onCatalogSelect}
       />
 
-      {exercise.catalogItem ? <ExerciseHelpCard item={exercise.catalogItem} /> : null}
-
-      {normalizeExerciseName(exercise.exerciseName).length >= 3 ? (
+      {exercise.catalogItem ? (
+        <ExerciseHelpCard
+          item={exercise.catalogItem}
+          overloadState={overloadState}
+          fallbackSuggestion={getSuggestedNextWeight(workouts, exercise.exerciseName, null, null)}
+        />
+      ) : normalizeExerciseName(exercise.exerciseName).length >= 3 ? (
         <ExerciseSuggestionNotice
           overloadState={overloadState}
           fallbackSuggestion={getSuggestedNextWeight(workouts, exercise.exerciseName, null, null)}
@@ -1839,7 +1843,15 @@ function ExerciseEditorCard({
   )
 }
 
-function ExerciseHelpCard({ item }: { item: ExerciseCatalogItem }) {
+function ExerciseHelpCard({
+  item,
+  overloadState,
+  fallbackSuggestion,
+}: {
+  item: ExerciseCatalogItem
+  overloadState?: OverloadRecommendationState
+  fallbackSuggestion: ReturnType<typeof getSuggestedNextWeight>
+}) {
   const [isExpanded, setIsExpanded] = useState(false)
   const muscleTags = [item.primaryMuscle, ...item.secondaryMuscles].filter(
     (muscle): muscle is string => Boolean(muscle),
@@ -1900,6 +1912,8 @@ function ExerciseHelpCard({ item }: { item: ExerciseCatalogItem }) {
           </div>
         </div>
       </div>
+
+      <ProgressiveOverloadTargetCard overloadState={overloadState} fallbackSuggestion={fallbackSuggestion} compact />
     </section>
   )
 }
@@ -2073,12 +2087,26 @@ function ExerciseSuggestionNotice({
   overloadState?: OverloadRecommendationState
   fallbackSuggestion: ReturnType<typeof getSuggestedNextWeight>
 }) {
+  return <ProgressiveOverloadTargetCard overloadState={overloadState} fallbackSuggestion={fallbackSuggestion} />
+}
+
+function ProgressiveOverloadTargetCard({
+  overloadState,
+  fallbackSuggestion,
+  compact = false,
+}: {
+  overloadState?: OverloadRecommendationState
+  fallbackSuggestion: ReturnType<typeof getSuggestedNextWeight>
+  compact?: boolean
+}) {
+  const containerClassName = compact ? 'suggestion-card suggestion-card-compact' : 'suggestion-card'
+
   if (!overloadState || overloadState.status === 'loading') {
     return (
-      <div className="suggestion-card">
-        <span className="stat-label">Progressive overload guidance</span>
-        <strong>Loading target...</strong>
-        <span className="stat-subtext">Checking your recent saved sessions for this exercise.</span>
+      <div className={containerClassName}>
+        <span className="stat-label">Next target</span>
+        <strong>Checking target...</strong>
+        <span className="stat-subtext">Reviewing recent saved sessions for this exercise.</span>
       </div>
     )
   }
@@ -2087,8 +2115,8 @@ function ExerciseSuggestionNotice({
     const recommendation = overloadState.recommendation
 
     return (
-      <div className="suggestion-card">
-        <span className="stat-label">Progressive overload guidance</span>
+      <div className={containerClassName}>
+        <span className="stat-label">Next target</span>
         <strong>
           {recommendation.recommendedWeightKg !== null
             ? `${recommendation.recommendedWeightKg} kg`
@@ -2104,8 +2132,8 @@ function ExerciseSuggestionNotice({
 
   if (overloadState?.status === 'error') {
     return (
-      <div className="suggestion-card">
-        <span className="stat-label">Progressive overload guidance</span>
+      <div className={containerClassName}>
+        <span className="stat-label">Next target</span>
         <strong>Guidance unavailable</strong>
         <span className="stat-subtext">
           {fallbackSuggestion
@@ -2121,17 +2149,17 @@ function ExerciseSuggestionNotice({
 
   if (!fallbackSuggestion) {
     return (
-      <div className="suggestion-card">
-        <span className="stat-label">Progressive overload guidance</span>
-        <strong>No history yet</strong>
-        <span className="stat-subtext">Save this exercise once to get a recommendation.</span>
+      <div className={containerClassName}>
+        <span className="stat-label">Next target</span>
+        <strong>No target yet</strong>
+        <span className="stat-subtext">Log more sessions to generate a target.</span>
       </div>
     )
   }
 
   return (
-    <div className="suggestion-card">
-      <span className="stat-label">Progressive overload guidance</span>
+    <div className={containerClassName}>
+      <span className="stat-label">Next target</span>
       <strong>{fallbackSuggestion.suggestedWeightKg} kg</strong>
       <span className="stat-subtext">{fallbackSuggestion.reason}</span>
       {fallbackSuggestion.confidenceLabel ? (
