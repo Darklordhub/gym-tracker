@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { searchExerciseCatalog } from '../api/exerciseCatalog'
 import { fetchCycleGuidance } from '../api/cycle'
 import { fetchLatestCalorieLog } from '../api/calories'
 import { fetchGoals } from '../api/goals'
@@ -25,6 +26,7 @@ import { buildDailyTrainingScore } from '../lib/trainingScore'
 import type { CycleGuidance } from '../types/cycle'
 import type { CalorieLog } from '../types/calories'
 import type { GoalSettings } from '../types/goals'
+import type { ExerciseCatalogItem } from '../types/exerciseCatalog'
 import type { ProgressiveOverloadRecommendation } from '../types/progressiveOverload'
 import type { ReadinessLog } from '../types/readiness'
 import type {
@@ -43,6 +45,7 @@ type ExerciseSetFormState = {
 
 type ExerciseFormState = {
   exerciseName: string
+  catalogItem: ExerciseCatalogItem | null
   sets: ExerciseSetFormState[]
 }
 
@@ -102,6 +105,7 @@ const createSetForm = (): ExerciseSetFormState => ({
 
 const createExerciseForm = (): ExerciseFormState => ({
   exerciseName: '',
+  catalogItem: null,
   sets: [createSetForm()],
 })
 
@@ -221,6 +225,7 @@ function mapSessionToForm(session: ActiveWorkoutSession): WorkoutFormState {
     notes: session.notes,
     exerciseEntries: session.exerciseEntries.map((exercise) => ({
       exerciseName: exercise.exerciseName,
+      catalogItem: null,
       sets: exercise.sets
         .slice()
         .sort((left, right) => left.order - right.order)
@@ -238,6 +243,7 @@ function mapTemplateToForm(template: WorkoutTemplate): WorkoutFormState {
     notes: template.notes,
     exerciseEntries: template.exerciseEntries.map((exercise) => ({
       exerciseName: exercise.exerciseName,
+      catalogItem: null,
       sets: exercise.sets
         .slice()
         .sort((left, right) => left.order - right.order)
@@ -528,14 +534,41 @@ export function WorkoutsPage() {
     kind: 'quick' | 'active',
     exerciseIndex: number,
     field: keyof ExerciseFormState,
-    value: string,
+    value: string | ExerciseCatalogItem | null,
   ) {
     const setter = kind === 'quick' ? setQuickLogForm : setActiveForm
 
     setter((current) => ({
       ...current,
       exerciseEntries: current.exerciseEntries.map((exercise, currentIndex) =>
-        currentIndex === exerciseIndex ? { ...exercise, [field]: value } : exercise,
+        currentIndex === exerciseIndex
+          ? {
+              ...exercise,
+              [field]: value,
+              ...(field === 'exerciseName' ? { catalogItem: null } : null),
+            }
+          : exercise,
+      ),
+    }))
+  }
+
+  function selectCatalogExercise(
+    kind: 'quick' | 'active',
+    exerciseIndex: number,
+    catalogItem: ExerciseCatalogItem,
+  ) {
+    const setter = kind === 'quick' ? setQuickLogForm : setActiveForm
+
+    setter((current) => ({
+      ...current,
+      exerciseEntries: current.exerciseEntries.map((exercise, currentIndex) =>
+        currentIndex === exerciseIndex
+          ? {
+              ...exercise,
+              exerciseName: catalogItem.name,
+              catalogItem,
+            }
+          : exercise,
       ),
     }))
   }
@@ -1044,6 +1077,9 @@ export function WorkoutsPage() {
                           onExerciseChange={(field, value) =>
                             updateExercise('active', exerciseIndex, field, value)
                           }
+                          onCatalogSelect={(catalogItem) =>
+                            selectCatalogExercise('active', exerciseIndex, catalogItem)
+                          }
                           onSetChange={(setIndex, field, value) =>
                             updateSet('active', exerciseIndex, setIndex, field, value)
                           }
@@ -1195,6 +1231,9 @@ export function WorkoutsPage() {
                       overloadState={getOverloadRecommendationState(exercise.exerciseName)}
                       onExerciseChange={(field, value) =>
                         updateExercise('quick', exerciseIndex, field, value)
+                      }
+                      onCatalogSelect={(catalogItem) =>
+                        selectCatalogExercise('quick', exerciseIndex, catalogItem)
                       }
                       onSetChange={(setIndex, field, value) =>
                         updateSet('quick', exerciseIndex, setIndex, field, value)
@@ -1675,6 +1714,7 @@ function ExerciseEditorCard({
   workouts,
   overloadState,
   onExerciseChange,
+  onCatalogSelect,
   onSetChange,
   onAddSet,
   onRemoveSet,
@@ -1686,7 +1726,8 @@ function ExerciseEditorCard({
   errors?: ExerciseFieldErrors
   workouts: Workout[]
   overloadState?: OverloadRecommendationState
-  onExerciseChange: (field: keyof ExerciseFormState, value: string) => void
+  onExerciseChange: (field: keyof ExerciseFormState, value: string | ExerciseCatalogItem | null) => void
+  onCatalogSelect: (catalogItem: ExerciseCatalogItem) => void
   onSetChange: (setIndex: number, field: keyof ExerciseSetFormState, value: string) => void
   onAddSet: () => void
   onRemoveSet: (setIndex: number) => void
@@ -1706,18 +1747,12 @@ function ExerciseEditorCard({
         ) : null}
       </div>
 
-      <label className="field">
-        <span>Exercise name</span>
-        <input
-          type="text"
-          placeholder="Bench Press"
-          value={exercise.exerciseName}
-          onChange={(event) => onExerciseChange('exerciseName', event.target.value)}
-          aria-invalid={Boolean(errors?.exerciseName)}
-        />
-        <small>Use the same naming each time to improve progress suggestions and records.</small>
-        {errors?.exerciseName ? <small className="field-error">{errors.exerciseName}</small> : null}
-      </label>
+      <ExerciseCatalogPickerField
+        exercise={exercise}
+        errorMessage={errors?.exerciseName}
+        onExerciseNameChange={(value) => onExerciseChange('exerciseName', value)}
+        onCatalogSelect={onCatalogSelect}
+      />
 
       {normalizeExerciseName(exercise.exerciseName).length >= 3 ? (
         <ExerciseSuggestionNotice
@@ -1798,6 +1833,168 @@ function ExerciseEditorCard({
           Add another set
         </button>
       </div>
+    </div>
+  )
+}
+
+const exerciseCatalogSearchCache = new Map<string, ExerciseCatalogItem[]>()
+
+function ExerciseCatalogPickerField({
+  exercise,
+  errorMessage,
+  onExerciseNameChange,
+  onCatalogSelect,
+}: {
+  exercise: ExerciseFormState
+  errorMessage?: string
+  onExerciseNameChange: (value: string) => void
+  onCatalogSelect: (catalogItem: ExerciseCatalogItem) => void
+}) {
+  const [results, setResults] = useState<ExerciseCatalogItem[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null)
+  const deferredExerciseName = useDeferredValue(exercise.exerciseName)
+  const normalizedQuery = deferredExerciseName.trim().toLowerCase()
+
+  useEffect(() => {
+    let isCancelled = false
+
+    if (!isOpen || normalizedQuery.length < 2) {
+      setResults([])
+      setIsLoading(false)
+      setSearchErrorMessage(null)
+      return
+    }
+
+    const cachedResults = exerciseCatalogSearchCache.get(normalizedQuery)
+    if (cachedResults) {
+      setResults(cachedResults)
+      setIsLoading(false)
+      setSearchErrorMessage(null)
+      return
+    }
+
+    setIsLoading(true)
+    setSearchErrorMessage(null)
+
+    const timeoutId = window.setTimeout(() => {
+      void searchExerciseCatalog(deferredExerciseName.trim())
+        .then((nextResults) => {
+          if (isCancelled) {
+            return
+          }
+
+          exerciseCatalogSearchCache.set(normalizedQuery, nextResults)
+          setResults(nextResults)
+        })
+        .catch((error) => {
+          if (isCancelled) {
+            return
+          }
+
+          setResults([])
+          setSearchErrorMessage(getRequestErrorMessage(error, 'Unable to search the exercise catalog right now.'))
+        })
+        .finally(() => {
+          if (!isCancelled) {
+            setIsLoading(false)
+          }
+        })
+    }, 250)
+
+    return () => {
+      isCancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [deferredExerciseName, isOpen, normalizedQuery])
+
+  return (
+    <div className="catalog-picker-field">
+      <label className="field">
+        <span>Exercise name</span>
+        <input
+          type="text"
+          placeholder="Bench Press"
+          value={exercise.exerciseName}
+          onChange={(event) => {
+            onExerciseNameChange(event.target.value)
+            setIsOpen(true)
+          }}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+          aria-invalid={Boolean(errorMessage)}
+          aria-expanded={isOpen && normalizedQuery.length >= 2}
+          aria-autocomplete="list"
+        />
+        <small>Pick from the catalog or keep typing manually to preserve your existing naming flow.</small>
+        {errorMessage ? <small className="field-error">{errorMessage}</small> : null}
+      </label>
+
+      {exercise.catalogItem ? (
+        <button
+          type="button"
+          className="catalog-selected-card"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          {exercise.catalogItem.thumbnailUrl ? (
+            <img src={exercise.catalogItem.thumbnailUrl} alt="" className="catalog-selected-thumb" />
+          ) : (
+            <span className="catalog-selected-thumb catalog-selected-thumb-placeholder" aria-hidden="true">
+              {exercise.catalogItem.name.slice(0, 1)}
+            </span>
+          )}
+          <span className="catalog-selected-copy">
+            <strong>{exercise.catalogItem.name}</strong>
+            <span>
+              {exercise.catalogItem.primaryMuscle ?? 'Catalog exercise'}
+              {exercise.catalogItem.equipment ? ` · ${exercise.catalogItem.equipment}` : ''}
+            </span>
+          </span>
+        </button>
+      ) : null}
+
+      {isOpen && normalizedQuery.length >= 2 ? (
+        <div className="catalog-suggestions-panel" role="listbox" aria-label="Exercise catalog suggestions">
+          {isLoading ? <p className="catalog-suggestion-status">Searching catalog...</p> : null}
+          {!isLoading && searchErrorMessage ? <p className="catalog-suggestion-status field-error">{searchErrorMessage}</p> : null}
+          {!isLoading && !searchErrorMessage && results.length === 0 ? (
+            <p className="catalog-suggestion-status">No catalog matches. You can still keep the current manual name.</p>
+          ) : null}
+          {!isLoading && !searchErrorMessage && results.length > 0 ? (
+            <div className="catalog-suggestion-list">
+              {results.slice(0, 6).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="catalog-suggestion-item"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onCatalogSelect(item)
+                    setIsOpen(false)
+                  }}
+                >
+                  {item.thumbnailUrl ? (
+                    <img src={item.thumbnailUrl} alt="" className="catalog-suggestion-thumb" />
+                  ) : (
+                    <span className="catalog-suggestion-thumb catalog-selected-thumb-placeholder" aria-hidden="true">
+                      {item.name.slice(0, 1)}
+                    </span>
+                  )}
+                  <span className="catalog-suggestion-copy">
+                    <strong>{item.name}</strong>
+                    <span>
+                      {item.primaryMuscle ?? 'No muscle tag'}
+                      {item.equipment ? ` · ${item.equipment}` : ''}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }
