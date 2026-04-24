@@ -283,6 +283,7 @@ export function WorkoutsPage() {
   const [isCompletingSession, setIsCompletingSession] = useState(false)
   const [deletingWorkoutId, setDeletingWorkoutId] = useState<number | null>(null)
   const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null)
+  const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [overloadRecommendations, setOverloadRecommendations] = useState<
@@ -292,6 +293,21 @@ export function WorkoutsPage() {
   useEffect(() => {
     void loadData()
   }, [])
+
+  useEffect(() => {
+    if (!selectedWorkout) {
+      return
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setSelectedWorkout(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedWorkout])
 
   const stats = useMemo(() => {
     const latestWorkout = workouts[0]
@@ -719,6 +735,7 @@ export function WorkoutsPage() {
       setErrorMessage(null)
       await deleteWorkout(workout.id)
       setWorkouts((current) => current.filter((currentWorkout) => currentWorkout.id !== workout.id))
+      setSelectedWorkout((current) => (current?.id === workout.id ? null : current))
       setFeedback('Workout deleted.')
     } catch (error) {
       setErrorMessage(getRequestErrorMessage(error, 'Unable to delete this workout.'))
@@ -1514,9 +1531,22 @@ export function WorkoutsPage() {
               description="Try widening the date range or changing the search term."
             />
           ) : (
-            <div className="workout-list" role="list">
+            <div className="workout-list-scroll">
+              <div className="workout-list" role="list">
               {filteredWorkouts.map((workout) => (
-                <article key={workout.id} className="workout-card" role="listitem">
+                <article
+                  key={workout.id}
+                  className="workout-card workout-card-clickable"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedWorkout(workout)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setSelectedWorkout(workout)
+                    }
+                  }}
+                >
                   <div className="workout-card-header">
                     <div>
                       <p className="entry-date">{formatDate(workout.date)}</p>
@@ -1541,7 +1571,10 @@ export function WorkoutsPage() {
                     <button
                       type="button"
                       className="ghost-button subtle-danger-button compact-button"
-                      onClick={() => void handleDeleteWorkout(workout)}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void handleDeleteWorkout(workout)
+                      }}
                       disabled={deletingWorkoutId === workout.id}
                     >
                       {deletingWorkoutId === workout.id ? 'Deleting...' : 'Delete workout'}
@@ -1588,10 +1621,20 @@ export function WorkoutsPage() {
                   )}
                 </article>
               ))}
+              </div>
             </div>
           )}
         </div>
       </section>
+
+      {selectedWorkout ? (
+        <WorkoutDetailsModal
+          workout={selectedWorkout}
+          onClose={() => setSelectedWorkout(null)}
+          onDelete={() => void handleDeleteWorkout(selectedWorkout)}
+          isDeleting={deletingWorkoutId === selectedWorkout.id}
+        />
+      ) : null}
     </main>
   )
 }
@@ -1704,6 +1747,126 @@ function formatCardioIntensity(intensity: Workout['cardioIntensity']) {
     default:
       return 'Cardio'
   }
+}
+
+function WorkoutDetailsModal({
+  workout,
+  onClose,
+  onDelete,
+  isDeleting,
+}: {
+  workout: Workout
+  onClose: () => void
+  onDelete: () => void
+  isDeleting: boolean
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="modal-panel workout-details-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="workout-details-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modal-header workout-details-header">
+          <div>
+            <span className="stat-label">Workout details</span>
+            <h2 id="workout-details-title">{formatDate(workout.date)}</h2>
+            <p className="record-hint">
+              {workout.workoutType === 'cardio' ? 'Cardio session' : 'Strength workout'}
+            </p>
+          </div>
+          <button type="button" className="ghost-button compact-button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        <div className="workout-details-meta">
+          <span
+            className={
+              workout.workoutType === 'cardio'
+                ? 'info-pill info-pill-cardio'
+                : 'info-pill info-pill-strength'
+            }
+          >
+            {workout.workoutType === 'cardio' ? 'Cardio' : 'Strength'}
+          </span>
+          {workout.workoutType === 'cardio' && workout.cardioDurationMinutes ? (
+            <span className="info-pill">{workout.cardioDurationMinutes} min</span>
+          ) : null}
+          {workout.workoutType === 'strength' ? (
+            <span className="info-pill">
+              {workout.exerciseEntries.length} exercise{workout.exerciseEntries.length === 1 ? '' : 's'}
+            </span>
+          ) : null}
+        </div>
+
+        {workout.notes ? <p className="workout-notes workout-details-notes">{workout.notes}</p> : null}
+
+        <div className="workout-details-body">
+          {workout.workoutType === 'cardio' ? (
+            <div className="workout-details-cardio">
+              <div className="exercise-summary-item cardio-summary-item">
+                <div className="exercise-summary-copy">
+                  <strong>{formatCardioActivityType(workout.cardioActivityType)}</strong>
+                  <span>
+                    {workout.cardioDurationMinutes} min
+                    {workout.cardioDistanceKm ? ` • ${workout.cardioDistanceKm} km` : ''}
+                  </span>
+                </div>
+                <div className="exercise-summary-meta">
+                  <span className="info-pill">{formatCardioIntensity(workout.cardioIntensity)}</span>
+                  <span className="record-hint">
+                    {workout.cardioDistanceKm ? 'Duration, distance, intensity' : 'Duration and intensity'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="workout-details-exercise-list">
+              {workout.exerciseEntries.map((exercise) => (
+                <article key={exercise.id} className="workout-details-exercise-card">
+                  <div className="workout-card-header">
+                    <div>
+                      <strong>{exercise.exerciseName}</strong>
+                      <p className="record-hint">{exercise.sets.length} set{exercise.sets.length === 1 ? '' : 's'}</p>
+                    </div>
+                    <div className="exercise-summary-meta">
+                      {exercise.isPersonalRecord ? <span className="pr-badge">PR</span> : null}
+                      <span className="record-hint">Best: {exercise.personalRecordWeightKg} kg</span>
+                    </div>
+                  </div>
+                  <div className="workout-details-set-list">
+                    {exercise.sets
+                      .slice()
+                      .sort((left, right) => left.order - right.order)
+                      .map((set) => (
+                        <div key={set.id} className="workout-details-set-row">
+                          <span>Set {set.order}</span>
+                          <strong>
+                            {set.reps} reps x {set.weightKg} kg
+                          </strong>
+                        </div>
+                      ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="action-row workout-details-actions">
+          <button type="button" className="ghost-button" onClick={onClose}>
+            Close
+          </button>
+          <button type="button" className="ghost-button subtle-danger-button" onClick={onDelete} disabled={isDeleting}>
+            {isDeleting ? 'Deleting...' : 'Delete workout'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function ExerciseEditorCard({

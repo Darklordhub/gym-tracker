@@ -4228,6 +4228,101 @@
     var(--surface-overlay);
 }
 
+.workout-list-scroll {
+  max-height: min(70vh, 1040px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.workout-card-clickable {
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.workout-card-clickable:hover,
+.workout-card-clickable:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.workout-details-modal {
+  width: min(100%, 760px);
+  max-height: min(88vh, 920px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.workout-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+
+.workout-details-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.workout-details-notes {
+  margin-bottom: 14px;
+}
+
+.workout-details-body {
+  overflow-y: auto;
+  display: grid;
+  gap: 14px;
+  padding-right: 4px;
+}
+
+.workout-details-cardio,
+.workout-details-exercise-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-overlay);
+}
+
+.workout-details-exercise-list {
+  display: grid;
+  gap: 12px;
+}
+
+.workout-details-set-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.workout-details-set-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.workout-details-set-row strong {
+  color: var(--text);
+}
+
+.workout-details-actions {
+  margin-top: 16px;
+}
+
 @media (max-width: 1280px) {
   .forge-stat-strip-workouts {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4263,6 +4358,10 @@
   .workouts-panel-templates,
   .workouts-panel-cardio {
     grid-column: span 3;
+  }
+
+  .workout-list-scroll {
+    max-height: min(66vh, 920px);
   }
 
   .dashboard-assistant-grid,
@@ -5851,6 +5950,22 @@
 
   .notification-panel {
     padding: 0.9375rem;
+  }
+
+  .workout-list-scroll {
+    max-height: none;
+    padding-right: 0;
+  }
+
+  .workout-details-header,
+  .workout-details-set-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .workout-details-modal {
+    width: min(100%, 100%);
+    max-height: min(90vh, 100%);
   }
 }
 
