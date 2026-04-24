@@ -1754,6 +1754,8 @@ function ExerciseEditorCard({
         onCatalogSelect={onCatalogSelect}
       />
 
+      {exercise.catalogItem ? <ExerciseHelpCard item={exercise.catalogItem} /> : null}
+
       {normalizeExerciseName(exercise.exerciseName).length >= 3 ? (
         <ExerciseSuggestionNotice
           overloadState={overloadState}
@@ -1834,6 +1836,71 @@ function ExerciseEditorCard({
         </button>
       </div>
     </div>
+  )
+}
+
+function ExerciseHelpCard({ item }: { item: ExerciseCatalogItem }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const muscleTags = [item.primaryMuscle, ...item.secondaryMuscles].filter(
+    (muscle): muscle is string => Boolean(muscle),
+  )
+  const guidanceText = item.instructions ?? item.description
+  const guidancePreview =
+    guidanceText && guidanceText.length > 220 ? `${guidanceText.slice(0, 220).trimEnd()}...` : guidanceText
+  const shouldClamp = Boolean(guidanceText && guidanceText.length > 220)
+
+  return (
+    <section className="exercise-help-card">
+      <div className="exercise-help-header">
+        <div className="exercise-help-heading">
+          <span className="stat-label">Exercise guidance</span>
+          <h4>{item.name}</h4>
+        </div>
+        {shouldClamp ? (
+          <button
+            type="button"
+            className="ghost-button compact-button"
+            onClick={() => setIsExpanded((current) => !current)}
+          >
+            {isExpanded ? 'Show less' : 'Show more'}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="exercise-help-body">
+        {item.thumbnailUrl ? (
+          <div className="exercise-help-media">
+            <img src={item.thumbnailUrl} alt={item.name} />
+          </div>
+        ) : null}
+
+        <div className="exercise-help-copy">
+          <div className="exercise-help-pills">
+            {muscleTags.slice(0, 4).map((muscle) => (
+              <span key={muscle} className="info-pill">
+                {formatLabel(muscle)}
+              </span>
+            ))}
+            {item.equipment ? <span className="info-pill">{formatLabel(item.equipment)}</span> : null}
+          </div>
+
+          {guidanceText ? (
+            <p className="exercise-help-text">{isExpanded ? guidanceText : guidancePreview}</p>
+          ) : (
+            <p className="exercise-help-text">Catalog guidance is limited for this exercise, but the name and tags are still linked.</p>
+          )}
+
+          <div className="exercise-help-footer">
+            {item.videoUrl ? (
+              <a className="ghost-button compact-button" href={item.videoUrl} target="_blank" rel="noreferrer">
+                Watch demo
+              </a>
+            ) : null}
+            <span className="record-hint">Catalog-backed guidance only. Your sets and save flow stay unchanged.</span>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -2083,6 +2150,14 @@ function ExerciseSuggestionNotice({
       ) : null}
     </div>
   )
+}
+
+function formatLabel(value: string) {
+  return value
+    .split(/[\s,_-]+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(' ')
 }
 
 function formatProgressionStatus(status: ProgressiveOverloadRecommendation['progressionStatus']) {
