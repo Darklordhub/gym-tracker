@@ -8,6 +8,7 @@ import { fetchWorkouts } from './api/workouts'
 import { DashboardPage } from './pages/DashboardPage'
 import { AdminPage } from './pages/AdminPage'
 import { CyclePage } from './pages/CyclePage'
+import { ExerciseLibraryPage } from './pages/ExerciseLibraryPage'
 import { ExerciseProgressPage } from './pages/ExerciseProgressPage'
 import { LoginPage } from './pages/LoginPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -18,7 +19,7 @@ import { formatDate } from './lib/format'
 import { generateNotifications, type AppNotification } from './lib/notifications'
 
 type ThemeMode = 'light' | 'dark'
-type IconName = 'dashboard' | 'weight' | 'workouts' | 'progress' | 'cycle' | 'profile' | 'admin'
+type IconName = 'dashboard' | 'weight' | 'workouts' | 'progress' | 'cycle' | 'profile' | 'admin' | 'library'
 
 type NavItem = {
   to: string
@@ -30,6 +31,7 @@ const primaryNavItems: readonly NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { to: '/weight', label: 'Weight', icon: 'weight' },
   { to: '/workouts', label: 'Workouts', icon: 'workouts' },
+  { to: '/exercise-library', label: 'Exercise Library', icon: 'library' },
   { to: '/exercise-progress', label: 'Exercise Progress', icon: 'progress' },
   { to: '/cycle', label: 'Cycle', icon: 'cycle' },
   { to: '/profile', label: 'Profile', icon: 'profile' },
@@ -50,6 +52,11 @@ const routeMeta: Record<string, { title: string; eyebrow: string; description: s
     title: 'Session Library',
     eyebrow: 'Workload',
     description: 'Track strength and cardio sessions with a layout tuned for dense training data.',
+  },
+  '/exercise-library': {
+    title: 'Exercise Library',
+    eyebrow: 'Catalog',
+    description: 'Review the local exercise catalog foundation that future provider sync will build on.',
   },
   '/exercise-progress': {
     title: 'Performance Trends',
@@ -101,6 +108,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/weight" element={<WeightPage />} />
           <Route path="/workouts" element={<WorkoutsPage />} />
+          <Route path="/exercise-library" element={<ExerciseLibraryPage />} />
           <Route path="/exercise-progress" element={<ExerciseProgressPage />} />
           <Route path="/cycle" element={<CyclePage />} />
           <Route path="/profile" element={<ProfilePage />} />
@@ -607,6 +615,8 @@ function getNavMeta(pathname: string) {
       return 'Body metrics'
     case '/workouts':
       return 'Session logs'
+    case '/exercise-library':
+      return 'Catalog'
     case '/exercise-progress':
       return 'Lift history'
     case '/cycle':
@@ -661,6 +671,14 @@ function AppIcon({ name }: { name: IconName }) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 18 10 12l4 4 6-8" />
           <path d="M4 6v12h16" />
+        </svg>
+      )
+    case 'library':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v16H7.5A2.5 2.5 0 0 0 5 21z" />
+          <path d="M5 5.5V21" />
+          <path d="M9 7h6M9 11h6M9 15h4" />
         </svg>
       )
     case 'cycle':

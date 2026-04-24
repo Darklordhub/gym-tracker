@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<UserCycleSymptomLog> UserCycleSymptomLogs => Set<UserCycleSymptomLog>();
     public DbSet<UserReadinessLog> UserReadinessLogs => Set<UserReadinessLog>();
     public DbSet<UserCalorieLog> UserCalorieLogs => Set<UserCalorieLog>();
+    public DbSet<ExerciseCatalogItem> ExerciseCatalogItems => Set<ExerciseCatalogItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -86,6 +87,62 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserCalorieLog>()
             .Property(log => log.Notes)
             .HasMaxLength(500);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.Source)
+            .HasMaxLength(40);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.ExternalId)
+            .HasMaxLength(120);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.Name)
+            .HasMaxLength(160);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.Slug)
+            .HasMaxLength(180);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.Description)
+            .HasMaxLength(4000);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.Instructions)
+            .HasMaxLength(6000);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.PrimaryMuscle)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.SecondaryMuscles)
+            .HasMaxLength(300);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.Equipment)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.Difficulty)
+            .HasMaxLength(40);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.VideoUrl)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.ThumbnailUrl)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.LocalMediaPath)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .Property(item => item.IsActive)
+            .HasDefaultValue(true);
 
         modelBuilder.Entity<GoalSettings>()
             .Property(goalSettings => goalSettings.CalorieTargetMode)
@@ -185,6 +242,10 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<UserCalorieLog>()
             .HasIndex(log => new { log.UserId, log.Date })
+            .IsUnique();
+
+        modelBuilder.Entity<ExerciseCatalogItem>()
+            .HasIndex(item => item.Slug)
             .IsUnique();
 
         modelBuilder.Entity<WeightEntry>()

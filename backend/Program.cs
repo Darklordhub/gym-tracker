@@ -46,6 +46,8 @@ builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<LegacyDataMigrationService>();
 builder.Services.AddScoped<TrainingIntelligenceService>();
 builder.Services.AddScoped<ProgressiveOverloadService>();
+builder.Services.AddScoped<ExerciseCatalogService>();
+builder.Services.AddScoped<ExerciseCatalogSeedService>();
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>
@@ -89,6 +91,7 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseMigration");
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var legacyDataMigrationService = scope.ServiceProvider.GetRequiredService<LegacyDataMigrationService>();
+    var exerciseCatalogSeedService = scope.ServiceProvider.GetRequiredService<ExerciseCatalogSeedService>();
 
     const int maxMigrationAttempts = 10;
 
@@ -98,6 +101,7 @@ using (var scope = app.Services.CreateScope())
         {
             dbContext.Database.Migrate();
             await legacyDataMigrationService.MigrateAsync();
+            await exerciseCatalogSeedService.SeedAsync();
             break;
         }
         catch (Exception exception) when (attempt < maxMigrationAttempts)
