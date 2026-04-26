@@ -55,6 +55,10 @@ public partial class WgerExerciseCatalogSyncService : IWgerExerciseCatalogSyncSe
         var created = 0;
         var updated = 0;
         var skipped = 0;
+        var itemsWithThumbnail = 0;
+        var itemsWithVideo = 0;
+        var itemsMissingMedia = 0;
+        var mediaExtractionFailures = 0;
         var offset = 0;
         var syncedAt = DateTime.UtcNow;
 
@@ -108,6 +112,32 @@ public partial class WgerExerciseCatalogSyncService : IWgerExerciseCatalogSyncSe
                     continue;
                 }
 
+                if (!string.IsNullOrWhiteSpace(mapped.ThumbnailUrl))
+                {
+                    itemsWithThumbnail++;
+                }
+
+                if (!string.IsNullOrWhiteSpace(mapped.VideoUrl))
+                {
+                    itemsWithVideo++;
+                }
+
+                if (string.IsNullOrWhiteSpace(mapped.ThumbnailUrl) && string.IsNullOrWhiteSpace(mapped.VideoUrl))
+                {
+                    itemsMissingMedia++;
+                }
+
+                if ((exercise.Images.Count > 0 && string.IsNullOrWhiteSpace(mapped.ThumbnailUrl))
+                    || (exercise.Videos.Count > 0 && string.IsNullOrWhiteSpace(mapped.VideoUrl)))
+                {
+                    mediaExtractionFailures++;
+                    _logger.LogDebug(
+                        "Wger media metadata was present but no usable media URL was selected. ExerciseId={ExerciseId} ImageCandidates={ImageCandidates} VideoCandidates={VideoCandidates}",
+                        exercise.Id,
+                        exercise.Images.Count,
+                        exercise.Videos.Count);
+                }
+
                 if (existingItems.TryGetValue(mapped.ExternalId!, out var existingItem))
                 {
                     ApplyUpdate(existingItem, mapped, syncedAt);
@@ -147,6 +177,13 @@ public partial class WgerExerciseCatalogSyncService : IWgerExerciseCatalogSyncSe
             created,
             updated,
             skipped);
+
+        _logger.LogInformation(
+            "Wger media enrichment summary. ItemsWithThumbnail={ItemsWithThumbnail} ItemsWithVideo={ItemsWithVideo} ItemsMissingMedia={ItemsMissingMedia} MediaExtractionFailures={MediaExtractionFailures}",
+            itemsWithThumbnail,
+            itemsWithVideo,
+            itemsMissingMedia,
+            mediaExtractionFailures);
 
         return response;
     }
@@ -188,6 +225,8 @@ public partial class WgerExerciseCatalogSyncService : IWgerExerciseCatalogSyncSe
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.OrdinalIgnoreCase));
 
+        var thumbnailUrl = SelectBestMediaUrl(exercise.Images, MediaKind.Image);
+        var videoUrl = SelectBestMediaUrl(exercise.Videos, MediaKind.Video);
         var externalId = exercise.Id.ToString();
         var slug = BuildSlug(name, externalId);
 
@@ -203,8 +242,8 @@ public partial class WgerExerciseCatalogSyncService : IWgerExerciseCatalogSyncSe
             SecondaryMuscles = string.Join(',', secondaryMuscles.Distinct(StringComparer.OrdinalIgnoreCase)),
             Equipment = string.IsNullOrWhiteSpace(equipment) ? null : equipment,
             Difficulty = null,
-            VideoUrl = GetFirstMediaUrl(exercise.Videos, "url", "video", "video_url"),
-            ThumbnailUrl = GetFirstMediaUrl(exercise.Images, "image_thumbnail", "thumbnail", "image", "original"),
+            VideoUrl = videoUrl,
+            ThumbnailUrl = thumbnailUrl,
             LocalMediaPath = null,
             IsActive = true,
             LastSyncedAt = syncedAt,
@@ -272,21 +311,29 @@ public partial class WgerExerciseCatalogSyncService : IWgerExerciseCatalogSyncSe
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
-    private static string? GetFirstMediaUrl(IEnumerable<JsonElement> items, params string[] keys)
+    private static string? SelectBestMediaUrl(IEnumerable<JsonElement> items, MediaKind mediaKind)
     {
+        MediaCandidate? best = null;
+
         foreach (var item in items)
         {
-            foreach (var key in keys)
+            var url = NormalizeText(GetBestMediaUrlFromItem(item, mediaKind));
+            if (string.IsNullOrWhiteSpace(url))
             {
-                var value = NormalizeText(GetString(item, key));
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    return value;
-                }
+                continue;
+            }
+
+            var candidate = new MediaCandidate(
+                url,
+                ScoreMediaCandidate(item, mediaKind));
+
+            if (best is null || candidate.Score > best.Score)
+            {
+                best = candidate;
             }
         }
 
-        return null;
+        return best?.Url;
     }
 
     private static string? GetName(JsonElement item)
@@ -437,9 +484,106 @@ public partial class WgerExerciseCatalogSyncService : IWgerExerciseCatalogSyncSe
         };
     }
 
+    private static string? GetBestMediaUrlFromItem(JsonElement item, MediaKind mediaKind)
+    {
+        var preferredKeys = mediaKind == MediaKind.Image
+            ? new[] { "image_thumbnail", "thumbnail", "medium", "small", "image", "url", "original" }
+            : new[] { "url", "video", "video_url", "file", "source" };
+
+        foreach (var key in preferredKeys)
+        {
+            var value = NormalizeText(GetString(item, key));
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static int ScoreMediaCandidate(JsonElement item, MediaKind mediaKind)
+    {
+        var score = 0;
+
+        if (GetBoolean(item, "is_main") == true
+            || GetBoolean(item, "main") == true
+            || GetBoolean(item, "featured") == true)
+        {
+            score += 10;
+        }
+
+        if (GetBoolean(item, "is_approved") == true
+            || GetBoolean(item, "approved") == true)
+        {
+            score += 8;
+        }
+
+        var status = NormalizeText(
+            GetString(item, "status")
+            ?? GetString(item, "state")
+            ?? GetString(item, "approval_status"));
+
+        if (string.Equals(status, "approved", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "accepted", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 8;
+        }
+
+        if (mediaKind == MediaKind.Image)
+        {
+            if (!string.IsNullOrWhiteSpace(GetString(item, "image_thumbnail"))
+                || !string.IsNullOrWhiteSpace(GetString(item, "thumbnail")))
+            {
+                score += 4;
+            }
+
+            if (!string.IsNullOrWhiteSpace(GetString(item, "image"))
+                || !string.IsNullOrWhiteSpace(GetString(item, "original")))
+            {
+                score += 2;
+            }
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(GetString(item, "url"))
+                || !string.IsNullOrWhiteSpace(GetString(item, "video_url")))
+            {
+                score += 4;
+            }
+        }
+
+        return score;
+    }
+
+    private static bool? GetBoolean(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(propertyName, out var propertyValue))
+        {
+            return null;
+        }
+
+        return propertyValue.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Number when propertyValue.TryGetInt32(out var number) => number != 0,
+            JsonValueKind.String when bool.TryParse(propertyValue.GetString(), out var boolean) => boolean,
+            _ => null,
+        };
+    }
+
     [GeneratedRegex("<.*?>", RegexOptions.Singleline)]
     private static partial Regex HtmlTagRegex();
 
     [GeneratedRegex("\\s+")]
     private static partial Regex WhitespaceRegex();
+
+    private enum MediaKind
+    {
+        Image,
+        Video,
+    }
+
+    private sealed record MediaCandidate(string Url, int Score);
 }
