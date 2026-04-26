@@ -7697,7 +7697,7 @@ body {
 }
 
 .exercise-library-list {
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   align-items: stretch;
   gap: 0.9rem;
 }
@@ -7714,22 +7714,28 @@ body {
 }
 
 .exercise-library-item-media {
+  display: grid;
+  place-items: center;
   overflow: hidden;
   width: 100%;
   min-height: 0;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 5 / 4;
+  padding: 0.75rem;
   border-radius: calc(var(--shell-radius-md) - 0.05rem);
   border: 1px solid var(--shell-border);
   background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 16%, transparent), transparent 56%),
-    color-mix(in srgb, var(--surface-muted) 88%, transparent);
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 12%, transparent), transparent 56%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay-strong) 84%, transparent), color-mix(in srgb, var(--surface-muted) 92%, transparent));
 }
 
 .exercise-library-item-media img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
+  min-width: 0;
+  min-height: 0;
 }
 
 .exercise-library-item-media-fallback {
@@ -7737,6 +7743,7 @@ body {
   place-items: center;
   align-content: center;
   gap: 0.45rem;
+  text-align: center;
 }
 
 .exercise-library-item-media-fallback-icon {
@@ -7786,6 +7793,15 @@ body {
   gap: 0.4rem;
 }
 
+.exercise-library-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.95rem;
+}
+
 .exercise-library-modal {
   width: min(100%, 940px);
   max-height: min(90vh, 940px);
@@ -7811,9 +7827,25 @@ body {
 }
 
 .exercise-library-modal-media {
+  display: grid;
+  place-items: center;
   min-height: 260px;
+  aspect-ratio: 5 / 4;
   position: sticky;
   top: 0;
+  padding: 1rem;
+  border-radius: calc(var(--shell-radius-lg) - 0.15rem);
+  border: 1px solid var(--shell-border);
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 12%, transparent), transparent 56%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay-strong) 84%, transparent), color-mix(in srgb, var(--surface-muted) 92%, transparent));
+}
+
+.exercise-library-modal-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .workout-details-modal {
@@ -7896,6 +7928,7 @@ body {
   .exercise-library-modal-media {
     position: static;
     min-height: 220px;
+    padding: 0.85rem;
   }
 }
 
@@ -7910,7 +7943,8 @@ body {
   }
 
   .exercise-library-item-media {
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 4 / 3;
+    padding: 0.65rem;
   }
 
   .exercise-library-modal {
@@ -7921,6 +7955,14 @@ body {
 
   .exercise-library-modal-header {
     gap: 12px;
+  }
+
+  .exercise-library-list-actions {
+    align-items: stretch;
+  }
+
+  .exercise-library-list-actions .ghost-button {
+    width: 100%;
   }
 
   .workout-details-modal {

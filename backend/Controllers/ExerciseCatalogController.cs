@@ -18,15 +18,27 @@ public class ExerciseCatalogController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ExerciseCatalogItemResponse>>> GetCatalog()
+    public async Task<ActionResult> GetCatalog([FromQuery] int? page, [FromQuery] int? pageSize)
     {
+        if (page.HasValue || pageSize.HasValue)
+        {
+            var catalogPage = await _exerciseCatalogService.GetPageAsync(page ?? 1, pageSize ?? 24);
+            return Ok(catalogPage);
+        }
+
         var items = await _exerciseCatalogService.GetAllAsync();
         return Ok(items);
     }
 
     [HttpGet("search")]
-    public async Task<ActionResult<IEnumerable<ExerciseCatalogItemResponse>>> Search([FromQuery] string? q)
+    public async Task<ActionResult> Search([FromQuery] string? q, [FromQuery] int? page, [FromQuery] int? pageSize)
     {
+        if (page.HasValue || pageSize.HasValue)
+        {
+            var catalogPage = await _exerciseCatalogService.GetPageAsync(page ?? 1, pageSize ?? 24, q);
+            return Ok(catalogPage);
+        }
+
         var items = await _exerciseCatalogService.SearchAsync(q);
         return Ok(items);
     }

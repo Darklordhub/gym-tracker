@@ -1,9 +1,9 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Dumbbell, PlayCircle } from 'lucide-react'
 import {
-  fetchExerciseCatalog,
+  fetchExerciseCatalogPage,
   fetchExerciseCatalogItem,
-  searchExerciseCatalog,
+  searchExerciseCatalogPage,
 } from '../api/exerciseCatalog'
 import { StateCard } from '../components/StateCard'
 import { VideoModal } from '../components/VideoModal'
@@ -11,22 +11,29 @@ import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { ExerciseCatalogItem } from '../types/exerciseCatalog'
 
+const CATALOG_PAGE_SIZE = 24
+
 export function ExerciseLibraryPage() {
   const [items, setItems] = useState<ExerciseCatalogItem[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [selectedItem, setSelectedItem] = useState<ExerciseCatalogItem | null>(null)
   const [videoTarget, setVideoTarget] = useState<{ title: string; url: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [isLoadingList, setIsLoadingList] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [detailsErrorMessage, setDetailsErrorMessage] = useState<string | null>(null)
   const [brokenThumbnails, setBrokenThumbnails] = useState<Record<number, true>>({})
   const deferredSearchQuery = useDeferredValue(searchQuery)
+  const latestCatalogRequestRef = useRef(0)
+  const normalizedSearchQuery = deferredSearchQuery.trim()
 
   useEffect(() => {
-    void loadCatalog(deferredSearchQuery)
-  }, [deferredSearchQuery])
+    void loadCatalogPage(normalizedSearchQuery, 1, false)
+  }, [normalizedSearchQuery])
 
   useEffect(() => {
     if (items.length === 0) {
@@ -75,17 +82,45 @@ export function ExerciseLibraryPage() {
     )
   }, [selectedItem])
 
-  async function loadCatalog(query: string) {
+  const hasMoreItems = items.length < totalCount
+  const isSearchActive = normalizedSearchQuery.length > 0
+
+  async function loadCatalogPage(query: string, nextPage: number, append: boolean) {
+    const requestId = ++latestCatalogRequestRef.current
+
     try {
-      setIsLoadingList(true)
-      setErrorMessage(null)
-      const nextItems = query.trim()
-        ? await searchExerciseCatalog(query.trim())
-        : await fetchExerciseCatalog()
-      setItems(nextItems)
+      if (append) {
+        setIsLoadingMore(true)
+      } else {
+        setIsLoadingList(true)
+        setErrorMessage(null)
+      }
+
+      const response = query
+        ? await searchExerciseCatalogPage(query, nextPage, CATALOG_PAGE_SIZE)
+        : await fetchExerciseCatalogPage(nextPage, CATALOG_PAGE_SIZE)
+
+      if (requestId !== latestCatalogRequestRef.current) {
+        return
+      }
+
+      setPage(response.page)
+      setTotalCount(response.totalCount)
+      setItems((currentItems) => {
+        if (!append) {
+          return response.items
+        }
+
+        const existingIds = new Set(currentItems.map((item) => item.id))
+        return [...currentItems, ...response.items.filter((item) => !existingIds.has(item.id))]
+      })
       setBrokenThumbnails((current) => {
+        if (append) {
+          return current
+        }
+
         const next: Record<number, true> = {}
-        for (const item of nextItems) {
+        for (const item of response.items) {
           if (current[item.id]) {
             next[item.id] = true
           }
@@ -93,10 +128,20 @@ export function ExerciseLibraryPage() {
         return next
       })
     } catch (error) {
+      if (requestId !== latestCatalogRequestRef.current) {
+        return
+      }
+
       setErrorMessage(getRequestErrorMessage(error, 'Unable to load the exercise library.'))
-      setItems([])
+      if (!append) {
+        setItems([])
+        setTotalCount(0)
+      }
     } finally {
-      setIsLoadingList(false)
+      if (requestId === latestCatalogRequestRef.current) {
+        setIsLoadingList(false)
+        setIsLoadingMore(false)
+      }
     }
   }
 
@@ -114,6 +159,17 @@ export function ExerciseLibraryPage() {
     }
   }
 
+  function markThumbnailBroken(itemId: number) {
+    setBrokenThumbnails((current) =>
+      current[itemId]
+        ? current
+        : {
+            ...current,
+            [itemId]: true,
+          },
+    )
+  }
+
   return (
     <main className="page-shell exercise-library-shell">
       <section className="hero-panel exercise-library-hero">
@@ -128,10 +184,13 @@ export function ExerciseLibraryPage() {
         <div className="exercise-library-hero-stats">
           <article className="forge-focus-card">
             <span className="stat-label">Catalog status</span>
-            <strong>{items.length}</strong>
-            <p>{items.length === 1 ? 'active exercise in view' : 'active exercises in view'}</p>
+            <strong>{totalCount}</strong>
+            <p>
+              Showing {items.length} of {totalCount}
+              {totalCount === 1 ? ' active exercise' : ' active exercises'}
+            </p>
             <div className="forge-focus-pills">
-              <span className="info-pill">{deferredSearchQuery.trim() ? 'Filtered' : 'Full library'}</span>
+              <span className="info-pill">{isSearchActive ? 'Filtered' : 'Full library'}</span>
               <span className="info-pill info-pill-strength">Local source</span>
             </div>
           </article>
@@ -167,65 +226,67 @@ export function ExerciseLibraryPage() {
             <StateCard
               title="No exercises found"
               description={
-                deferredSearchQuery.trim()
+                isSearchActive
                   ? 'Try a broader search term or clear the current filter.'
                   : 'No exercise catalog items are available yet.'
               }
             />
           ) : (
-            <div className="exercise-library-list list-scroll-region">
-              {items.map((item) => {
-                const previewText = item.description ?? item.instructions ?? 'Open details for muscles, equipment, and instructions.'
-                const showThumbnail = Boolean(item.thumbnailUrl) && !brokenThumbnails[item.id]
+            <>
+              <div className="exercise-library-list list-scroll-region">
+                {items.map((item) => {
+                  const previewText = item.description ?? item.instructions ?? 'Open details for muscles, equipment, and instructions.'
 
-                return (
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={item.id === selectedId ? 'exercise-library-item exercise-library-item-active' : 'exercise-library-item'}
+                      onClick={() => setSelectedId(item.id)}
+                    >
+                      <ExerciseLibraryMedia
+                        item={item}
+                        isBroken={Boolean(brokenThumbnails[item.id])}
+                        onError={() => markThumbnailBroken(item.id)}
+                      />
+                      <div className="exercise-library-item-copy">
+                        <strong>{item.name}</strong>
+                        <p>{previewText}</p>
+                      </div>
+                      <div className="exercise-library-item-meta">
+                        {item.primaryMuscle ? <span className="info-pill">{formatLabel(item.primaryMuscle)}</span> : null}
+                        {item.equipment ? <span className="info-pill">{formatLabel(item.equipment)}</span> : null}
+                        {item.difficulty ? <span className="info-pill">{formatLabel(item.difficulty)}</span> : null}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {hasMoreItems ? (
+                <div className="exercise-library-list-actions">
                   <button
-                    key={item.id}
                     type="button"
-                    className={item.id === selectedId ? 'exercise-library-item exercise-library-item-active' : 'exercise-library-item'}
-                    onClick={() => setSelectedId(item.id)}
+                    className="ghost-button"
+                    onClick={() => void loadCatalogPage(normalizedSearchQuery, page + 1, true)}
+                    disabled={isLoadingMore}
                   >
-                    {showThumbnail ? (
-                      <div className="exercise-library-item-media">
-                        <img
-                          src={item.thumbnailUrl!}
-                          alt={item.name}
-                          loading="lazy"
-                          onError={() =>
-                            setBrokenThumbnails((current) =>
-                              current[item.id]
-                                ? current
-                                : {
-                                    ...current,
-                                    [item.id]: true,
-                                  },
-                            )
-                          }
-                        />
-                      </div>
-                    ) : (
-                      <div className="exercise-library-item-media exercise-library-item-media-fallback" aria-hidden="true">
-                        <span className="exercise-library-item-media-fallback-icon">
-                          <Dumbbell aria-hidden="true" focusable="false" strokeWidth={1.8} />
-                        </span>
-                        <span className="exercise-library-item-media-fallback-initial">
-                          {item.name.slice(0, 1).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="exercise-library-item-copy">
-                      <strong>{item.name}</strong>
-                      <p>{previewText}</p>
-                    </div>
-                    <div className="exercise-library-item-meta">
-                      {item.primaryMuscle ? <span className="info-pill">{formatLabel(item.primaryMuscle)}</span> : null}
-                      {item.equipment ? <span className="info-pill">{formatLabel(item.equipment)}</span> : null}
-                      {item.difficulty ? <span className="info-pill">{formatLabel(item.difficulty)}</span> : null}
-                    </div>
+                    {isLoadingMore ? 'Loading more...' : 'Load more'}
                   </button>
-                )
-              })}
-            </div>
+                  <span className="record-hint">
+                    Showing {items.length} of {totalCount}
+                    {isSearchActive ? ' matching exercises' : ' exercises'}
+                  </span>
+                </div>
+              ) : totalCount > 0 ? (
+                <div className="exercise-library-list-actions">
+                  <span className="record-hint">
+                    Showing all {totalCount}
+                    {isSearchActive ? ' matching exercises' : ' exercises'}
+                  </span>
+                </div>
+              ) : null}
+            </>
           )}
         </section>
       </section>
@@ -291,11 +352,14 @@ function ExerciseLibraryDetailsModal({
           <StateCard title="Exercise unavailable" description="This exercise could not be loaded." />
         ) : (
           <div className="exercise-library-modal-body">
-            {item.thumbnailUrl ? (
-              <div className="exercise-library-detail-media exercise-library-modal-media">
-                <img src={item.thumbnailUrl} alt={item.name} />
-              </div>
-            ) : null}
+            <ExerciseLibraryMedia
+              item={item}
+              isBroken={false}
+              onError={() => undefined}
+              allowAnimated
+              loading="eager"
+              className="exercise-library-detail-media exercise-library-modal-media"
+            />
 
             <div className="exercise-library-detail-copy">
               <div className="exercise-library-detail-heading">
@@ -363,4 +427,78 @@ function formatLabel(value: string) {
     .filter(Boolean)
     .map((part) => part[0]?.toUpperCase() + part.slice(1))
     .join(' ')
+}
+
+function ExerciseLibraryMedia({
+  item,
+  isBroken,
+  onError,
+  allowAnimated = false,
+  loading = 'lazy',
+  className = 'exercise-library-item-media',
+}: {
+  item: ExerciseCatalogItem
+  isBroken: boolean
+  onError: () => void
+  allowAnimated?: boolean
+  loading?: 'eager' | 'lazy'
+  className?: string
+}) {
+  const thumbnailUrl = item.thumbnailUrl?.trim() || null
+  const isAnimatedThumbnail = Boolean(thumbnailUrl && isAnimatedImageUrl(thumbnailUrl))
+  const [hasInternalError, setHasInternalError] = useState(false)
+
+  useEffect(() => {
+    setHasInternalError(false)
+  }, [thumbnailUrl])
+
+  const showImage = Boolean(thumbnailUrl) && !isBroken && !hasInternalError && (allowAnimated || !isAnimatedThumbnail)
+
+  return (
+    <div className={showImage ? className : `${className} exercise-library-item-media-fallback`} aria-hidden={showImage ? undefined : 'true'}>
+      {showImage ? (
+        <img
+          src={thumbnailUrl!}
+          alt={item.name}
+          loading={loading}
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => {
+            setHasInternalError(true)
+            onError()
+          }}
+        />
+      ) : (
+        <ExerciseLibraryMediaPlaceholder
+          name={item.name}
+          showAnimatedLabel={Boolean(isAnimatedThumbnail && !allowAnimated)}
+        />
+      )}
+    </div>
+  )
+}
+
+function ExerciseLibraryMediaPlaceholder({
+  name,
+  showAnimatedLabel = false,
+}: {
+  name: string
+  showAnimatedLabel?: boolean
+}) {
+  return (
+    <>
+      <span className="exercise-library-item-media-fallback-icon">
+        <Dumbbell aria-hidden="true" focusable="false" strokeWidth={1.8} />
+      </span>
+      <span className="exercise-library-item-media-fallback-initial">
+        {name.slice(0, 1).toUpperCase()}
+      </span>
+      {showAnimatedLabel ? <span className="record-hint">Animated preview</span> : null}
+    </>
+  )
+}
+
+function isAnimatedImageUrl(url: string) {
+  const normalizedUrl = url.split('?')[0]?.toLowerCase() ?? ''
+  return normalizedUrl.endsWith('.gif')
 }

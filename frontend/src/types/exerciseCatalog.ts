@@ -18,3 +18,10 @@ export type ExerciseCatalogItem = {
   createdAt: string
   updatedAt: string
 }
+
+export type ExerciseCatalogPage = {
+  items: ExerciseCatalogItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
