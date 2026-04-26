@@ -241,7 +241,7 @@ export function ExerciseLibraryPage() {
                     <button
                       key={item.id}
                       type="button"
-                      className={item.id === selectedId ? 'exercise-library-item exercise-library-item-active' : 'exercise-library-item'}
+                      className={item.id === selectedId ? 'exercise-card exercise-card-active' : 'exercise-card'}
                       onClick={() => setSelectedId(item.id)}
                     >
                       <ExerciseLibraryMedia
@@ -249,11 +249,11 @@ export function ExerciseLibraryPage() {
                         isBroken={Boolean(brokenThumbnails[item.id])}
                         onError={() => markThumbnailBroken(item.id)}
                       />
-                      <div className="exercise-library-item-copy">
-                        <strong>{item.name}</strong>
-                        <p>{previewText}</p>
+                      <div className="exercise-card-body">
+                        <strong className="exercise-card-title">{item.name}</strong>
+                        <p className="exercise-card-description">{previewText}</p>
                       </div>
-                      <div className="exercise-library-item-meta">
+                      <div className="exercise-card-chips">
                         {item.primaryMuscle ? <span className="info-pill">{formatLabel(item.primaryMuscle)}</span> : null}
                         {item.equipment ? <span className="info-pill">{formatLabel(item.equipment)}</span> : null}
                         {item.difficulty ? <span className="info-pill">{formatLabel(item.difficulty)}</span> : null}
@@ -435,7 +435,7 @@ function ExerciseLibraryMedia({
   onError,
   allowAnimated = false,
   loading = 'lazy',
-  className = 'exercise-library-item-media',
+  className = 'exercise-card-media',
 }: {
   item: ExerciseCatalogItem
   isBroken: boolean

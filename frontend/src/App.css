@@ -7702,33 +7702,64 @@ body {
   gap: 0.9rem;
 }
 
-.exercise-library-item {
-  display: grid;
-  height: 100%;
-  min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  align-content: start;
+.exercise-card {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
   gap: 0.8rem;
   padding: 0.95rem;
+  border: 1px solid var(--shell-border);
+  border-radius: var(--shell-radius-md);
+  background: var(--surface-elevated);
+  color: var(--text-strong);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
   overflow: hidden;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
-.exercise-library-item-media {
+.exercise-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--shell-border));
+  background: color-mix(in srgb, var(--surface-elevated) 90%, var(--accent) 10%);
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px -28px rgba(15, 23, 42, 0.42);
+}
+
+.exercise-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  outline-offset: 2px;
+}
+
+.exercise-card-active {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--shell-border));
+  background: color-mix(in srgb, var(--surface-elevated) 84%, var(--accent) 16%);
+  box-shadow: 0 18px 36px -28px rgba(15, 23, 42, 0.46);
+}
+
+.exercise-card-media {
   display: grid;
   place-items: center;
   overflow: hidden;
   width: 100%;
-  min-height: 0;
+  min-height: 172px;
   aspect-ratio: 5 / 4;
   padding: 0.75rem;
   border-radius: calc(var(--shell-radius-md) - 0.05rem);
   border: 1px solid var(--shell-border);
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 12%, transparent), transparent 56%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay-strong) 84%, transparent), color-mix(in srgb, var(--surface-muted) 92%, transparent));
+  background: color-mix(in srgb, var(--surface-overlay-strong) 72%, white 28%);
 }
 
-.exercise-library-item-media img {
+.exercise-card-media img {
   display: block;
   width: 100%;
   height: 100%;
@@ -7762,22 +7793,25 @@ body {
   color: color-mix(in srgb, var(--accent) 64%, var(--text-strong));
 }
 
-.exercise-library-item-copy {
+.exercise-card-body {
   display: grid;
   align-content: start;
   gap: 0.34rem;
   min-height: 0;
+  flex: 1 1 auto;
 }
 
-.exercise-library-item-copy strong {
+.exercise-card-title {
   display: -webkit-box;
   overflow: hidden;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   line-height: 1.32;
+  font-size: 0.98rem;
+  color: var(--text-strong);
 }
 
-.exercise-library-item-copy p {
+.exercise-card-description {
   margin: 0;
   color: var(--text-secondary);
   display: -webkit-box;
@@ -7788,9 +7822,11 @@ body {
   min-height: 0;
 }
 
-.exercise-library-item-meta {
-  align-self: end;
+.exercise-card-chips {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
+  margin-top: auto;
 }
 
 .exercise-library-list-actions {
@@ -7937,13 +7973,14 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .exercise-library-item {
+  .exercise-card {
     gap: 0.72rem;
     padding: 0.82rem;
   }
 
-  .exercise-library-item-media {
+  .exercise-card-media {
     aspect-ratio: 4 / 3;
+    min-height: 160px;
     padding: 0.65rem;
   }
 
