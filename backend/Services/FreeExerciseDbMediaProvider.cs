@@ -173,7 +173,8 @@ public class FreeExerciseDbMediaProvider : IExerciseMediaProvider
             ?? GetString(item, "imageUrl")
             ?? GetString(item, "gifUrl")
             ?? GetString(item, "image")
-            ?? GetString(item, "gif"));
+            ?? GetString(item, "gif")
+            ?? GetFirstString(item, "images"));
 
         var videoUrl = BuildAbsoluteUrl(
             GetString(item, "videoUrl")
@@ -185,9 +186,17 @@ public class FreeExerciseDbMediaProvider : IExerciseMediaProvider
             NormalizedName = ExerciseCatalogMediaEnrichmentService.NormalizeName(name),
             ImageUrl = ExerciseCatalogMediaEnrichmentService.IsUsableUrl(imageUrl) ? imageUrl : null,
             VideoUrl = ExerciseCatalogMediaEnrichmentService.IsUsableUrl(videoUrl) ? videoUrl : null,
-            Equipment = NormalizeOptionalText(GetString(item, "equipment") ?? GetFirstString(item, "equipments")),
-            BodyPart = NormalizeOptionalText(GetString(item, "bodyPart") ?? GetFirstString(item, "bodyParts")),
-            TargetMuscle = NormalizeOptionalText(GetString(item, "target") ?? GetFirstString(item, "targetMuscles")),
+            Equipment = NormalizeOptionalText(
+                GetString(item, "equipment")
+                ?? GetFirstString(item, "equipments")),
+            BodyPart = NormalizeOptionalText(
+                GetString(item, "bodyPart")
+                ?? GetFirstString(item, "bodyParts")
+                ?? GetString(item, "category")),
+            TargetMuscle = NormalizeOptionalText(
+                GetString(item, "target")
+                ?? GetFirstString(item, "targetMuscles")
+                ?? GetFirstString(item, "primaryMuscles")),
         };
     }
 
