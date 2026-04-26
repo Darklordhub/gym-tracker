@@ -19,6 +19,7 @@ public enum ExerciseMediaProviderSelection
     All,
     Wger,
     ExerciseDb,
+    FreeExerciseDb,
 }
 
 public sealed record ExerciseCatalogMediaEnrichmentRequest(
@@ -100,6 +101,14 @@ public class ExerciseCatalogMediaEnrichmentService
                     continue;
                 }
 
+                _logger.LogDebug(
+                    "Attempting media enrichment for exercise catalog item {ItemId} ({Name}) via provider {Provider}. NeedImage={NeedImage} NeedVideo={NeedVideo}",
+                    item.Id,
+                    item.Name,
+                    provider.Name,
+                    needsImage,
+                    needsVideo);
+
                 ExerciseMediaMatchResult result;
                 try
                 {
@@ -127,13 +136,39 @@ public class ExerciseCatalogMediaEnrichmentService
                 switch (result.Status)
                 {
                     case ExerciseMediaMatchStatus.Ambiguous:
+                        _logger.LogDebug(
+                            "Media enrichment was ambiguous for exercise catalog item {ItemId} ({Name}) via provider {Provider}. Message={Message} Confidence={Confidence}",
+                            item.Id,
+                            item.Name,
+                            provider.Name,
+                            result.Message,
+                            result.Confidence);
                         ambiguousItems.Add(item.Id);
                         continue;
                     case ExerciseMediaMatchStatus.Failed:
+                        _logger.LogDebug(
+                            "Media enrichment failed for exercise catalog item {ItemId} ({Name}) via provider {Provider}. Message={Message}",
+                            item.Id,
+                            item.Name,
+                            provider.Name,
+                            result.Message);
                         response.Failed++;
                         continue;
                     case ExerciseMediaMatchStatus.NotFound:
+                        _logger.LogDebug(
+                            "No provider media match for exercise catalog item {ItemId} ({Name}) via provider {Provider}. Message={Message}",
+                            item.Id,
+                            item.Name,
+                            provider.Name,
+                            result.Message);
+                        continue;
                     case ExerciseMediaMatchStatus.Skipped:
+                        _logger.LogDebug(
+                            "Skipped media enrichment for exercise catalog item {ItemId} ({Name}) via provider {Provider}. Message={Message}",
+                            item.Id,
+                            item.Name,
+                            provider.Name,
+                            result.Message);
                         continue;
                     case ExerciseMediaMatchStatus.Found:
                     {
@@ -157,6 +192,14 @@ public class ExerciseCatalogMediaEnrichmentService
 
                         if (providerUpdatedAnyField)
                         {
+                            _logger.LogDebug(
+                                "Provider {Provider} enriched media for exercise catalog item {ItemId} ({Name}). AddedImage={AddedImage} AddedVideo={AddedVideo} Confidence={Confidence}",
+                                provider.Name,
+                                item.Id,
+                                item.Name,
+                                !needsImage,
+                                !needsVideo,
+                                result.Confidence);
                             itemUpdated = true;
                             IncrementProviderBreakdown(response.SourceBreakdown, provider.Name);
                         }
@@ -192,6 +235,7 @@ public class ExerciseCatalogMediaEnrichmentService
         {
             ExerciseMediaProviderSelection.Wger => _providers.Where(provider => string.Equals(provider.Name, "wger", StringComparison.OrdinalIgnoreCase)).ToList(),
             ExerciseMediaProviderSelection.ExerciseDb => _providers.Where(provider => string.Equals(provider.Name, "exercisedb", StringComparison.OrdinalIgnoreCase)).ToList(),
+            ExerciseMediaProviderSelection.FreeExerciseDb => _providers.Where(provider => string.Equals(provider.Name, "free-exercise-db", StringComparison.OrdinalIgnoreCase)).ToList(),
             _ => _providers.ToList(),
         };
     }
@@ -350,6 +394,7 @@ public class ExerciseCatalogMediaEnrichmentService
         {
             ExerciseMediaProviderSelection.Wger => "wger",
             ExerciseMediaProviderSelection.ExerciseDb => "exercisedb",
+            ExerciseMediaProviderSelection.FreeExerciseDb => "free-exercise-db",
             _ => "all",
         };
     }

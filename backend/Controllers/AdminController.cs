@@ -181,7 +181,7 @@ public class AdminController : ControllerBase
 
         if (!TryParseProviderSelection(provider, out var parsedProvider))
         {
-            return BadRequest(new { message = "provider must be one of: all, wger, exercisedb." });
+            return BadRequest(new { message = "provider must be one of: all, wger, exercisedb, free-exercise-db." });
         }
 
         var result = await _exerciseCatalogMediaEnrichmentService.EnrichMissingMediaAsync(
@@ -341,6 +341,9 @@ public class AdminController : ControllerBase
                 return true;
             case "exercisedb":
                 providerSelection = ExerciseMediaProviderSelection.ExerciseDb;
+                return true;
+            case "free-exercise-db":
+                providerSelection = ExerciseMediaProviderSelection.FreeExerciseDb;
                 return true;
             default:
                 providerSelection = ExerciseMediaProviderSelection.All;

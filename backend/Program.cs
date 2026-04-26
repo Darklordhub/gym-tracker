@@ -88,6 +88,26 @@ builder.Services.AddHttpClient<ExerciseDbExerciseMediaProvider>(httpClient =>
     httpClient.Timeout = TimeSpan.FromSeconds(45);
 });
 builder.Services.AddScoped<IExerciseMediaProvider>(serviceProvider => serviceProvider.GetRequiredService<ExerciseDbExerciseMediaProvider>());
+builder.Services.AddHttpClient<FreeExerciseDbMediaProvider>(httpClient =>
+{
+    if (!string.IsNullOrWhiteSpace(exerciseMediaEnrichmentOptions.FreeExerciseDb.BaseUrl))
+    {
+        httpClient.BaseAddress = new Uri(
+            exerciseMediaEnrichmentOptions.FreeExerciseDb.BaseUrl.EndsWith('/')
+                ? exerciseMediaEnrichmentOptions.FreeExerciseDb.BaseUrl
+                : $"{exerciseMediaEnrichmentOptions.FreeExerciseDb.BaseUrl}/");
+    }
+
+    httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+    foreach (var header in exerciseMediaEnrichmentOptions.FreeExerciseDb.RequestHeaders)
+    {
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+    }
+
+    httpClient.Timeout = TimeSpan.FromSeconds(45);
+});
+builder.Services.AddScoped<IExerciseMediaProvider>(serviceProvider => serviceProvider.GetRequiredService<FreeExerciseDbMediaProvider>());
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>

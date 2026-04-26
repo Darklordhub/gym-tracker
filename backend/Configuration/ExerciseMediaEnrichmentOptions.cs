@@ -7,6 +7,7 @@ public class ExerciseMediaEnrichmentOptions
     public int MaxItems { get; set; } = 250;
     public ExerciseMediaProviderOptions Wger { get; set; } = new();
     public ExerciseDbMediaProviderOptions ExerciseDb { get; set; } = new();
+    public ExerciseDbMediaProviderOptions FreeExerciseDb { get; set; } = new();
 }
 
 public class ExerciseMediaProviderOptions
