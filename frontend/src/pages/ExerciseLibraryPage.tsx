@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { PlayCircle } from 'lucide-react'
+import { Dumbbell, PlayCircle } from 'lucide-react'
 import {
   fetchExerciseCatalog,
   fetchExerciseCatalogItem,
@@ -21,6 +21,7 @@ export function ExerciseLibraryPage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [detailsErrorMessage, setDetailsErrorMessage] = useState<string | null>(null)
+  const [brokenThumbnails, setBrokenThumbnails] = useState<Record<number, true>>({})
   const deferredSearchQuery = useDeferredValue(searchQuery)
 
   useEffect(() => {
@@ -82,6 +83,15 @@ export function ExerciseLibraryPage() {
         ? await searchExerciseCatalog(query.trim())
         : await fetchExerciseCatalog()
       setItems(nextItems)
+      setBrokenThumbnails((current) => {
+        const next: Record<number, true> = {}
+        for (const item of nextItems) {
+          if (current[item.id]) {
+            next[item.id] = true
+          }
+        }
+        return next
+      })
     } catch (error) {
       setErrorMessage(getRequestErrorMessage(error, 'Unable to load the exercise library.'))
       setItems([])
@@ -166,6 +176,7 @@ export function ExerciseLibraryPage() {
             <div className="exercise-library-list list-scroll-region">
               {items.map((item) => {
                 const previewText = item.description ?? item.instructions ?? 'Open details for muscles, equipment, and instructions.'
+                const showThumbnail = Boolean(item.thumbnailUrl) && !brokenThumbnails[item.id]
 
                 return (
                   <button
@@ -174,13 +185,32 @@ export function ExerciseLibraryPage() {
                     className={item.id === selectedId ? 'exercise-library-item exercise-library-item-active' : 'exercise-library-item'}
                     onClick={() => setSelectedId(item.id)}
                   >
-                    {item.thumbnailUrl ? (
+                    {showThumbnail ? (
                       <div className="exercise-library-item-media">
-                        <img src={item.thumbnailUrl} alt={item.name} />
+                        <img
+                          src={item.thumbnailUrl!}
+                          alt={item.name}
+                          loading="lazy"
+                          onError={() =>
+                            setBrokenThumbnails((current) =>
+                              current[item.id]
+                                ? current
+                                : {
+                                    ...current,
+                                    [item.id]: true,
+                                  },
+                            )
+                          }
+                        />
                       </div>
                     ) : (
                       <div className="exercise-library-item-media exercise-library-item-media-fallback" aria-hidden="true">
-                        <span>{item.name.slice(0, 1).toUpperCase()}</span>
+                        <span className="exercise-library-item-media-fallback-icon">
+                          <Dumbbell aria-hidden="true" focusable="false" strokeWidth={1.8} />
+                        </span>
+                        <span className="exercise-library-item-media-fallback-initial">
+                          {item.name.slice(0, 1).toUpperCase()}
+                        </span>
                       </div>
                     )}
                     <div className="exercise-library-item-copy">

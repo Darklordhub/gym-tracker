@@ -7697,19 +7697,27 @@ body {
 }
 
 .exercise-library-list {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   align-items: stretch;
+  gap: 0.9rem;
 }
 
 .exercise-library-item {
+  display: grid;
   height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   align-content: start;
-  grid-template-rows: auto auto 1fr;
+  gap: 0.8rem;
+  padding: 0.95rem;
+  overflow: hidden;
 }
 
 .exercise-library-item-media {
   overflow: hidden;
-  min-height: 152px;
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 16 / 10;
   border-radius: calc(var(--shell-radius-md) - 0.05rem);
   border: 1px solid var(--shell-border);
   background:
@@ -7727,16 +7735,39 @@ body {
 .exercise-library-item-media-fallback {
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 0.45rem;
 }
 
-.exercise-library-item-media-fallback span {
+.exercise-library-item-media-fallback-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-strong));
+}
+
+.exercise-library-item-media-fallback-initial {
   font-family: 'Clash Display', 'Cabinet Grotesk', system-ui, sans-serif;
-  font-size: 2.1rem;
+  font-size: 1.65rem;
   color: color-mix(in srgb, var(--accent) 64%, var(--text-strong));
 }
 
 .exercise-library-item-copy {
+  display: grid;
   align-content: start;
+  gap: 0.34rem;
+  min-height: 0;
+}
+
+.exercise-library-item-copy strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.32;
 }
 
 .exercise-library-item-copy p {
@@ -7746,6 +7777,13 @@ body {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.48;
+  min-height: 0;
+}
+
+.exercise-library-item-meta {
+  align-self: end;
+  gap: 0.4rem;
 }
 
 .exercise-library-modal {
@@ -7842,6 +7880,7 @@ body {
 
   .exercise-library-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
   }
 
   .exercise-library-modal {
@@ -7866,11 +7905,12 @@ body {
   }
 
   .exercise-library-item {
-    padding: 0.875rem;
+    gap: 0.72rem;
+    padding: 0.82rem;
   }
 
   .exercise-library-item-media {
-    min-height: 136px;
+    aspect-ratio: 16 / 9;
   }
 
   .exercise-library-modal {
