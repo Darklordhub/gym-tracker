@@ -9,5 +9,5 @@ public class WgerOptions
     public int? LanguageId { get; set; } = 2;
     public string? LanguageCode { get; set; }
     public int PageSize { get; set; } = 50;
-    public int MaxItems { get; set; } = 250;
+    public int MaxItems { get; set; } = 1000;
 }
