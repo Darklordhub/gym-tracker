@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { PlayCircle } from 'lucide-react'
 import {
   fetchExerciseCatalog,
   fetchExerciseCatalogItem,
@@ -296,6 +297,7 @@ function ExerciseLibraryDetailsModal({
               <div className="exercise-library-detail-footer">
                 {item.videoUrl ? (
                   <a className="ghost-button compact-button" href={item.videoUrl} target="_blank" rel="noreferrer">
+                    <PlayCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
                     Watch demo
                   </a>
                 ) : null}

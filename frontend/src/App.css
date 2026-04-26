@@ -620,6 +620,10 @@ body {
 .primary-button,
 .ghost-button,
 .danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
   border: 0;
   border-radius: 14px;
   padding: 12px 16px;
@@ -3507,7 +3511,7 @@ body {
 
 .dashboard-hero-forge::after,
 .workouts-hero-forge::after {
-  content: 'FORGE';
+  content: none;
   position: absolute;
   right: -20px;
   top: 50%;
@@ -4554,7 +4558,7 @@ body {
 .profile-hero-forge::after,
 .progress-hero-forge::after,
 .cycle-hero-forge::after {
-  content: 'FORGE';
+  content: none;
   position: absolute;
   right: -16px;
   top: 50%;
@@ -8042,7 +8046,10 @@ body {
 .sidebar-link-icon svg,
 .sidebar-action-button svg,
 .topbar-icon-button svg,
-.notification-bell svg {
+.notification-bell svg,
+.primary-button svg,
+.ghost-button svg,
+.danger-button svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;

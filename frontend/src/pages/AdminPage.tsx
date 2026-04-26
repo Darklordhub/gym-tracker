@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useState } from 'react'
+import { KeyRound, Pencil, RefreshCw } from 'lucide-react'
 import {
   fetchAdminExerciseCatalog,
   fetchAdminUsers,
@@ -398,6 +399,7 @@ export function AdminPage() {
                         <td>
                           <div className="admin-actions">
                             <button type="button" className="ghost-button" disabled={isUpdating} onClick={() => openResetPasswordDialog(user)}>
+                              <KeyRound aria-hidden="true" focusable="false" strokeWidth={1.9} />
                               {isPasswordResetting ? 'Saving...' : 'Reset Password'}
                             </button>
                             <button
@@ -432,6 +434,7 @@ export function AdminPage() {
                 onClick={() => void handleSyncCatalog()}
                 disabled={pendingActions['catalog:sync'] ?? false}
               >
+                <RefreshCw aria-hidden="true" focusable="false" strokeWidth={1.9} />
                 {pendingActions['catalog:sync'] ?? false ? 'Syncing...' : 'Sync Wger'}
               </button>
             </div>
@@ -494,6 +497,7 @@ export function AdminPage() {
                         <td>
                           <div className="admin-actions">
                             <button type="button" className="ghost-button" onClick={() => openCatalogEditor(item)}>
+                              <Pencil aria-hidden="true" focusable="false" strokeWidth={1.9} />
                               Edit
                             </button>
                             <button

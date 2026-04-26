@@ -1,5 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
+import type { LucideIcon } from 'lucide-react'
+import {
+  Activity,
+  Bell,
+  BookOpen,
+  Dumbbell,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Moon,
+  Scale,
+  Shield,
+  SunMedium,
+  TrendingUp,
+  UserRound,
+} from 'lucide-react'
 import './App.css'
 import { useAuth } from './auth/AuthContext'
 import { fetchCycleSettings } from './api/cycle'
@@ -649,105 +665,23 @@ function getInitials(value?: string) {
   return parts || value.slice(0, 2).toUpperCase()
 }
 
-function IconBase({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.85"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      focusable="false"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  )
-}
-
 function AppIcon({ name }: { name: IconName }) {
-  switch (name) {
-    case 'dashboard':
-      return (
-        <IconBase>
-          <path d="M4 5.5h6v6H4zM14 5.5h6v9h-6zM4 15.5h6V19H4zM14 17h6v2h-6z" />
-        </IconBase>
-      )
-    case 'weight':
-      return (
-        <IconBase>
-          <path d="M6 8.5h12l1 8.7A2 2 0 0 1 17 19.5H7a2 2 0 0 1-2-2.3Z" />
-          <path d="M8.5 8.5a3.5 3.5 0 0 1 7 0" />
-          <path d="m12 12 1.4-2.4" />
-        </IconBase>
-      )
-    case 'workouts':
-      return (
-        <IconBase>
-          <path d="M4 10v4M7 8.5v7M17 8.5v7M20 10v4M9.5 10h5M9.5 14h5" />
-          <path d="M7 12h2.5M14.5 12H17" />
-        </IconBase>
-      )
-    case 'progress':
-      return (
-        <IconBase>
-          <path d="M4 18h16" />
-          <path d="M6 15.5 10 11l3.5 3.5L18 8.5" />
-          <path d="M18 8.5V13" />
-        </IconBase>
-      )
-    case 'library':
-      return (
-        <IconBase>
-          <path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v16H7.5A2.5 2.5 0 0 0 5 21z" />
-          <path d="M5 5.5V21" />
-          <path d="M9 7.5h6M9 11.5h6M9 15.5h4" />
-        </IconBase>
-      )
-    case 'cycle':
-      return (
-        <IconBase>
-          <path d="M20 7h-4V3" />
-          <path d="M20 12a8 8 0 1 1-2.3-5.7L20 7" />
-        </IconBase>
-      )
-    case 'profile':
-      return (
-        <IconBase>
-          <path d="M12 12a3.75 3.75 0 1 0-3.75-3.75A3.75 3.75 0 0 0 12 12Z" />
-          <path d="M5 19a7 7 0 0 1 14 0" />
-        </IconBase>
-      )
-    case 'admin':
-      return (
-        <IconBase>
-          <path d="M12 3 5 6v5c0 4.2 2.4 7.3 7 10 4.6-2.7 7-5.8 7-10V6Z" />
-          <path d="m9.8 12 1.4 1.4 3-3.2" />
-        </IconBase>
-      )
-    case 'moon':
-      return (
-        <IconBase>
-          <path d="M20 14.5A7.5 7.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" />
-        </IconBase>
-      )
-    case 'sun':
-      return (
-        <IconBase>
-          <path d="M12 3v2.2M12 18.8V21M5.64 5.64l1.56 1.56M16.8 16.8l1.56 1.56M3 12h2.2M18.8 12H21M5.64 18.36 7.2 16.8M16.8 7.2l1.56-1.56" />
-          <circle cx="12" cy="12" r="4.25" />
-        </IconBase>
-      )
-    case 'logout':
-      return (
-        <IconBase>
-          <path d="M14 7V5.5A1.5 1.5 0 0 0 12.5 4h-6A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20h6a1.5 1.5 0 0 0 1.5-1.5V17" />
-          <path d="M10 12h10" />
-          <path d="m17 8 4 4-4 4" />
-        </IconBase>
-      )
+  const iconMap: Record<IconName, LucideIcon> = {
+    dashboard: LayoutDashboard,
+    weight: Scale,
+    workouts: Dumbbell,
+    progress: TrendingUp,
+    library: BookOpen,
+    cycle: Activity,
+    profile: UserRound,
+    admin: Shield,
+    moon: Moon,
+    sun: SunMedium,
+    logout: LogOut,
   }
+
+  const Icon = iconMap[name]
+  return <Icon aria-hidden="true" focusable="false" strokeWidth={1.9} />
 }
 
 function ThemeIcon({ theme }: { theme: ThemeMode }) {
@@ -755,20 +689,11 @@ function ThemeIcon({ theme }: { theme: ThemeMode }) {
 }
 
 function HamburgerIcon() {
-  return (
-    <IconBase>
-      <path d="M4 7h16M4 12h16M4 17h16" />
-    </IconBase>
-  )
+  return <Menu aria-hidden="true" focusable="false" strokeWidth={1.9} />
 }
 
 function BellIcon() {
-  return (
-    <IconBase>
-      <path d="M12 4a4 4 0 0 0-4 4v1.1a7 7 0 0 1-1.6 4.5L5 15.3V17h14v-1.7l-1.4-1.7A7 7 0 0 1 16 9.1V8a4 4 0 0 0-4-4Z" />
-      <path d="M10 19a2 2 0 0 0 4 0" />
-    </IconBase>
-  )
+  return <Bell aria-hidden="true" focusable="false" strokeWidth={1.9} />
 }
 
 export default App

@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { CheckCircle2, PlayCircle, Plus, PlusCircle, Trash2 } from 'lucide-react'
 import { searchExerciseCatalog } from '../api/exerciseCatalog'
 import { fetchCycleGuidance } from '../api/cycle'
 import { fetchLatestCalorieLog } from '../api/calories'
@@ -1067,6 +1068,7 @@ export function WorkoutsPage() {
                       <p>Add movements as you work through the session, then save progress between sets if needed.</p>
                     </div>
                     <button type="button" className="ghost-button" onClick={() => addExercise('active')}>
+                      <Plus aria-hidden="true" focusable="false" strokeWidth={1.9} />
                       Add exercise
                     </button>
                   </div>
@@ -1124,6 +1126,7 @@ export function WorkoutsPage() {
                     onClick={() => void handleCompleteActiveSession()}
                     disabled={isSavingSession || isCompletingSession}
                   >
+                    <CheckCircle2 aria-hidden="true" focusable="false" strokeWidth={1.9} />
                     {isCompletingSession ? 'Completing...' : 'Complete workout'}
                   </button>
                 </div>
@@ -1221,9 +1224,10 @@ export function WorkoutsPage() {
                   <h3>Exercises</h3>
                   <p>Add each movement in the order you performed it. Consistent naming keeps history and PR suggestions cleaner.</p>
                 </div>
-                <button type="button" className="ghost-button" onClick={() => addExercise('quick')}>
-                  Add exercise
-                </button>
+                  <button type="button" className="ghost-button" onClick={() => addExercise('quick')}>
+                    <Plus aria-hidden="true" focusable="false" strokeWidth={1.9} />
+                    Add exercise
+                  </button>
               </div>
 
               {quickLogErrors.exerciseEntries ? (
@@ -1472,6 +1476,7 @@ export function WorkoutsPage() {
                 Clear cardio form
               </button>
               <button type="submit" className="primary-button" disabled={isSavingCardio}>
+                <CheckCircle2 aria-hidden="true" focusable="false" strokeWidth={1.9} />
                 {isSavingCardio ? 'Saving cardio...' : 'Save cardio'}
               </button>
             </div>
@@ -1577,6 +1582,7 @@ export function WorkoutsPage() {
                       }}
                       disabled={deletingWorkoutId === workout.id}
                     >
+                      <Trash2 aria-hidden="true" focusable="false" strokeWidth={1.9} />
                       {deletingWorkoutId === workout.id ? 'Deleting...' : 'Delete workout'}
                     </button>
                   </div>
@@ -1861,6 +1867,7 @@ function WorkoutDetailsModal({
             Close
           </button>
           <button type="button" className="ghost-button subtle-danger-button" onClick={onDelete} disabled={isDeleting}>
+            <Trash2 aria-hidden="true" focusable="false" strokeWidth={1.9} />
             {isDeleting ? 'Deleting...' : 'Delete workout'}
           </button>
         </div>
@@ -1905,6 +1912,7 @@ function ExerciseEditorCard({
         </div>
         {onRemoveExercise ? (
           <button type="button" className="ghost-button subtle-danger-button compact-button" onClick={onRemoveExercise}>
+            <Trash2 aria-hidden="true" focusable="false" strokeWidth={1.9} />
             Remove exercise
           </button>
         ) : null}
@@ -1936,6 +1944,7 @@ function ExerciseEditorCard({
           <p>Track reps and load, then keep moving with quick add.</p>
         </div>
         <button type="button" className="ghost-button compact-button" onClick={onAddSet}>
+          <PlusCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
           Add set
         </button>
       </div>
@@ -1956,6 +1965,7 @@ function ExerciseEditorCard({
                   className="ghost-button subtle-danger-button compact-button"
                   onClick={() => onRemoveSet(setIndex)}
                 >
+                  <Trash2 aria-hidden="true" focusable="false" strokeWidth={1.9} />
                   Remove
                 </button>
               ) : null}
@@ -1999,6 +2009,7 @@ function ExerciseEditorCard({
 
       <div className="exercise-card-footer">
         <button type="button" className="ghost-button compact-button add-set-footer-button" onClick={onAddSet}>
+          <PlusCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
           Add another set
         </button>
       </div>
@@ -2068,6 +2079,7 @@ function ExerciseHelpCard({
           <div className="exercise-help-footer">
             {item.videoUrl ? (
               <a className="ghost-button compact-button" href={item.videoUrl} target="_blank" rel="noreferrer">
+                <PlayCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
                 Watch demo
               </a>
             ) : null}
