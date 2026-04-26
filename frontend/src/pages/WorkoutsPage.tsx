@@ -19,6 +19,7 @@ import {
   updateActiveWorkoutSession,
 } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
+import { VideoModal } from '../components/VideoModal'
 import { getWorkoutAssistantInsight, getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { buildDailyCalorieBalance } from '../lib/calorieBalance'
 import { formatDate, getTodayDateValue } from '../lib/format'
@@ -285,6 +286,7 @@ export function WorkoutsPage() {
   const [deletingWorkoutId, setDeletingWorkoutId] = useState<number | null>(null)
   const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null)
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null)
+  const [exerciseVideoTarget, setExerciseVideoTarget] = useState<{ title: string; url: string } | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [overloadRecommendations, setOverloadRecommendations] = useState<
@@ -1105,6 +1107,7 @@ export function WorkoutsPage() {
                           onAddSet={() => addSet('active', exerciseIndex)}
                           onRemoveSet={(setIndex) => removeSet('active', exerciseIndex, setIndex)}
                           onRemoveExercise={() => removeExercise('active', exerciseIndex)}
+                          onOpenVideo={(title, url) => setExerciseVideoTarget({ title, url })}
                         />
                       ))}
                     </div>
@@ -1262,6 +1265,7 @@ export function WorkoutsPage() {
                       onAddSet={() => addSet('quick', exerciseIndex)}
                       onRemoveSet={(setIndex) => removeSet('quick', exerciseIndex, setIndex)}
                       onRemoveExercise={() => removeExercise('quick', exerciseIndex)}
+                      onOpenVideo={(title, url) => setExerciseVideoTarget({ title, url })}
                     />
                   ))}
                 </div>
@@ -1641,6 +1645,14 @@ export function WorkoutsPage() {
           isDeleting={deletingWorkoutId === selectedWorkout.id}
         />
       ) : null}
+
+      {exerciseVideoTarget ? (
+        <VideoModal
+          title={exerciseVideoTarget.title}
+          videoUrl={exerciseVideoTarget.url}
+          onClose={() => setExerciseVideoTarget(null)}
+        />
+      ) : null}
     </main>
   )
 }
@@ -1889,6 +1901,7 @@ function ExerciseEditorCard({
   onAddSet,
   onRemoveSet,
   onRemoveExercise,
+  onOpenVideo,
 }: {
   title: string
   sectionLabel: string
@@ -1902,6 +1915,7 @@ function ExerciseEditorCard({
   onAddSet: () => void
   onRemoveSet: (setIndex: number) => void
   onRemoveExercise?: () => void
+  onOpenVideo: (title: string, url: string) => void
 }) {
   return (
     <div className="exercise-card">
@@ -1930,6 +1944,7 @@ function ExerciseEditorCard({
           item={exercise.catalogItem}
           overloadState={overloadState}
           fallbackSuggestion={getSuggestedNextWeight(workouts, exercise.exerciseName, null, null)}
+          onOpenVideo={onOpenVideo}
         />
       ) : normalizeExerciseName(exercise.exerciseName).length >= 3 ? (
         <ExerciseSuggestionNotice
@@ -2021,10 +2036,12 @@ function ExerciseHelpCard({
   item,
   overloadState,
   fallbackSuggestion,
+  onOpenVideo,
 }: {
   item: ExerciseCatalogItem
   overloadState?: OverloadRecommendationState
   fallbackSuggestion: ReturnType<typeof getSuggestedNextWeight>
+  onOpenVideo: (title: string, url: string) => void
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const muscleTags = [item.primaryMuscle, ...item.secondaryMuscles].filter(
@@ -2078,10 +2095,14 @@ function ExerciseHelpCard({
 
           <div className="exercise-help-footer">
             {item.videoUrl ? (
-              <a className="ghost-button compact-button" href={item.videoUrl} target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                onClick={() => onOpenVideo(item.name, item.videoUrl!)}
+              >
                 <PlayCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
                 Watch demo
-              </a>
+              </button>
             ) : null}
             <span className="record-hint">Catalog-backed guidance only. Your sets and save flow stay unchanged.</span>
           </div>

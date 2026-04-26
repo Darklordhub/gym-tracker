@@ -6,6 +6,7 @@ import {
   searchExerciseCatalog,
 } from '../api/exerciseCatalog'
 import { StateCard } from '../components/StateCard'
+import { VideoModal } from '../components/VideoModal'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { ExerciseCatalogItem } from '../types/exerciseCatalog'
@@ -14,6 +15,7 @@ export function ExerciseLibraryPage() {
   const [items, setItems] = useState<ExerciseCatalogItem[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [selectedItem, setSelectedItem] = useState<ExerciseCatalogItem | null>(null)
+  const [videoTarget, setVideoTarget] = useState<{ title: string; url: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoadingList, setIsLoadingList] = useState(true)
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
@@ -48,7 +50,7 @@ export function ExerciseLibraryPage() {
   }, [selectedId])
 
   useEffect(() => {
-    if (selectedId === null) {
+    if (selectedId === null || videoTarget) {
       return
     }
 
@@ -60,7 +62,7 @@ export function ExerciseLibraryPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedId])
+  }, [selectedId, videoTarget])
 
   const activeMuscles = useMemo(() => {
     if (!selectedItem) {
@@ -204,8 +206,13 @@ export function ExerciseLibraryPage() {
           isLoading={isLoadingDetails}
           errorMessage={detailsErrorMessage}
           activeMuscles={activeMuscles}
+          onOpenVideo={(title, url) => setVideoTarget({ title, url })}
           onClose={() => setSelectedId(null)}
         />
+      ) : null}
+
+      {videoTarget ? (
+        <VideoModal title={videoTarget.title} videoUrl={videoTarget.url} onClose={() => setVideoTarget(null)} />
       ) : null}
     </main>
   )
@@ -216,12 +223,14 @@ function ExerciseLibraryDetailsModal({
   isLoading,
   errorMessage,
   activeMuscles,
+  onOpenVideo,
   onClose,
 }: {
   item: ExerciseCatalogItem | null
   isLoading: boolean
   errorMessage: string | null
   activeMuscles: string[]
+  onOpenVideo: (title: string, url: string) => void
   onClose: () => void
 }) {
   return (
@@ -296,10 +305,14 @@ function ExerciseLibraryDetailsModal({
 
               <div className="exercise-library-detail-footer">
                 {item.videoUrl ? (
-                  <a className="ghost-button compact-button" href={item.videoUrl} target="_blank" rel="noreferrer">
+                  <button
+                    type="button"
+                    className="ghost-button compact-button"
+                    onClick={() => onOpenVideo(item.name, item.videoUrl!)}
+                  >
                     <PlayCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
                     Watch demo
-                  </a>
+                  </button>
                 ) : null}
                 <span className="record-hint">
                   Updated {formatDate(item.updatedAt)}
