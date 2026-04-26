@@ -14,6 +14,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 var enableHttpsRedirection = builder.Configuration.GetValue("Http:UseHttpsRedirection", false);
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 var wgerOptions = builder.Configuration.GetSection(WgerOptions.SectionName).Get<WgerOptions>() ?? new WgerOptions();
+var exerciseMediaEnrichmentOptions = builder.Configuration
+    .GetSection(ExerciseMediaEnrichmentOptions.SectionName)
+    .Get<ExerciseMediaEnrichmentOptions>() ?? new ExerciseMediaEnrichmentOptions();
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()?
@@ -37,6 +40,7 @@ if (string.IsNullOrWhiteSpace(jwtOptions.SigningKey) || jwtOptions.SigningKey.Le
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<WgerOptions>(builder.Configuration.GetSection(WgerOptions.SectionName));
+builder.Services.Configure<ExerciseMediaEnrichmentOptions>(builder.Configuration.GetSection(ExerciseMediaEnrichmentOptions.SectionName));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -50,12 +54,40 @@ builder.Services.AddScoped<TrainingIntelligenceService>();
 builder.Services.AddScoped<ProgressiveOverloadService>();
 builder.Services.AddScoped<ExerciseCatalogService>();
 builder.Services.AddScoped<ExerciseCatalogSeedService>();
+builder.Services.AddScoped<ExerciseCatalogMediaEnrichmentService>();
 builder.Services.AddHttpClient<IWgerExerciseCatalogSyncService, WgerExerciseCatalogSyncService>(httpClient =>
 {
     httpClient.BaseAddress = new Uri(wgerOptions.BaseUrl.EndsWith('/') ? wgerOptions.BaseUrl : $"{wgerOptions.BaseUrl}/");
     httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
     httpClient.Timeout = TimeSpan.FromSeconds(30);
 });
+builder.Services.AddHttpClient<WgerExerciseMediaProvider>(httpClient =>
+{
+    httpClient.BaseAddress = new Uri(wgerOptions.BaseUrl.EndsWith('/') ? wgerOptions.BaseUrl : $"{wgerOptions.BaseUrl}/");
+    httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+    httpClient.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddScoped<IExerciseMediaProvider>(serviceProvider => serviceProvider.GetRequiredService<WgerExerciseMediaProvider>());
+builder.Services.AddHttpClient<ExerciseDbExerciseMediaProvider>(httpClient =>
+{
+    if (!string.IsNullOrWhiteSpace(exerciseMediaEnrichmentOptions.ExerciseDb.BaseUrl))
+    {
+        httpClient.BaseAddress = new Uri(
+            exerciseMediaEnrichmentOptions.ExerciseDb.BaseUrl.EndsWith('/')
+                ? exerciseMediaEnrichmentOptions.ExerciseDb.BaseUrl
+                : $"{exerciseMediaEnrichmentOptions.ExerciseDb.BaseUrl}/");
+    }
+
+    httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+    foreach (var header in exerciseMediaEnrichmentOptions.ExerciseDb.RequestHeaders)
+    {
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+    }
+
+    httpClient.Timeout = TimeSpan.FromSeconds(45);
+});
+builder.Services.AddScoped<IExerciseMediaProvider>(serviceProvider => serviceProvider.GetRequiredService<ExerciseDbExerciseMediaProvider>());
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>

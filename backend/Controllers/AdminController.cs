@@ -20,17 +20,20 @@ public class AdminController : ControllerBase
     private readonly PasswordHasher<AppUser> _passwordHasher;
     private readonly IWgerExerciseCatalogSyncService _wgerExerciseCatalogSyncService;
     private readonly ExerciseCatalogService _exerciseCatalogService;
+    private readonly ExerciseCatalogMediaEnrichmentService _exerciseCatalogMediaEnrichmentService;
 
     public AdminController(
         AppDbContext dbContext,
         PasswordHasher<AppUser> passwordHasher,
         IWgerExerciseCatalogSyncService wgerExerciseCatalogSyncService,
-        ExerciseCatalogService exerciseCatalogService)
+        ExerciseCatalogService exerciseCatalogService,
+        ExerciseCatalogMediaEnrichmentService exerciseCatalogMediaEnrichmentService)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
         _wgerExerciseCatalogSyncService = wgerExerciseCatalogSyncService;
         _exerciseCatalogService = exerciseCatalogService;
+        _exerciseCatalogMediaEnrichmentService = exerciseCatalogMediaEnrichmentService;
     }
 
     [HttpGet("users")]
@@ -162,6 +165,32 @@ public class AdminController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("exercise-catalog/enrich-missing-media")]
+    public async Task<ActionResult<ExerciseCatalogMediaEnrichmentResponse>> EnrichMissingExerciseCatalogMedia(
+        [FromQuery] int? limit,
+        [FromQuery] string? mediaType,
+        [FromQuery] string? provider,
+        CancellationToken cancellationToken)
+    {
+        var selectedLimit = Math.Clamp(limit ?? 250, 1, 1000);
+
+        if (!TryParseMediaType(mediaType, out var parsedMediaType))
+        {
+            return BadRequest(new { message = "mediaType must be one of: all, images, videos." });
+        }
+
+        if (!TryParseProviderSelection(provider, out var parsedProvider))
+        {
+            return BadRequest(new { message = "provider must be one of: all, wger, exercisedb." });
+        }
+
+        var result = await _exerciseCatalogMediaEnrichmentService.EnrichMissingMediaAsync(
+            new ExerciseCatalogMediaEnrichmentRequest(selectedLimit, parsedMediaType, parsedProvider),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
     [HttpGet("exercise-catalog")]
     public async Task<ActionResult<IReadOnlyList<AdminExerciseCatalogItemResponse>>> GetExerciseCatalog([FromQuery] string? q)
     {
@@ -275,5 +304,47 @@ public class AdminController : ControllerBase
 
         return Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri)
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+
+    private static bool TryParseMediaType(string? value, out ExerciseMediaType mediaType)
+    {
+        switch (value?.Trim().ToLowerInvariant())
+        {
+            case null:
+            case "":
+            case "all":
+                mediaType = ExerciseMediaType.All;
+                return true;
+            case "images":
+                mediaType = ExerciseMediaType.Images;
+                return true;
+            case "videos":
+                mediaType = ExerciseMediaType.Videos;
+                return true;
+            default:
+                mediaType = ExerciseMediaType.All;
+                return false;
+        }
+    }
+
+    private static bool TryParseProviderSelection(string? value, out ExerciseMediaProviderSelection providerSelection)
+    {
+        switch (value?.Trim().ToLowerInvariant())
+        {
+            case null:
+            case "":
+            case "all":
+                providerSelection = ExerciseMediaProviderSelection.All;
+                return true;
+            case "wger":
+                providerSelection = ExerciseMediaProviderSelection.Wger;
+                return true;
+            case "exercisedb":
+                providerSelection = ExerciseMediaProviderSelection.ExerciseDb;
+                return true;
+            default:
+                providerSelection = ExerciseMediaProviderSelection.All;
+                return false;
+        }
     }
 }
