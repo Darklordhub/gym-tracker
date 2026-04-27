@@ -5,6 +5,7 @@ import {
   fetchExerciseCatalogItem,
   searchExerciseCatalogPage,
 } from '../api/exerciseCatalog'
+import { apiClient } from '../lib/http'
 import { StateCard } from '../components/StateCard'
 import { VideoModal } from '../components/VideoModal'
 import { formatDate } from '../lib/format'
@@ -356,7 +357,6 @@ function ExerciseLibraryDetailsModal({
               item={item}
               isBroken={false}
               onError={() => undefined}
-              allowAnimated
               loading="eager"
               className="exercise-library-detail-media exercise-library-modal-media"
             />
@@ -433,26 +433,25 @@ function ExerciseLibraryMedia({
   item,
   isBroken,
   onError,
-  allowAnimated = false,
   loading = 'lazy',
   className = 'exercise-card-media',
 }: {
   item: ExerciseCatalogItem
   isBroken: boolean
   onError: () => void
-  allowAnimated?: boolean
   loading?: 'eager' | 'lazy'
   className?: string
 }) {
-  const thumbnailUrl = item.thumbnailUrl?.trim() || null
-  const isAnimatedThumbnail = Boolean(thumbnailUrl && isAnimatedImageUrl(thumbnailUrl))
+  const thumbnailUrl = resolveExerciseLibraryMediaUrl(item.thumbnailUrl ?? item.localMediaPath)
   const [hasInternalError, setHasInternalError] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
 
   useEffect(() => {
     setHasInternalError(false)
+    setHasLoaded(false)
   }, [thumbnailUrl])
 
-  const showImage = Boolean(thumbnailUrl) && !isBroken && !hasInternalError && (allowAnimated || !isAnimatedThumbnail)
+  const showImage = Boolean(thumbnailUrl) && !isBroken && !hasInternalError
 
   return (
     <div className={showImage ? className : `${className} exercise-library-item-media-fallback`} aria-hidden={showImage ? undefined : 'true'}>
@@ -463,16 +462,15 @@ function ExerciseLibraryMedia({
           loading={loading}
           decoding="async"
           referrerPolicy="no-referrer"
+          className={hasLoaded ? 'is-loaded' : undefined}
+          onLoad={() => setHasLoaded(true)}
           onError={() => {
             setHasInternalError(true)
             onError()
           }}
         />
       ) : (
-        <ExerciseLibraryMediaPlaceholder
-          name={item.name}
-          showAnimatedLabel={Boolean(isAnimatedThumbnail && !allowAnimated)}
-        />
+        <ExerciseLibraryMediaPlaceholder name={item.name} />
       )}
     </div>
   )
@@ -498,7 +496,45 @@ function ExerciseLibraryMediaPlaceholder({
   )
 }
 
-function isAnimatedImageUrl(url: string) {
-  const normalizedUrl = url.split('?')[0]?.toLowerCase() ?? ''
-  return normalizedUrl.endsWith('.gif')
+function resolveExerciseLibraryMediaUrl(value: string | null | undefined) {
+  const normalizedValue = value?.trim()
+  if (!normalizedValue) {
+    return null
+  }
+
+  if (normalizedValue.startsWith('data:image/')) {
+    return normalizedValue
+  }
+
+  const mediaOrigin = resolveExerciseLibraryMediaOrigin()
+
+  try {
+    const absoluteUrl = normalizedValue.startsWith('//')
+      ? new URL(`${window.location.protocol}${normalizedValue}`)
+      : new URL(normalizedValue, `${mediaOrigin}/`)
+
+    if (!['http:', 'https:', 'data:', 'blob:'].includes(absoluteUrl.protocol)) {
+      return null
+    }
+
+    return absoluteUrl.toString()
+  } catch {
+    return null
+  }
+}
+
+function resolveExerciseLibraryMediaOrigin() {
+  if (typeof window === 'undefined') {
+    return 'http://localhost'
+  }
+
+  const configuredApiBaseUrl = typeof apiClient.defaults.baseURL === 'string'
+    ? apiClient.defaults.baseURL
+    : '/api'
+
+  try {
+    return new URL(configuredApiBaseUrl, window.location.origin).origin
+  } catch {
+    return window.location.origin
+  }
 }
