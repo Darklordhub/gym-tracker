@@ -6,6 +6,12 @@ namespace backend.Services;
 
 public class ExerciseCatalogSeedService
 {
+    private const string BrokenWalkingLungeThumbnailUrl =
+        "https://images.unsplash.com/photo-1518611012118-fbaf6f6c1f47?auto=format&fit=crop&w=900&q=80";
+
+    private const string FixedWalkingLungeThumbnailUrl =
+        "https://wger.de/media/exercise-images/1102/cf41f3fb-a3e6-4d0b-b704-6404a7e584fc.jpg";
+
     private readonly AppDbContext _dbContext;
     private readonly ILogger<ExerciseCatalogSeedService> _logger;
 
@@ -19,6 +25,7 @@ public class ExerciseCatalogSeedService
     {
         if (await _dbContext.ExerciseCatalogItems.AnyAsync())
         {
+            await RepairKnownSeedMediaAsync();
             return;
         }
 
@@ -95,7 +102,7 @@ public class ExerciseCatalogSeedService
                 secondaryMuscles: "glutes,hamstrings,adductors",
                 equipment: "bodyweight",
                 difficulty: "beginner",
-                thumbnailUrl: "https://images.unsplash.com/photo-1518611012118-fbaf6f6c1f47?auto=format&fit=crop&w=900&q=80",
+                thumbnailUrl: FixedWalkingLungeThumbnailUrl,
                 videoUrl: "https://www.youtube.com/watch?v=L8fvypPrzzs",
                 now: now),
             CreateItem(
@@ -128,6 +135,29 @@ public class ExerciseCatalogSeedService
         await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Seeded {Count} exercise catalog items.", items.Length);
+    }
+
+    private async Task RepairKnownSeedMediaAsync()
+    {
+        var walkingLunge = await _dbContext.ExerciseCatalogItems
+            .FirstOrDefaultAsync(item =>
+                item.Source == "local"
+                && item.Slug == "walking-lunge"
+                && !item.IsManuallyEdited
+                && string.IsNullOrWhiteSpace(item.LocalThumbnailUrlOverride)
+                && item.ThumbnailUrl == BrokenWalkingLungeThumbnailUrl);
+
+        if (walkingLunge is null)
+        {
+            return;
+        }
+
+        walkingLunge.ThumbnailUrl = FixedWalkingLungeThumbnailUrl;
+        walkingLunge.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation("Repaired broken thumbnail URL for seeded exercise {ExerciseName}.", walkingLunge.Name);
     }
 
     private static ExerciseCatalogItem CreateItem(

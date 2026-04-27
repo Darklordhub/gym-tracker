@@ -464,7 +464,8 @@ function ExerciseLibraryMedia({
           referrerPolicy="no-referrer"
           className={hasLoaded ? 'is-loaded' : undefined}
           onLoad={() => setHasLoaded(true)}
-          onError={() => {
+          onError={(event) => {
+            event.currentTarget.style.display = 'none'
             setHasInternalError(true)
             onError()
           }}
