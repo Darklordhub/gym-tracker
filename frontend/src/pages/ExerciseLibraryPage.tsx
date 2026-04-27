@@ -30,6 +30,8 @@ export function ExerciseLibraryPage() {
   const [brokenThumbnails, setBrokenThumbnails] = useState<Record<number, true>>({})
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const latestCatalogRequestRef = useRef(0)
+  const activeListRequestCountRef = useRef(0)
+  const activeLoadMoreRequestCountRef = useRef(0)
   const normalizedSearchQuery = deferredSearchQuery.trim()
 
   useEffect(() => {
@@ -85,14 +87,21 @@ export function ExerciseLibraryPage() {
 
   const hasMoreItems = items.length < totalCount
   const isSearchActive = normalizedSearchQuery.length > 0
+  const shouldShowListSkeleton = isLoadingList && items.length === 0
+
+  useEffect(() => {
+    console.log({ loading: isLoadingList, itemsLength: items.length })
+  }, [isLoadingList, items.length])
 
   async function loadCatalogPage(query: string, nextPage: number, append: boolean) {
     const requestId = ++latestCatalogRequestRef.current
 
     try {
       if (append) {
+        activeLoadMoreRequestCountRef.current += 1
         setIsLoadingMore(true)
       } else {
+        activeListRequestCountRef.current += 1
         setIsLoadingList(true)
         setErrorMessage(null)
       }
@@ -139,9 +148,16 @@ export function ExerciseLibraryPage() {
         setTotalCount(0)
       }
     } finally {
-      if (requestId === latestCatalogRequestRef.current) {
-        setIsLoadingList(false)
-        setIsLoadingMore(false)
+      if (append) {
+        activeLoadMoreRequestCountRef.current = Math.max(0, activeLoadMoreRequestCountRef.current - 1)
+        if (activeLoadMoreRequestCountRef.current === 0) {
+          setIsLoadingMore(false)
+        }
+      } else {
+        activeListRequestCountRef.current = Math.max(0, activeListRequestCountRef.current - 1)
+        if (activeListRequestCountRef.current === 0) {
+          setIsLoadingList(false)
+        }
       }
     }
   }
@@ -221,7 +237,7 @@ export function ExerciseLibraryPage() {
 
           {errorMessage ? (
             <StateCard title="Library unavailable" description={errorMessage} tone="error" />
-          ) : isLoadingList ? (
+          ) : shouldShowListSkeleton ? (
             <StateCard title="Loading library" description="Pulling the current exercise catalog." loading />
           ) : items.length === 0 ? (
             <StateCard
