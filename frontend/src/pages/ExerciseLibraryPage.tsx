@@ -258,7 +258,11 @@ export function ExerciseLibraryPage() {
                     <button
                       key={item.id}
                       type="button"
-                      className={item.id === selectedId ? 'exercise-card exercise-card-active' : 'exercise-card'}
+                      className={
+                        item.id === selectedId
+                          ? 'exercise-library-card exercise-library-card-active'
+                          : 'exercise-library-card'
+                      }
                       onClick={() => setSelectedId(item.id)}
                     >
                       <ExerciseLibraryMedia
@@ -266,11 +270,11 @@ export function ExerciseLibraryPage() {
                         isBroken={Boolean(brokenThumbnails[item.id])}
                         onError={() => markThumbnailBroken(item.id)}
                       />
-                      <div className="exercise-card-body">
-                        <strong className="exercise-card-title">{item.name}</strong>
-                        <p className="exercise-card-description">{previewText}</p>
+                      <div className="exercise-library-card-body">
+                        <strong className="exercise-library-card-title">{item.name}</strong>
+                        <p className="exercise-library-card-description">{previewText}</p>
                       </div>
-                      <div className="exercise-card-chips">
+                      <div className="exercise-library-card-chips">
                         {item.primaryMuscle ? <span className="info-pill">{formatLabel(item.primaryMuscle)}</span> : null}
                         {item.equipment ? <span className="info-pill">{formatLabel(item.equipment)}</span> : null}
                         {item.difficulty ? <span className="info-pill">{formatLabel(item.difficulty)}</span> : null}
@@ -450,7 +454,7 @@ function ExerciseLibraryMedia({
   isBroken,
   onError,
   loading = 'lazy',
-  className = 'exercise-card-media',
+  className = 'exercise-library-card-media',
 }: {
   item: ExerciseCatalogItem
   isBroken: boolean
