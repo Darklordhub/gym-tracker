@@ -8403,3 +8403,200 @@ body {
     padding: 14px;
   }
 }
+
+.ai-workout-shell {
+  gap: 1.25rem;
+}
+
+.ai-workout-hero,
+.ai-workout-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.ai-workout-hero {
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.9fr);
+  align-items: start;
+}
+
+.ai-workout-grid {
+  grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.ai-workout-panel,
+.ai-workout-plan,
+.ai-workout-form,
+.ai-workout-section-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.ai-workout-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.ai-workout-toggle-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem 1.25rem;
+}
+
+.ai-workout-form-actions {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ai-workout-plan-summary,
+.ai-workout-section-card,
+.ai-workout-notes-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--shell-border);
+  border-radius: var(--shell-radius-md);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-soft);
+}
+
+.ai-workout-plan-summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+}
+
+.ai-workout-plan-summary h3,
+.ai-workout-section-header h3 {
+  margin: 0;
+}
+
+.ai-workout-plan-summary p,
+.ai-workout-exercise-instructions,
+.ai-workout-prescription-note {
+  margin: 0;
+}
+
+.ai-workout-summary-pills,
+.ai-workout-exercise-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ai-workout-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.ai-workout-exercise-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ai-workout-exercise-card {
+  display: grid;
+  grid-template-columns: minmax(96px, 120px) minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: start;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay) 72%, transparent), transparent),
+    var(--surface-muted);
+}
+
+.ai-workout-exercise-media {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 110px;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-overlay-strong) 72%, white 28%);
+}
+
+.ai-workout-exercise-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0.65rem;
+  object-fit: contain;
+}
+
+.ai-workout-exercise-media-placeholder {
+  align-content: center;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.ai-workout-exercise-copy {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.ai-workout-exercise-header {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ai-workout-prescription-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  color: var(--text-secondary);
+}
+
+.ai-workout-prescription-grid strong,
+.ai-workout-exercise-header strong {
+  color: var(--text-strong);
+}
+
+.ai-workout-prescription-note {
+  color: var(--text-secondary);
+}
+
+.ai-workout-exercise-instructions {
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.ai-workout-video-button {
+  justify-self: start;
+}
+
+.ai-workout-note-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.55rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1024px) {
+  .ai-workout-hero,
+  .ai-workout-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .ai-workout-form-grid,
+  .ai-workout-plan-summary,
+  .ai-workout-exercise-card {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-workout-exercise-media {
+    max-width: 132px;
+  }
+}

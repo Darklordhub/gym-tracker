@@ -1,0 +1,455 @@
+import { useEffect, useState, type FormEvent } from 'react'
+import { Dumbbell, PlayCircle } from 'lucide-react'
+import { generateAiWorkout } from '../api/aiWorkoutApi'
+import { apiClient, getRequestErrorMessage } from '../lib/http'
+import { StateCard } from '../components/StateCard'
+import { VideoModal } from '../components/VideoModal'
+import type { AiWorkoutExercise, AiWorkoutGeneratePayload, AiWorkoutPlan } from '../types/aiWorkout'
+
+type GoalOption = 'strength' | 'muscle-gain' | 'fat-loss' | 'general-fitness' | 'endurance' | 'custom'
+type WorkoutTypeOption = 'auto' | 'full-body' | 'upper' | 'lower' | 'push' | 'pull' | 'core'
+type FitnessLevelOption = 'auto' | 'beginner' | 'intermediate' | 'advanced'
+
+type GeneratorFormState = {
+  goal: GoalOption
+  customGoal: string
+  preferredWorkoutType: WorkoutTypeOption
+  durationMinutes: string
+  fitnessLevel: FitnessLevelOption
+  targetMuscles: string
+  excludedExercises: string
+  includeWarmup: boolean
+  includeCooldown: boolean
+}
+
+const initialFormState: GeneratorFormState = {
+  goal: 'general-fitness',
+  customGoal: '',
+  preferredWorkoutType: 'auto',
+  durationMinutes: '45',
+  fitnessLevel: 'auto',
+  targetMuscles: '',
+  excludedExercises: '',
+  includeWarmup: true,
+  includeCooldown: true,
+}
+
+export function AiWorkoutGeneratorPage() {
+  const [form, setForm] = useState<GeneratorFormState>(initialFormState)
+  const [plan, setPlan] = useState<AiWorkoutPlan | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [videoTarget, setVideoTarget] = useState<{ title: string; url: string } | null>(null)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const payload = buildPayload(form)
+    if (!payload.goal.trim()) {
+      setErrorMessage('Choose a goal or enter a custom goal before generating a plan.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      setErrorMessage(null)
+      const nextPlan = await generateAiWorkout(payload)
+      setPlan(nextPlan)
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to generate an AI workout plan right now.'))
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  return (
+    <main className="page-shell ai-workout-shell">
+      <section className="hero-panel ai-workout-hero">
+        <div className="ai-workout-hero-copy">
+          <span className="eyebrow">FORGE / Generator</span>
+          <h1>AI Workout Generator</h1>
+          <p className="hero-text">
+            Build a structured workout from your local goals, recent training history, and the current exercise catalog.
+            This MVP stays deterministic and read-only, so nothing is saved until you choose to log a session yourself.
+          </p>
+        </div>
+
+        <div className="ai-workout-hero-side">
+          <article className="forge-focus-card">
+            <span className="stat-label">Generator mode</span>
+            <strong>Rules-first MVP</strong>
+            <p>
+              Uses your catalog coverage, recent workouts, and goal context now, while keeping the service shape ready for a
+              future LLM provider.
+            </p>
+            <div className="forge-focus-pills">
+              <span className="info-pill">{plan ? plan.workoutType : 'Read-only plan'}</span>
+              <span className="info-pill info-pill-strength">
+                {plan ? `${plan.estimatedDurationMinutes} min` : 'No auto-save'}
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="ai-workout-grid">
+        <section className="panel ai-workout-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Generate a plan</h2>
+              <p>Choose the goal, split, duration, and any constraints you want the generator to honor.</p>
+            </div>
+          </div>
+
+          <form className="ai-workout-form" onSubmit={handleSubmit}>
+            <div className="ai-workout-form-grid">
+              <label className="field">
+                <span>Goal</span>
+                <select
+                  className="select-input"
+                  value={form.goal}
+                  onChange={(event) => setForm((current) => ({ ...current, goal: event.target.value as GoalOption }))}
+                >
+                  <option value="strength">Strength</option>
+                  <option value="muscle-gain">Muscle gain</option>
+                  <option value="fat-loss">Fat loss</option>
+                  <option value="general-fitness">General fitness</option>
+                  <option value="endurance">Endurance</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Preferred workout type</span>
+                <select
+                  className="select-input"
+                  value={form.preferredWorkoutType}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, preferredWorkoutType: event.target.value as WorkoutTypeOption }))
+                  }
+                >
+                  <option value="auto">Auto</option>
+                  <option value="full-body">Full body</option>
+                  <option value="upper">Upper body</option>
+                  <option value="lower">Lower body</option>
+                  <option value="push">Push</option>
+                  <option value="pull">Pull</option>
+                  <option value="core">Core</option>
+                </select>
+              </label>
+
+              {form.goal === 'custom' ? (
+                <label className="field field-span-2">
+                  <span>Custom goal</span>
+                  <input
+                    type="text"
+                    placeholder="Athletic performance"
+                    value={form.customGoal}
+                    onChange={(event) => setForm((current) => ({ ...current, customGoal: event.target.value }))}
+                  />
+                  <small>Use a short phrase. The backend will still normalize this to the closest safe training intent.</small>
+                </label>
+              ) : null}
+
+              <label className="field">
+                <span>Duration minutes</span>
+                <input
+                  type="number"
+                  min="15"
+                  max="180"
+                  step="5"
+                  value={form.durationMinutes}
+                  onChange={(event) => setForm((current) => ({ ...current, durationMinutes: event.target.value }))}
+                />
+              </label>
+
+              <label className="field">
+                <span>Fitness level</span>
+                <select
+                  className="select-input"
+                  value={form.fitnessLevel}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, fitnessLevel: event.target.value as FitnessLevelOption }))
+                  }
+                >
+                  <option value="auto">Auto</option>
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </label>
+
+              <label className="field field-span-2">
+                <span>Target muscles</span>
+                <input
+                  type="text"
+                  placeholder="Chest, back, glutes"
+                  value={form.targetMuscles}
+                  onChange={(event) => setForm((current) => ({ ...current, targetMuscles: event.target.value }))}
+                />
+                <small>Comma-separated. Leave blank to let the workout type drive selection.</small>
+              </label>
+
+              <label className="field field-span-2">
+                <span>Excluded exercises</span>
+                <input
+                  type="text"
+                  placeholder="Barbell bench press, walking lunge"
+                  value={form.excludedExercises}
+                  onChange={(event) => setForm((current) => ({ ...current, excludedExercises: event.target.value }))}
+                />
+                <small>Comma-separated names to avoid in the generated plan.</small>
+              </label>
+            </div>
+
+            <div className="ai-workout-toggle-grid">
+              <label className="field-checkbox">
+                <input
+                  type="checkbox"
+                  checked={form.includeWarmup}
+                  onChange={(event) => setForm((current) => ({ ...current, includeWarmup: event.target.checked }))}
+                />
+                <span>Include warm-up</span>
+              </label>
+
+              <label className="field-checkbox">
+                <input
+                  type="checkbox"
+                  checked={form.includeCooldown}
+                  onChange={(event) => setForm((current) => ({ ...current, includeCooldown: event.target.checked }))}
+                />
+                <span>Include cooldown</span>
+              </label>
+            </div>
+
+            {errorMessage ? <p className="field-error">{errorMessage}</p> : null}
+
+            <div className="ai-workout-form-actions">
+              <button type="submit" className="primary-button" disabled={isGenerating}>
+                {isGenerating ? 'Generating...' : 'Generate workout'}
+              </button>
+              <span className="record-hint">Plans are preview-only in this MVP and never auto-create workout records.</span>
+            </div>
+          </form>
+        </section>
+
+        <section className="panel ai-workout-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Generated plan</h2>
+              <p>Review the structure, prescription, and catalog media before you take anything into a live session.</p>
+            </div>
+          </div>
+
+          {isGenerating ? (
+            <StateCard title="Generating workout" description="Balancing goals, catalog coverage, and recent training history." loading />
+          ) : !plan ? (
+            <StateCard
+              title="No plan yet"
+              description="Choose your constraints on the left, then generate a workout to see the recommended sections and exercises."
+            />
+          ) : (
+            <div className="ai-workout-plan">
+              <article className="ai-workout-plan-summary">
+                <div>
+                  <span className="stat-label">Workout blueprint</span>
+                  <h3>{plan.title}</h3>
+                  <p>
+                    {plan.goal} focus · {plan.workoutType} split · {plan.difficulty} difficulty
+                  </p>
+                </div>
+                <div className="ai-workout-summary-pills">
+                  <span className="info-pill">{plan.estimatedDurationMinutes} min</span>
+                  <span className="info-pill info-pill-strength">{plan.sections.length} sections</span>
+                </div>
+              </article>
+
+              <div className="ai-workout-section-list">
+                {plan.sections.map((section) => (
+                  <article key={section.name} className="ai-workout-section-card">
+                    <div className="ai-workout-section-header">
+                      <h3>{section.name}</h3>
+                      <span className="record-hint">{section.exercises.length} exercises</span>
+                    </div>
+
+                    <div className="ai-workout-exercise-list">
+                      {section.exercises.map((exercise) => (
+                        <article key={`${section.name}-${exercise.name}`} className="ai-workout-exercise-card">
+                          <PlanExerciseMedia exercise={exercise} />
+
+                          <div className="ai-workout-exercise-copy">
+                            <div className="ai-workout-exercise-header">
+                              <strong>{exercise.name}</strong>
+                              <div className="ai-workout-exercise-pills">
+                                {exercise.category ? <span className="info-pill">{exercise.category}</span> : null}
+                                {exercise.targetMuscle ? <span className="info-pill">{exercise.targetMuscle}</span> : null}
+                              </div>
+                            </div>
+
+                            <div className="ai-workout-prescription-grid">
+                              <span><strong>{exercise.sets}</strong> sets</span>
+                              <span><strong>{exercise.reps}</strong></span>
+                              <span><strong>{exercise.restSeconds}s</strong> rest</span>
+                            </div>
+
+                            {exercise.suggestedWeight ? (
+                              <p className="ai-workout-prescription-note">{exercise.suggestedWeight}</p>
+                            ) : null}
+
+                            <p className="ai-workout-exercise-instructions">{exercise.instructions}</p>
+
+                            {exercise.videoUrl ? (
+                              <button
+                                type="button"
+                                className="ghost-button compact-button ai-workout-video-button"
+                                onClick={() => setVideoTarget({ title: exercise.name, url: exercise.videoUrl! })}
+                              >
+                                <PlayCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
+                                Watch demo
+                              </button>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              {plan.notes.length > 0 ? (
+                <article className="ai-workout-notes-card">
+                  <span className="stat-label">Notes</span>
+                  <ul className="ai-workout-note-list">
+                    {plan.notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                </article>
+              ) : null}
+            </div>
+          )}
+        </section>
+      </section>
+
+      {videoTarget ? (
+        <VideoModal title={videoTarget.title} videoUrl={videoTarget.url} onClose={() => setVideoTarget(null)} />
+      ) : null}
+    </main>
+  )
+}
+
+function buildPayload(form: GeneratorFormState): AiWorkoutGeneratePayload {
+  return {
+    goal: form.goal === 'custom' ? form.customGoal.trim() : mapGoalOptionToValue(form.goal),
+    preferredWorkoutType: form.preferredWorkoutType === 'auto' ? null : form.preferredWorkoutType,
+    durationMinutes: form.durationMinutes.trim() ? Number(form.durationMinutes) : null,
+    fitnessLevel: form.fitnessLevel === 'auto' ? null : form.fitnessLevel,
+    targetMuscles: splitCommaSeparatedValues(form.targetMuscles),
+    excludedExercises: splitCommaSeparatedValues(form.excludedExercises),
+    includeWarmup: form.includeWarmup,
+    includeCooldown: form.includeCooldown,
+  }
+}
+
+function mapGoalOptionToValue(goal: Exclude<GoalOption, 'custom'>) {
+  switch (goal) {
+    case 'strength':
+      return 'strength'
+    case 'muscle-gain':
+      return 'muscle gain'
+    case 'fat-loss':
+      return 'fat loss'
+    case 'general-fitness':
+      return 'general fitness'
+    case 'endurance':
+      return 'endurance'
+  }
+}
+
+function splitCommaSeparatedValues(value: string) {
+  const parts = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+
+  return parts.length > 0 ? parts : null
+}
+
+function PlanExerciseMedia({ exercise }: { exercise: AiWorkoutExercise }) {
+  const mediaUrl = resolvePlanMediaUrl(exercise.thumbnailUrl)
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    setHasError(false)
+  }, [mediaUrl])
+
+  if (!mediaUrl || hasError) {
+    return (
+      <div className="ai-workout-exercise-media ai-workout-exercise-media-placeholder" aria-hidden="true">
+        <span className="exercise-library-item-media-fallback-icon">
+          <Dumbbell aria-hidden="true" focusable="false" strokeWidth={1.8} />
+        </span>
+        <span className="record-hint">No media</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="ai-workout-exercise-media">
+      <img
+        src={mediaUrl}
+        alt={exercise.name}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={(event) => {
+          event.currentTarget.style.display = 'none'
+          setHasError(true)
+        }}
+      />
+    </div>
+  )
+}
+
+function resolvePlanMediaUrl(value: string | null | undefined) {
+  const normalizedValue = value?.trim()
+  if (!normalizedValue) {
+    return null
+  }
+
+  if (normalizedValue.startsWith('data:image/')) {
+    return normalizedValue
+  }
+
+  const mediaOrigin = resolvePlanMediaOrigin()
+
+  try {
+    const absoluteUrl = normalizedValue.startsWith('//')
+      ? new URL(`${window.location.protocol}${normalizedValue}`)
+      : new URL(normalizedValue, `${mediaOrigin}/`)
+
+    if (!['http:', 'https:', 'data:', 'blob:'].includes(absoluteUrl.protocol)) {
+      return null
+    }
+
+    return absoluteUrl.toString()
+  } catch {
+    return null
+  }
+}
+
+function resolvePlanMediaOrigin() {
+  if (typeof window === 'undefined') {
+    return 'http://localhost'
+  }
+
+  const configuredApiBaseUrl = typeof apiClient.defaults.baseURL === 'string'
+    ? apiClient.defaults.baseURL
+    : '/api'
+
+  try {
+    return new URL(configuredApiBaseUrl, window.location.origin).origin
+  } catch {
+    return window.location.origin
+  }
+}
