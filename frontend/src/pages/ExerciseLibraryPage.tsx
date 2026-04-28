@@ -246,7 +246,7 @@ export function ExerciseLibraryPage() {
             />
           ) : (
             <>
-              <div className="exercise-library-list list-scroll-region">
+              <div className="exercise-library-list">
                 {items.map((item) => {
                   const previewText = item.description ?? item.instructions ?? 'Open details for muscles, equipment, and instructions.'
 

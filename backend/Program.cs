@@ -112,6 +112,7 @@ builder.Services.AddHttpClient<FreeExerciseDbMediaProvider>(httpClient =>
     httpClient.Timeout = TimeSpan.FromSeconds(45);
 });
 builder.Services.AddScoped<IExerciseMediaProvider>(serviceProvider => serviceProvider.GetRequiredService<FreeExerciseDbMediaProvider>());
+builder.Services.AddHostedService<ExerciseCatalogMediaEnrichmentBackgroundService>();
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy =>

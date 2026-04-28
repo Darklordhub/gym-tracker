@@ -7590,7 +7590,7 @@ body {
   overflow: auto;
 }
 
-.exercise-library-list.list-scroll-region,
+.exercise-library-list,
 .exercise-history-list.list-scroll-region,
 .entry-list.list-scroll-region {
   min-height: 0;
