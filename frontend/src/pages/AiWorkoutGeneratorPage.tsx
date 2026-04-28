@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import axios from 'axios'
 import { Dumbbell, PlayCircle } from 'lucide-react'
 import { generateAiWorkout } from '../api/aiWorkoutApi'
 import { apiClient, getRequestErrorMessage } from '../lib/http'
@@ -56,7 +57,13 @@ export function AiWorkoutGeneratorPage() {
       const nextPlan = await generateAiWorkout(payload)
       setPlan(nextPlan)
     } catch (error) {
-      setErrorMessage(getRequestErrorMessage(error, 'Unable to generate an AI workout plan right now.'))
+      console.error('AI workout generator request failed.', {
+        error,
+        isAxiosError: axios.isAxiosError(error),
+        status: axios.isAxiosError(error) ? error.response?.status : undefined,
+        data: axios.isAxiosError(error) ? error.response?.data : undefined,
+      })
+      setErrorMessage(getAiWorkoutGenerateErrorMessage(error))
     } finally {
       setIsGenerating(false)
     }
@@ -452,4 +459,22 @@ function resolvePlanMediaOrigin() {
   } catch {
     return window.location.origin
   }
+}
+
+function getAiWorkoutGenerateErrorMessage(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    if (error.response?.status === 404) {
+      return 'The AI workout generator API is not available on the current backend deployment. Redeploy the backend so POST /api/ai-workout/generate exists.'
+    }
+
+    if (error.response?.status === 401) {
+      return 'Your session has expired. Sign in again and retry the workout generator.'
+    }
+
+    if (error.response?.status === 403) {
+      return 'Your account is not allowed to use the AI workout generator.'
+    }
+  }
+
+  return getRequestErrorMessage(error, 'Unable to generate an AI workout plan right now.')
 }
