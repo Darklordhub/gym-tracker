@@ -116,10 +116,11 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         }
 
         // TODO: Replace this deterministic planner with a provider-backed LLM implementation behind the same interface when external AI integration is introduced.
-        var goalsTask = _dbContext.GoalSettings
+        var goals = await _dbContext.GoalSettings
             .AsNoTracking()
             .FirstOrDefaultAsync(goal => goal.UserId == parsedUserId, cancellationToken);
-        var recentWorkoutsTask = _dbContext.Workouts
+
+        var recentWorkouts = await _dbContext.Workouts
             .AsNoTracking()
             .Where(workout => workout.UserId == parsedUserId)
             .Include(workout => workout.ExerciseEntries)
@@ -128,18 +129,13 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             .ThenByDescending(workout => workout.Id)
             .Take(12)
             .ToListAsync(cancellationToken);
-        var catalogTask = _dbContext.ExerciseCatalogItems
+
+        var catalogItems = await _dbContext.ExerciseCatalogItems
             .AsNoTracking()
             .Where(item => item.IsActive)
             .OrderBy(item => item.Name)
             .ThenBy(item => item.Id)
             .ToListAsync(cancellationToken);
-
-        await Task.WhenAll(goalsTask, recentWorkoutsTask, catalogTask);
-
-        var goals = goalsTask.Result;
-        var recentWorkouts = recentWorkoutsTask.Result;
-        var catalogItems = catalogTask.Result;
 
         var context = BuildContext(request, goals, recentWorkouts.Count);
         var recentExerciseCounts = BuildRecentExerciseCounts(recentWorkouts.Take(2));
