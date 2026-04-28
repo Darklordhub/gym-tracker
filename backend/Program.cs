@@ -55,6 +55,10 @@ builder.Services.AddScoped<ProgressiveOverloadService>();
 builder.Services.AddScoped<ExerciseCatalogService>();
 builder.Services.AddScoped<ExerciseCatalogSeedService>();
 builder.Services.AddScoped<ExerciseCatalogMediaEnrichmentService>();
+builder.Services.AddHttpClient<ExerciseMediaUrlValidationService>(httpClient =>
+{
+    httpClient.Timeout = TimeSpan.FromSeconds(Math.Clamp(exerciseMediaEnrichmentOptions.UrlValidationTimeoutSeconds, 3, 60));
+});
 builder.Services.AddHttpClient<IWgerExerciseCatalogSyncService, WgerExerciseCatalogSyncService>(httpClient =>
 {
     httpClient.BaseAddress = new Uri(wgerOptions.BaseUrl.EndsWith('/') ? wgerOptions.BaseUrl : $"{wgerOptions.BaseUrl}/");

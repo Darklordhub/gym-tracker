@@ -170,6 +170,8 @@ public class AdminController : ControllerBase
         [FromQuery] int? limit,
         [FromQuery] string? mediaType,
         [FromQuery] string? provider,
+        [FromQuery] bool? repairBadUrls,
+        [FromQuery] bool? dryRun,
         CancellationToken cancellationToken)
     {
         var selectedLimit = Math.Clamp(limit ?? 250, 1, 1000);
@@ -185,7 +187,34 @@ public class AdminController : ControllerBase
         }
 
         var result = await _exerciseCatalogMediaEnrichmentService.EnrichMissingMediaAsync(
-            new ExerciseCatalogMediaEnrichmentRequest(selectedLimit, parsedMediaType, parsedProvider),
+            new ExerciseCatalogMediaEnrichmentRequest(
+                selectedLimit,
+                parsedMediaType,
+                parsedProvider,
+                repairBadUrls ?? false,
+                dryRun ?? false),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    [HttpGet("exercise-catalog/media-diagnostics")]
+    public async Task<ActionResult<ExerciseCatalogMediaDiagnosticsResponse>> GetExerciseCatalogMediaDiagnostics(
+        [FromQuery] bool? validateUrls,
+        [FromQuery] int? sampleSize,
+        [FromQuery] string? source,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseDiagnosticsSourceFilter(source, out var parsedSourceFilter))
+        {
+            return BadRequest(new { message = "source must be one of: all, wger, local." });
+        }
+
+        var result = await _exerciseCatalogMediaEnrichmentService.GetMediaDiagnosticsAsync(
+            new ExerciseCatalogMediaDiagnosticsRequest(
+                validateUrls ?? false,
+                Math.Clamp(sampleSize ?? 25, 1, 100),
+                parsedSourceFilter),
             cancellationToken);
 
         return Ok(result);
@@ -347,6 +376,27 @@ public class AdminController : ControllerBase
                 return true;
             default:
                 providerSelection = ExerciseMediaProviderSelection.All;
+                return false;
+        }
+    }
+
+    private static bool TryParseDiagnosticsSourceFilter(string? value, out ExerciseCatalogMediaDiagnosticsSourceFilter sourceFilter)
+    {
+        switch (value?.Trim().ToLowerInvariant())
+        {
+            case null:
+            case "":
+            case "all":
+                sourceFilter = ExerciseCatalogMediaDiagnosticsSourceFilter.All;
+                return true;
+            case "wger":
+                sourceFilter = ExerciseCatalogMediaDiagnosticsSourceFilter.Wger;
+                return true;
+            case "local":
+                sourceFilter = ExerciseCatalogMediaDiagnosticsSourceFilter.Local;
+                return true;
+            default:
+                sourceFilter = ExerciseCatalogMediaDiagnosticsSourceFilter.All;
                 return false;
         }
     }

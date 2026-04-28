@@ -25,6 +25,7 @@ public enum ExerciseMediaMatchStatus
     NotFound,
     Found,
     Ambiguous,
+    LowConfidence,
     Failed,
     Skipped,
 }
@@ -36,6 +37,7 @@ public sealed class ExerciseMediaMatchResult
     public string? VideoUrl { get; init; }
     public double Confidence { get; init; }
     public string? Message { get; init; }
+    public string? MatchedName { get; init; }
 
     public static ExerciseMediaMatchResult Skipped(string? message = null) => new()
     {
@@ -56,18 +58,32 @@ public sealed class ExerciseMediaMatchResult
         Confidence = confidence,
     };
 
+    public static ExerciseMediaMatchResult LowConfidence(string? message = null, double confidence = 0, string? matchedName = null) => new()
+    {
+        Status = ExerciseMediaMatchStatus.LowConfidence,
+        Message = message,
+        Confidence = confidence,
+        MatchedName = matchedName,
+    };
+
     public static ExerciseMediaMatchResult Failed(string? message = null) => new()
     {
         Status = ExerciseMediaMatchStatus.Failed,
         Message = message,
     };
 
-    public static ExerciseMediaMatchResult Found(string? imageUrl, string? videoUrl, double confidence, string? message = null) => new()
+    public static ExerciseMediaMatchResult Found(
+        string? imageUrl,
+        string? videoUrl,
+        double confidence,
+        string? message = null,
+        string? matchedName = null) => new()
     {
         Status = ExerciseMediaMatchStatus.Found,
         ImageUrl = imageUrl,
         VideoUrl = videoUrl,
         Confidence = confidence,
         Message = message,
+        MatchedName = matchedName,
     };
 }

@@ -89,10 +89,6 @@ export function ExerciseLibraryPage() {
   const isSearchActive = normalizedSearchQuery.length > 0
   const shouldShowListSkeleton = isLoadingList && items.length === 0
 
-  useEffect(() => {
-    console.log({ loading: isLoadingList, itemsLength: items.length })
-  }, [isLoadingList, items.length])
-
   async function loadCatalogPage(query: string, nextPage: number, append: boolean) {
     const requestId = ++latestCatalogRequestRef.current
 

@@ -79,7 +79,8 @@ public class WgerExerciseMediaProvider : IExerciseMediaProvider
             ExerciseCatalogMediaEnrichmentService.IsUsableUrl(imageUrl) ? imageUrl : null,
             ExerciseCatalogMediaEnrichmentService.IsUsableUrl(videoUrl) ? videoUrl : null,
             1,
-            "Matched by Wger external id.");
+            "Matched by Wger external id.",
+            item.Name);
     }
 
     private static string? SelectBestMediaUrl(IEnumerable<JsonElement> items, MediaKind mediaKind)

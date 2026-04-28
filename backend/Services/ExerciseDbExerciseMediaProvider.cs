@@ -9,7 +9,7 @@ namespace backend.Services;
 public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
 {
     public string Name => "exercisedb";
-    public int Priority => 200;
+    public int Priority => 300;
 
     private readonly HttpClient _httpClient;
     private readonly ExerciseDbMediaProviderOptions _options;
@@ -45,6 +45,7 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
         }
 
         var normalizedName = ExerciseCatalogMediaEnrichmentService.NormalizeName(item.Name);
+        var normalizedNameWithoutEquipmentPrefix = ExerciseCatalogMediaEnrichmentService.NormalizeNameWithoutEquipmentPrefix(item.Name);
         if (string.IsNullOrWhiteSpace(normalizedName))
         {
             return ExerciseMediaMatchResult.NotFound("Exercise name is empty after normalization.");
@@ -81,9 +82,39 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
             return ExerciseMediaMatchResult.Ambiguous("Multiple ExerciseDB entries matched the normalized exercise name.", 0.99);
         }
 
+        if (!string.IsNullOrWhiteSpace(normalizedNameWithoutEquipmentPrefix)
+            && !string.Equals(normalizedNameWithoutEquipmentPrefix, normalizedName, StringComparison.Ordinal))
+        {
+            var equipmentNormalizedMatches = eligibleEntries
+                .Where(entry => string.Equals(entry.NormalizedNameWithoutEquipmentPrefix, normalizedNameWithoutEquipmentPrefix, StringComparison.Ordinal))
+                .ToList();
+
+            if (equipmentNormalizedMatches.Count == 1)
+            {
+                return BuildFoundResult(
+                    equipmentNormalizedMatches[0],
+                    requirement,
+                    0.985,
+                    "Matched by normalized exercise name after equipment-prefix cleanup.");
+            }
+
+            if (equipmentNormalizedMatches.Count > 1)
+            {
+                var equipmentDisambiguated = DisambiguateExactMatches(item, equipmentNormalizedMatches);
+                if (equipmentDisambiguated.Count == 1)
+                {
+                    return BuildFoundResult(
+                        equipmentDisambiguated[0],
+                        requirement,
+                        0.975,
+                        "Matched by equipment-cleaned normalized name with equipment/muscle disambiguation.");
+                }
+            }
+        }
+
         var rankedMatches = eligibleEntries
             .Select(entry => new RankedExerciseDbMatch(entry, ScoreCandidate(item, entry)))
-            .Where(match => match.Score >= 0.9)
+            .Where(match => match.Score >= 0.75)
             .OrderByDescending(match => match.Score)
             .ThenBy(match => match.Entry.Name, StringComparer.OrdinalIgnoreCase)
             .Take(3)
@@ -102,9 +133,17 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
             return BuildFoundResult(bestMatch.Entry, requirement, bestMatch.Score, "Matched by high-confidence fuzzy name comparison.");
         }
 
-        return ExerciseMediaMatchResult.Ambiguous(
-            "ExerciseDB produced multiple plausible matches, so enrichment was skipped.",
-            bestMatch.Score);
+        if (bestMatch.Score >= 0.9 && secondBestScore >= 0.87 && bestMatch.Score - secondBestScore < 0.03)
+        {
+            return ExerciseMediaMatchResult.Ambiguous(
+                "ExerciseDB produced multiple plausible high-confidence matches, so enrichment was skipped.",
+                bestMatch.Score);
+        }
+
+        return ExerciseMediaMatchResult.LowConfidence(
+            "Best ExerciseDB fallback match was below the confidence threshold.",
+            bestMatch.Score,
+            bestMatch.Entry.Name);
     }
 
     private async Task<IReadOnlyList<ExerciseDbMediaEntry>> EnsureEntriesLoadedAsync(CancellationToken cancellationToken)
@@ -173,7 +212,8 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
             ?? GetString(item, "imageUrl")
             ?? GetString(item, "gifUrl")
             ?? GetString(item, "image")
-            ?? GetString(item, "gif"));
+            ?? GetString(item, "gif")
+            ?? GetFirstString(item, "images"));
 
         var videoUrl = BuildAbsoluteUrl(
             GetString(item, "videoUrl")
@@ -183,6 +223,7 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
         {
             Name = name,
             NormalizedName = ExerciseCatalogMediaEnrichmentService.NormalizeName(name),
+            NormalizedNameWithoutEquipmentPrefix = ExerciseCatalogMediaEnrichmentService.NormalizeNameWithoutEquipmentPrefix(name),
             ImageUrl = ExerciseCatalogMediaEnrichmentService.IsUsableUrl(imageUrl) ? imageUrl : null,
             VideoUrl = ExerciseCatalogMediaEnrichmentService.IsUsableUrl(videoUrl) ? videoUrl : null,
             Equipment = NormalizeOptionalText(GetString(item, "equipment") ?? GetFirstString(item, "equipments")),
@@ -204,17 +245,10 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
             return absoluteUri.ToString();
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.AssetBaseUrl) && Uri.TryCreate(_options.AssetBaseUrl, UriKind.Absolute, out var assetBaseUri))
-        {
-            return new Uri(assetBaseUri, normalizedValue).ToString();
-        }
-
-        if (_httpClient.BaseAddress is not null)
-        {
-            return new Uri(_httpClient.BaseAddress, normalizedValue).ToString();
-        }
-
-        return null;
+        return ExerciseCatalogMediaEnrichmentService.BuildAbsoluteMediaUrl(
+            normalizedValue,
+            _options.AssetBaseUrl,
+            _httpClient.BaseAddress);
     }
 
     private static ExerciseMediaMatchResult BuildFoundResult(
@@ -231,7 +265,7 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
             return ExerciseMediaMatchResult.NotFound("Matched ExerciseDB entry has no usable media for the requested fields.");
         }
 
-        return ExerciseMediaMatchResult.Found(imageUrl, videoUrl, confidence, message);
+        return ExerciseMediaMatchResult.Found(imageUrl, videoUrl, confidence, message, entry.Name);
     }
 
     private static List<ExerciseDbMediaEntry> DisambiguateExactMatches(
@@ -256,11 +290,23 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
 
     private static double ScoreCandidate(ExerciseCatalogItem item, ExerciseDbMediaEntry entry)
     {
+        var strippedItemName = ExerciseCatalogMediaEnrichmentService.NormalizeNameWithoutEquipmentPrefix(item.Name);
+        var strippedEntryName = entry.NormalizedNameWithoutEquipmentPrefix;
+
         var nameSimilarity = Math.Max(
             ExerciseCatalogMediaEnrichmentService.GetLevenshteinSimilarity(item.Name, entry.Name),
             ExerciseCatalogMediaEnrichmentService.GetTokenSimilarity(item.Name, entry.Name));
+        var strippedNameSimilarity = string.IsNullOrWhiteSpace(strippedItemName) || string.IsNullOrWhiteSpace(strippedEntryName)
+            ? 0
+            : Math.Max(
+                ExerciseCatalogMediaEnrichmentService.GetLevenshteinSimilarity(strippedItemName, strippedEntryName),
+                ExerciseCatalogMediaEnrichmentService.GetTokenSimilarity(strippedItemName, strippedEntryName));
 
-        var tokenContainment = ExerciseCatalogMediaEnrichmentService.GetTokenContainmentSimilarity(item.Name, entry.Name);
+        var tokenContainment = Math.Max(
+            ExerciseCatalogMediaEnrichmentService.GetTokenContainmentSimilarity(item.Name, entry.Name),
+            string.IsNullOrWhiteSpace(strippedItemName) || string.IsNullOrWhiteSpace(strippedEntryName)
+                ? 0
+                : ExerciseCatalogMediaEnrichmentService.GetTokenContainmentSimilarity(strippedItemName, strippedEntryName));
         var equipmentMatch = !string.IsNullOrWhiteSpace(item.Equipment)
             && string.Equals(
                 ExerciseCatalogMediaEnrichmentService.NormalizeName(item.Equipment),
@@ -268,11 +314,16 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
                 StringComparison.Ordinal);
 
         var muscleMatch = MatchesMuscle(item, entry);
-        var score = nameSimilarity;
+        var score = Math.Max(nameSimilarity, strippedNameSimilarity);
 
         if (tokenContainment >= 1 && (equipmentMatch || muscleMatch))
         {
             score = Math.Max(score, 0.95);
+        }
+
+        if (strippedNameSimilarity >= 0.94 && (equipmentMatch || muscleMatch))
+        {
+            score = Math.Max(score, 0.965);
         }
 
         if (equipmentMatch)
@@ -347,6 +398,7 @@ public class ExerciseDbExerciseMediaProvider : IExerciseMediaProvider
     {
         public string Name { get; init; } = string.Empty;
         public string NormalizedName { get; init; } = string.Empty;
+        public string NormalizedNameWithoutEquipmentPrefix { get; init; } = string.Empty;
         public string? ImageUrl { get; init; }
         public string? VideoUrl { get; init; }
         public string? Equipment { get; init; }

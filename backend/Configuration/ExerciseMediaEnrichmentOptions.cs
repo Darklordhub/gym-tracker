@@ -5,6 +5,7 @@ public class ExerciseMediaEnrichmentOptions
     public const string SectionName = "ExerciseMediaEnrichment";
 
     public int MaxItems { get; set; } = 250;
+    public int UrlValidationTimeoutSeconds { get; set; } = 12;
     public ExerciseMediaProviderOptions Wger { get; set; } = new();
     public ExerciseDbMediaProviderOptions ExerciseDb { get; set; } = new();
     public ExerciseDbMediaProviderOptions FreeExerciseDb { get; set; } = new();

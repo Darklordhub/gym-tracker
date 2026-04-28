@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, PlayCircle, Plus, PlusCircle, Trash2 } from 'lucide-react'
+import { CheckCircle2, Dumbbell, PlayCircle, Plus, PlusCircle, Trash2 } from 'lucide-react'
 import { searchExerciseCatalog } from '../api/exerciseCatalog'
 import { fetchCycleGuidance } from '../api/cycle'
 import { fetchLatestCalorieLog } from '../api/calories'
@@ -23,7 +23,7 @@ import { VideoModal } from '../components/VideoModal'
 import { getWorkoutAssistantInsight, getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { buildDailyCalorieBalance } from '../lib/calorieBalance'
 import { formatDate, getTodayDateValue } from '../lib/format'
-import { getRequestErrorMessage } from '../lib/http'
+import { apiClient, getRequestErrorMessage } from '../lib/http'
 import { buildDailyTrainingScore } from '../lib/trainingScore'
 import type { CycleGuidance } from '../types/cycle'
 import type { CalorieLog } from '../types/calories'
@@ -2071,11 +2071,7 @@ function ExerciseHelpCard({
       </div>
 
       <div className="exercise-help-body">
-        {item.thumbnailUrl ? (
-          <div className="exercise-help-media">
-            <img src={item.thumbnailUrl} alt={item.name} />
-          </div>
-        ) : null}
+        <ExerciseHelpMedia item={item} />
 
         <div className="exercise-help-copy">
           <div className="exercise-help-pills">
@@ -2112,6 +2108,85 @@ function ExerciseHelpCard({
       <ProgressiveOverloadTargetCard overloadState={overloadState} fallbackSuggestion={fallbackSuggestion} compact />
     </section>
   )
+}
+
+function ExerciseHelpMedia({ item }: { item: ExerciseCatalogItem }) {
+  const mediaUrl = resolveCatalogMediaUrl(item.thumbnailUrl ?? item.localMediaPath)
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    setHasError(false)
+  }, [mediaUrl])
+
+  if (!mediaUrl || hasError) {
+    return (
+      <div className="exercise-help-media exercise-help-media-placeholder" aria-hidden="true">
+        <span className="exercise-library-item-media-fallback-icon">
+          <Dumbbell aria-hidden="true" focusable="false" strokeWidth={1.8} />
+        </span>
+        <span className="record-hint">No media yet</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="exercise-help-media">
+      <img
+        src={mediaUrl}
+        alt={item.name}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={(event) => {
+          event.currentTarget.style.display = 'none'
+          setHasError(true)
+        }}
+      />
+    </div>
+  )
+}
+
+function resolveCatalogMediaUrl(value: string | null | undefined) {
+  const normalizedValue = value?.trim()
+  if (!normalizedValue) {
+    return null
+  }
+
+  if (normalizedValue.startsWith('data:image/')) {
+    return normalizedValue
+  }
+
+  const mediaOrigin = resolveCatalogMediaOrigin()
+
+  try {
+    const absoluteUrl = normalizedValue.startsWith('//')
+      ? new URL(`${window.location.protocol}${normalizedValue}`)
+      : new URL(normalizedValue, `${mediaOrigin}/`)
+
+    if (!['http:', 'https:', 'data:', 'blob:'].includes(absoluteUrl.protocol)) {
+      return null
+    }
+
+    return absoluteUrl.toString()
+  } catch {
+    return null
+  }
+}
+
+function resolveCatalogMediaOrigin() {
+  if (typeof window === 'undefined') {
+    return 'http://localhost'
+  }
+
+  const configuredApiBaseUrl = typeof apiClient.defaults.baseURL === 'string'
+    ? apiClient.defaults.baseURL
+    : '/api'
+
+  try {
+    return new URL(configuredApiBaseUrl, window.location.origin).origin
+  } catch {
+    return window.location.origin
+  }
 }
 
 const exerciseCatalogSearchCache = new Map<string, ExerciseCatalogItem[]>()
