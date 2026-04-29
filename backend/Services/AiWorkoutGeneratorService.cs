@@ -93,6 +93,32 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         "bird dog",
     ];
 
+    private static readonly HashSet<string> ExerciseFamilyStopWords = new(StringComparer.Ordinal)
+    {
+        "barbell",
+        "dumbbell",
+        "cable",
+        "machine",
+        "smith",
+        "bodyweight",
+        "band",
+        "trx",
+        "standing",
+        "seated",
+        "single",
+        "one",
+        "arm",
+        "alternating",
+        "lever",
+        "plate",
+        "weighted",
+        "assisted",
+        "reverse",
+        "incline",
+        "decline",
+        "mp",
+    };
+
     private readonly AppDbContext _dbContext;
 
     public AiWorkoutGeneratorService(AppDbContext dbContext)
@@ -138,9 +164,24 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             .ToListAsync(cancellationToken);
 
         var context = BuildContext(request, goals, recentWorkouts.Count);
+        var random = Random.Shared;
+        var variation = BuildVariationProfile(context, random);
         var recentExerciseCounts = BuildRecentExerciseCounts(recentWorkouts.Take(2));
         var recentExerciseWeights = BuildRecentExerciseWeightLookup(recentWorkouts);
+        var recentExercisePenalties = BuildRecentExercisePenaltyLookup(recentWorkouts.Take(6));
+        var recentFamilyPenalties = BuildRecentExerciseFamilyPenaltyLookup(recentWorkouts.Take(6));
+        var recentPatternPenalties = BuildRecentMovementPatternPenaltyLookup(recentWorkouts.Take(6));
         var catalogCandidates = BuildCatalogCandidates(catalogItems, context.ExcludedExercises);
+        var mainWorkout = BuildMainWorkoutExercises(
+            context,
+            catalogCandidates,
+            recentExerciseCounts,
+            recentExerciseWeights,
+            recentExercisePenalties,
+            recentFamilyPenalties,
+            recentPatternPenalties,
+            variation,
+            random);
 
         var sections = new List<AiWorkoutSectionDto>();
 
@@ -153,16 +194,10 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             });
         }
 
-        var mainSectionExercises = BuildMainWorkoutExercises(
-            context,
-            catalogCandidates,
-            recentExerciseCounts,
-            recentExerciseWeights);
-
         sections.Add(new AiWorkoutSectionDto
         {
             Name = GetMainSectionName(context.WorkoutType),
-            Exercises = mainSectionExercises,
+            Exercises = mainWorkout.Exercises,
         });
 
         if (context.IncludeCooldown)
@@ -182,7 +217,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             EstimatedDurationMinutes = EstimateDurationMinutes(sections, context.DurationMinutes),
             Difficulty = FormatLabel(context.FitnessLevel),
             Sections = sections,
-            Notes = BuildPlanNotes(context, mainSectionExercises, recentWorkouts.Count),
+            Notes = BuildPlanNotes(context, mainWorkout, recentWorkouts.Count, variation),
         };
     }
 
@@ -257,6 +292,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             Id = item.Id,
             Name = name,
             NameNormalized = NormalizeText(name),
+            FamilyKey = BuildExerciseFamilyKey(name),
             Instructions = GetEffectiveInstructions(item),
             PrimaryMuscle = string.IsNullOrWhiteSpace(item.PrimaryMuscle) ? null : item.PrimaryMuscle.Trim(),
             PrimaryMuscleNormalized = string.IsNullOrWhiteSpace(item.PrimaryMuscle) ? null : NormalizeMuscle(item.PrimaryMuscle),
@@ -267,74 +303,135 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             VideoUrl = GetEffectiveVideoUrl(item),
             FocusGroup = focusGroup,
             Category = category,
+            MovementPattern = ResolveMovementPattern(name, muscles, focusGroup, category),
             IsBodyweight = string.Equals(NormalizeOptionalText(item.Equipment), "bodyweight", StringComparison.OrdinalIgnoreCase)
                            || category == "bodyweight",
             IsAdvanced = string.Equals(NormalizeOptionalText(item.Difficulty), "advanced", StringComparison.OrdinalIgnoreCase),
         };
     }
 
-    private static List<AiWorkoutExerciseDto> BuildMainWorkoutExercises(
+    private static GeneratedMainWorkoutResult BuildMainWorkoutExercises(
         WorkoutGenerationContext context,
         IReadOnlyList<CatalogExerciseCandidate> catalogCandidates,
         IReadOnlyDictionary<string, int> recentExerciseCounts,
-        IReadOnlyDictionary<string, decimal> recentExerciseWeights)
+        IReadOnlyDictionary<string, decimal> recentExerciseWeights,
+        IReadOnlyDictionary<string, int> recentExercisePenalties,
+        IReadOnlyDictionary<string, int> recentFamilyPenalties,
+        IReadOnlyDictionary<string, int> recentPatternPenalties,
+        GenerationVariationProfile variation,
+        Random random)
     {
-        var slots = BuildMainSlots(context);
+        var slots = BuildMainSlots(context, random);
         var selectedExercises = new List<AiWorkoutExerciseDto>(slots.Count);
         var usedCatalogIds = new HashSet<int>();
         var usedExerciseNames = new HashSet<string>(StringComparer.Ordinal);
+        var usedFamilyKeys = new HashSet<string>(StringComparer.Ordinal);
+        var usedMovementPatterns = new Dictionary<string, int>(StringComparer.Ordinal);
+        var summary = new WorkoutSelectionSummary();
 
         foreach (var slot in slots)
         {
-            var candidate = SelectBestCandidate(
+            var selection = SelectCandidate(
                 catalogCandidates,
                 slot,
                 context,
                 recentExerciseCounts,
+                recentExercisePenalties,
+                recentFamilyPenalties,
+                recentPatternPenalties,
                 usedCatalogIds,
                 usedExerciseNames,
+                usedFamilyKeys,
+                usedMovementPatterns,
                 allowRecent: false);
 
-            candidate ??= SelectBestCandidate(
+            selection ??= SelectCandidate(
                 catalogCandidates,
                 slot,
                 context,
                 recentExerciseCounts,
+                recentExercisePenalties,
+                recentFamilyPenalties,
+                recentPatternPenalties,
                 usedCatalogIds,
                 usedExerciseNames,
+                usedFamilyKeys,
+                usedMovementPatterns,
                 allowRecent: true);
 
-            if (candidate is not null)
+            if (selection?.Candidate is not null)
             {
+                var candidate = selection.Candidate;
                 usedCatalogIds.Add(candidate.Id);
                 usedExerciseNames.Add(candidate.NameNormalized);
-                selectedExercises.Add(MapSelectedCatalogExercise(candidate, slot, context, recentExerciseWeights));
+                usedFamilyKeys.Add(candidate.FamilyKey);
+                if (!string.IsNullOrWhiteSpace(candidate.MovementPattern))
+                {
+                    usedMovementPatterns[candidate.MovementPattern] =
+                        usedMovementPatterns.TryGetValue(candidate.MovementPattern, out var usedCount) ? usedCount + 1 : 1;
+                    summary.RecordMovementPattern(candidate.MovementPattern);
+                }
+
+                summary.CatalogExerciseCount++;
+                if (selection.AvoidedRecentAlternative)
+                {
+                    summary.RotatedAwayFromRecentRepeatsCount++;
+                }
+
+                if (!string.IsNullOrWhiteSpace(candidate.ThumbnailUrl) || !string.IsNullOrWhiteSpace(candidate.VideoUrl))
+                {
+                    summary.MediaBackedExerciseCount++;
+                }
+
+                selectedExercises.Add(MapSelectedCatalogExercise(candidate, slot, context, recentExerciseWeights, variation));
                 continue;
             }
 
-            var fallbackExercise = BuildFallbackExercise(slot, context);
+            var fallbackExercise = BuildFallbackExercise(slot, context, variation);
             usedExerciseNames.Add(NormalizeText(fallbackExercise.Name));
+            summary.FallbackExerciseCount++;
+            var fallbackPattern = ResolveMovementPattern(
+                fallbackExercise.Name,
+                [],
+                slot.FocusGroup,
+                NormalizeText(fallbackExercise.Category));
+            usedMovementPatterns[fallbackPattern] =
+                usedMovementPatterns.TryGetValue(fallbackPattern, out var fallbackPatternCount) ? fallbackPatternCount + 1 : 1;
+            summary.RecordMovementPattern(fallbackPattern);
             selectedExercises.Add(fallbackExercise);
         }
 
-        return selectedExercises;
+        return new GeneratedMainWorkoutResult
+        {
+            Exercises = selectedExercises,
+            Summary = summary,
+        };
     }
 
-    private static CatalogExerciseCandidate? SelectBestCandidate(
+    private static CandidateSelectionResult? SelectCandidate(
         IReadOnlyList<CatalogExerciseCandidate> candidates,
         WorkoutSlot slot,
         WorkoutGenerationContext context,
         IReadOnlyDictionary<string, int> recentExerciseCounts,
+        IReadOnlyDictionary<string, int> recentExercisePenalties,
+        IReadOnlyDictionary<string, int> recentFamilyPenalties,
+        IReadOnlyDictionary<string, int> recentPatternPenalties,
         IReadOnlySet<int> usedCatalogIds,
         IReadOnlySet<string> usedExerciseNames,
+        IReadOnlySet<string> usedFamilyKeys,
+        IReadOnlyDictionary<string, int> usedMovementPatterns,
         bool allowRecent)
     {
-        CatalogExerciseCandidate? bestCandidate = null;
-        var bestScore = int.MinValue;
+        var scoredCandidates = new List<ScoredCandidate>();
 
         foreach (var candidate in candidates)
         {
             if (usedCatalogIds.Contains(candidate.Id) || usedExerciseNames.Contains(candidate.NameNormalized))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(candidate.FamilyKey) && usedFamilyKeys.Contains(candidate.FamilyKey))
             {
                 continue;
             }
@@ -345,22 +442,79 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 continue;
             }
 
-            var score = ScoreCandidate(candidate, slot, context, recentCount);
-            if (score > bestScore)
+            var score = ScoreCandidate(
+                candidate,
+                slot,
+                context,
+                recentCount,
+                recentExercisePenalties,
+                recentFamilyPenalties,
+                recentPatternPenalties,
+                usedMovementPatterns,
+                Random.Shared);
+
+            if (score >= 14)
             {
-                bestScore = score;
-                bestCandidate = candidate;
+                scoredCandidates.Add(new ScoredCandidate
+                {
+                    Candidate = candidate,
+                    Score = score,
+                    RecentCount = recentCount,
+                });
             }
         }
 
-        return bestScore >= 18 ? bestCandidate : null;
+        if (scoredCandidates.Count == 0)
+        {
+            return null;
+        }
+
+        scoredCandidates.Sort((left, right) => right.Score.CompareTo(left.Score));
+        var bestScore = scoredCandidates[0].Score;
+        var selectionPool = scoredCandidates
+            .Where(entry => entry.Score >= bestScore - 6)
+            .Take(5)
+            .ToList();
+
+        var totalWeight = selectionPool.Sum(entry => Math.Max(1, entry.Score - bestScore + 8));
+        var pick = Random.Shared.Next(totalWeight);
+        var runningWeight = 0;
+
+        foreach (var option in selectionPool)
+        {
+            runningWeight += Math.Max(1, option.Score - bestScore + 8);
+            if (pick < runningWeight)
+            {
+                return new CandidateSelectionResult
+                {
+                    Candidate = option.Candidate,
+                    AvoidedRecentAlternative = option.RecentCount == 0
+                        && scoredCandidates.Any(entry =>
+                            entry.RecentCount > 0
+                            && entry.Score >= bestScore - 4),
+                };
+            }
+        }
+
+        var chosen = selectionPool[0];
+        return new CandidateSelectionResult
+        {
+            Candidate = chosen.Candidate,
+            AvoidedRecentAlternative = chosen.RecentCount == 0
+                && scoredCandidates.Any(entry => entry.RecentCount > 0 && entry.Score >= bestScore - 4),
+        };
     }
 
     private static int ScoreCandidate(
         CatalogExerciseCandidate candidate,
         WorkoutSlot slot,
         WorkoutGenerationContext context,
-        int recentCount)
+        int recentCount,
+        IReadOnlyDictionary<string, int> recentExercisePenalties,
+        IReadOnlyDictionary<string, int> recentFamilyPenalties,
+        IReadOnlyDictionary<string, int> recentPatternPenalties,
+        IReadOnlyDictionary<string, int> usedMovementPatterns,
+        Random random)
     {
         var score = 0;
 
@@ -391,6 +545,9 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         {
             score += 14;
         }
+
+        var movementPatternScore = ScoreMovementPattern(candidate.MovementPattern, slot.PreferredPatterns);
+        score += movementPatternScore;
 
         if (!string.IsNullOrWhiteSpace(slot.TargetMuscle))
         {
@@ -423,6 +580,29 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         if (recentCount > 0)
         {
             score -= 18 * recentCount;
+        }
+
+        if (recentExercisePenalties.TryGetValue(candidate.NameNormalized, out var recentExercisePenalty))
+        {
+            score -= recentExercisePenalty * 2;
+        }
+
+        if (!string.IsNullOrWhiteSpace(candidate.FamilyKey)
+            && recentFamilyPenalties.TryGetValue(candidate.FamilyKey, out var familyPenalty))
+        {
+            score -= familyPenalty * 2;
+        }
+
+        if (!string.IsNullOrWhiteSpace(candidate.MovementPattern)
+            && recentPatternPenalties.TryGetValue(candidate.MovementPattern, out var patternPenalty))
+        {
+            score -= patternPenalty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(candidate.MovementPattern)
+            && usedMovementPatterns.TryGetValue(candidate.MovementPattern, out var sameWorkoutPatternCount))
+        {
+            score -= 16 * sameWorkoutPatternCount;
         }
 
         if (!string.IsNullOrWhiteSpace(candidate.Instructions))
@@ -465,6 +645,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             score += 3;
         }
 
+        score += random.Next(-2, 3);
         return score;
     }
 
@@ -472,7 +653,8 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         CatalogExerciseCandidate candidate,
         WorkoutSlot slot,
         WorkoutGenerationContext context,
-        IReadOnlyDictionary<string, decimal> recentExerciseWeights)
+        IReadOnlyDictionary<string, decimal> recentExerciseWeights,
+        GenerationVariationProfile variation)
     {
         return new AiWorkoutExerciseDto
         {
@@ -480,10 +662,10 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             Name = candidate.Name,
             Category = FormatLabel(candidate.Category),
             TargetMuscle = candidate.PrimaryMuscle ?? FormatLabel(slot.TargetMuscle ?? candidate.FocusGroup),
-            Sets = GetSetCountForSlot(slot, context.SetTarget),
-            Reps = GetRepTargetForSlot(slot, context.RepTarget, context.Goal),
+            Sets = GetSetCountForSlot(slot, context, variation),
+            Reps = GetRepTargetForSlot(slot, context, variation),
             SuggestedWeight = BuildSuggestedWeight(candidate, context, recentExerciseWeights),
-            RestSeconds = GetRestSecondsForSlot(slot, context.RestSeconds, context.Goal),
+            RestSeconds = GetRestSecondsForSlot(slot, context, variation),
             Instructions = string.IsNullOrWhiteSpace(candidate.Instructions)
                 ? BuildFallbackInstruction(candidate.FocusGroup, candidate.Category)
                 : candidate.Instructions!,
@@ -492,7 +674,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         };
     }
 
-    private static List<WorkoutSlot> BuildMainSlots(WorkoutGenerationContext context)
+    private static List<WorkoutSlot> BuildMainSlots(WorkoutGenerationContext context, Random random)
     {
         var slotCount = GetMainExerciseCount(context.WorkoutType, context.DurationMinutes);
         if (context.TargetMuscles.Count > 0)
@@ -501,12 +683,12 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             for (var index = 0; index < slotCount; index++)
             {
                 var targetMuscle = context.TargetMuscles[index % context.TargetMuscles.Count];
-                slots.Add(new WorkoutSlot
-                {
-                    FocusGroup = ResolveFocusGroupForTargetMuscle(targetMuscle),
-                    TargetMuscle = targetMuscle,
-                    PreferredCategories = index < 2 ? ["compound", "bodyweight"] : ["compound", "isolation", "bodyweight", "core"],
-                });
+                var compoundBias = index < Math.Min(2, slotCount);
+                slots.Add(BuildSlot(
+                    ResolveFocusGroupForTargetMuscle(targetMuscle),
+                    compoundBias ? ["compound", "bodyweight"] : ["compound", "isolation", "bodyweight", "core"],
+                    GetPreferredPatternsForTargetMuscle(targetMuscle, compoundBias, random),
+                    targetMuscle));
             }
 
             return slots;
@@ -514,70 +696,101 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
 
         List<WorkoutSlot> baseSlots = context.WorkoutType switch
         {
-            "upper" => new List<WorkoutSlot>
+            "upper" => Shuffle(new[]
+                {
+                    BuildSlot("push", ["compound", "bodyweight"], DistinctShuffled(["horizontal press", "vertical press", "angled press"], random, 3)),
+                    BuildSlot("pull", ["compound", "bodyweight"], DistinctShuffled(["horizontal pull", "vertical pull"], random, 2)),
+                }, random)
+                .Concat(Shuffle(new[]
+                {
+                    BuildSlot("push", ["isolation", "bodyweight"], DistinctShuffled(["lateral raise", "triceps extension", "chest fly", "push bodyweight"], random, 3)),
+                    BuildSlot("pull", ["isolation", "bodyweight"], DistinctShuffled(["curl", "rear delt", "horizontal pull"], random, 3)),
+                    BuildSlot("upper", ["compound", "isolation", "bodyweight"], DistinctShuffled(["vertical press", "horizontal pull", "curl", "lateral raise"], random, 3)),
+                }, random))
+                .Concat(new[] { BuildSlot("core", "core", "bodyweight") })
+                .ToList(),
+            "lower" or "legs" => Shuffle(new[]
+                {
+                    BuildSlot("lower", ["compound", "bodyweight"], DistinctShuffled(["squat", "hinge", "lunge"], random, 3)),
+                    BuildSlot("lower", ["compound", "bodyweight"], DistinctShuffled(["hinge", "squat", "hip thrust"], random, 3)),
+                }, random)
+                .Concat(Shuffle(new[]
+                {
+                    BuildSlot("lower", ["isolation", "bodyweight"], DistinctShuffled(["lunge", "hamstring curl", "hip thrust", "knee extension"], random, 3)),
+                    BuildSlot("lower", ["isolation", "bodyweight"], DistinctShuffled(["calf raise", "hamstring curl", "knee extension", "lunge"], random, 3)),
+                    BuildSlot("full-body", ["compound", "bodyweight"], DistinctShuffled(["lunge", "squat", "hinge"], random, 3)),
+                }, random))
+                .Concat(new[] { BuildSlot("core", "core", "bodyweight") })
+                .ToList(),
+            "push" => Shuffle(new[]
+                {
+                    BuildSlot("push", ["compound", "bodyweight"], DistinctShuffled(["horizontal press", "angled press", "push bodyweight"], random, 3)),
+                    BuildSlot("push", ["compound", "bodyweight"], DistinctShuffled(["vertical press", "horizontal press", "dip"], random, 3)),
+                }, random)
+                .Concat(Shuffle(new[]
+                {
+                    BuildSlot("push", ["isolation", "bodyweight"], DistinctShuffled(["lateral raise", "triceps extension", "chest fly"], random, 3)),
+                    BuildSlot("push", ["isolation", "bodyweight"], DistinctShuffled(["triceps extension", "lateral raise", "push bodyweight"], random, 3)),
+                }, random))
+                .Concat(new[] { BuildSlot("core", "core", "bodyweight") })
+                .ToList(),
+            "pull" => Shuffle(new[]
+                {
+                    BuildSlot("pull", ["compound", "bodyweight"], DistinctShuffled(["horizontal pull", "vertical pull"], random, 2)),
+                    BuildSlot("pull", ["compound", "bodyweight"], DistinctShuffled(["vertical pull", "horizontal pull"], random, 2)),
+                }, random)
+                .Concat(Shuffle(new[]
+                {
+                    BuildSlot("pull", ["isolation", "bodyweight"], DistinctShuffled(["curl", "rear delt", "shrug"], random, 3)),
+                    BuildSlot("pull", ["isolation", "bodyweight"], DistinctShuffled(["rear delt", "curl", "vertical pull"], random, 3)),
+                }, random))
+                .Concat(new[] { BuildSlot("core", "core", "bodyweight") })
+                .ToList(),
+            "core" => Shuffle(new[]
             {
-                BuildSlot("push", "compound"),
-                BuildSlot("pull", "compound"),
-                BuildSlot("push", "isolation", "bodyweight"),
-                BuildSlot("pull", "isolation", "bodyweight"),
-                BuildSlot("core", "core", "bodyweight"),
-                BuildSlot("upper", "compound", "isolation"),
-            },
-            "lower" or "legs" => new List<WorkoutSlot>
-            {
-                BuildSlot("lower", "compound"),
-                BuildSlot("lower", "compound"),
-                BuildSlot("lower", "isolation", "bodyweight"),
-                BuildSlot("core", "core", "bodyweight"),
-                BuildSlot("lower", "isolation", "bodyweight"),
-                BuildSlot("full-body", "compound", "bodyweight"),
-            },
-            "push" => new List<WorkoutSlot>
-            {
-                BuildSlot("push", "compound"),
-                BuildSlot("push", "compound", "bodyweight"),
-                BuildSlot("push", "isolation", "bodyweight"),
-                BuildSlot("core", "core", "bodyweight"),
-                BuildSlot("push", "isolation"),
-            },
-            "pull" => new List<WorkoutSlot>
-            {
-                BuildSlot("pull", "compound"),
-                BuildSlot("pull", "compound", "bodyweight"),
-                BuildSlot("pull", "isolation", "bodyweight"),
-                BuildSlot("core", "core", "bodyweight"),
-                BuildSlot("pull", "isolation"),
-            },
-            "core" => new List<WorkoutSlot>
-            {
-                BuildSlot("core", "core", "bodyweight"),
-                BuildSlot("core", "core", "bodyweight"),
-                BuildSlot("lower", "bodyweight", "compound"),
-                BuildSlot("full-body", "bodyweight", "compound"),
-                BuildSlot("core", "core"),
-            },
-            _ => new List<WorkoutSlot>
-            {
-                BuildSlot("lower", "compound"),
-                BuildSlot("push", "compound"),
-                BuildSlot("pull", "compound"),
-                BuildSlot("core", "core", "bodyweight"),
-                BuildSlot("lower", "isolation", "bodyweight"),
-                BuildSlot("push", "isolation", "bodyweight"),
-                BuildSlot("pull", "isolation", "bodyweight"),
-            },
+                BuildSlot("core", ["core", "bodyweight"], DistinctShuffled(["plank", "anti rotation", "core flexion"], random, 3)),
+                BuildSlot("core", ["core", "bodyweight"], DistinctShuffled(["core flexion", "rotation", "plank"], random, 3)),
+                BuildSlot("lower", ["bodyweight", "compound"], DistinctShuffled(["lunge", "squat", "hinge"], random, 3)),
+                BuildSlot("full-body", ["bodyweight", "compound"], DistinctShuffled(["push bodyweight", "horizontal pull", "lunge"], random, 3)),
+                BuildSlot("core", ["core", "bodyweight"], DistinctShuffled(["rotation", "plank", "anti rotation"], random, 3)),
+            }, random).ToList(),
+            _ => Shuffle(new[]
+                {
+                    BuildSlot("lower", ["compound", "bodyweight"], DistinctShuffled(["squat", "hinge", "lunge"], random, 3)),
+                    BuildSlot("push", ["compound", "bodyweight"], DistinctShuffled(["horizontal press", "vertical press", "angled press"], random, 3)),
+                    BuildSlot("pull", ["compound", "bodyweight"], DistinctShuffled(["horizontal pull", "vertical pull"], random, 2)),
+                }, random)
+                .Concat(Shuffle(new[]
+                {
+                    BuildSlot("lower", ["isolation", "bodyweight"], DistinctShuffled(["lunge", "hamstring curl", "calf raise"], random, 3)),
+                    BuildSlot("push", ["isolation", "bodyweight"], DistinctShuffled(["lateral raise", "triceps extension", "chest fly"], random, 3)),
+                    BuildSlot("pull", ["isolation", "bodyweight"], DistinctShuffled(["curl", "rear delt", "shrug"], random, 3)),
+                }, random))
+                .Concat(new[] { BuildSlot("core", "core", "bodyweight") })
+                .ToList(),
         };
 
         return baseSlots.Take(slotCount).ToList();
     }
 
-    private static WorkoutSlot BuildSlot(string focusGroup, params string[] preferredCategories)
+    private static WorkoutSlot BuildSlot(
+        string focusGroup,
+        IReadOnlyList<string> preferredCategories,
+        IReadOnlyList<string>? preferredPatterns = null,
+        string? targetMuscle = null)
     {
         return new WorkoutSlot
         {
             FocusGroup = focusGroup,
+            TargetMuscle = targetMuscle,
             PreferredCategories = preferredCategories.ToList(),
+            PreferredPatterns = preferredPatterns?.ToList() ?? [],
         };
+    }
+
+    private static WorkoutSlot BuildSlot(string focusGroup, params string[] preferredCategories)
+    {
+        return BuildSlot(focusGroup, preferredCategories, null, null);
     }
 
     private static List<AiWorkoutExerciseDto> BuildWarmupExercises(WorkoutGenerationContext context)
@@ -674,7 +887,10 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         ];
     }
 
-    private static AiWorkoutExerciseDto BuildFallbackExercise(WorkoutSlot slot, WorkoutGenerationContext context)
+    private static AiWorkoutExerciseDto BuildFallbackExercise(
+        WorkoutSlot slot,
+        WorkoutGenerationContext context,
+        GenerationVariationProfile variation)
     {
         return slot.FocusGroup switch
         {
@@ -683,10 +899,10 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 Name = "Push-up",
                 Category = "Bodyweight",
                 TargetMuscle = "Chest",
-                Sets = GetSetCountForSlot(slot, context.SetTarget),
-                Reps = GetRepTargetForSlot(slot, context.RepTarget, context.Goal),
+                Sets = GetSetCountForSlot(slot, context, variation),
+                Reps = GetRepTargetForSlot(slot, context, variation),
                 SuggestedWeight = "Bodyweight only.",
-                RestSeconds = GetRestSecondsForSlot(slot, context.RestSeconds, context.Goal),
+                RestSeconds = GetRestSecondsForSlot(slot, context, variation),
                 Instructions = "Keep your ribs down, move through a full range, and stop 1-2 reps before form breaks.",
             },
             "pull" => new AiWorkoutExerciseDto
@@ -694,10 +910,10 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 Name = "Band row or inverted row",
                 Category = "Bodyweight",
                 TargetMuscle = "Back",
-                Sets = GetSetCountForSlot(slot, context.SetTarget),
-                Reps = GetRepTargetForSlot(slot, context.RepTarget, context.Goal),
+                Sets = GetSetCountForSlot(slot, context, variation),
+                Reps = GetRepTargetForSlot(slot, context, variation),
                 SuggestedWeight = "Use a band or setup that leaves 1-2 reps in reserve.",
-                RestSeconds = GetRestSecondsForSlot(slot, context.RestSeconds, context.Goal),
+                RestSeconds = GetRestSecondsForSlot(slot, context, variation),
                 Instructions = "Keep the ribcage stacked, pull elbows back, and pause briefly when the shoulder blades retract.",
             },
             "lower" => new AiWorkoutExerciseDto
@@ -705,10 +921,10 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 Name = "Goblet squat or split squat",
                 Category = "Compound",
                 TargetMuscle = "Quadriceps",
-                Sets = GetSetCountForSlot(slot, context.SetTarget),
-                Reps = GetRepTargetForSlot(slot, context.RepTarget, context.Goal),
+                Sets = GetSetCountForSlot(slot, context, variation),
+                Reps = GetRepTargetForSlot(slot, context, variation),
                 SuggestedWeight = "Choose a controlled load that leaves 1-2 reps in reserve.",
-                RestSeconds = GetRestSecondsForSlot(slot, context.RestSeconds, context.Goal),
+                RestSeconds = GetRestSecondsForSlot(slot, context, variation),
                 Instructions = "Move with full depth you can control, keep the feet planted, and maintain a steady torso position.",
             },
             "core" => new AiWorkoutExerciseDto
@@ -716,10 +932,10 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 Name = "Front plank",
                 Category = "Core",
                 TargetMuscle = "Core",
-                Sets = Math.Max(2, context.SetTarget - 1),
+                Sets = GetSetCountForSlot(slot, context, variation),
                 Reps = context.Goal == "strength" ? "20-30 sec" : "30-45 sec",
                 SuggestedWeight = "Bodyweight only.",
-                RestSeconds = 45,
+                RestSeconds = Math.Min(60, GetRestSecondsForSlot(slot, context, variation)),
                 Instructions = "Brace the trunk, squeeze glutes lightly, and hold a straight line without letting the low back sag.",
             },
             _ => new AiWorkoutExerciseDto
@@ -727,10 +943,10 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 Name = "Walking lunge",
                 Category = "Bodyweight",
                 TargetMuscle = "Lower body",
-                Sets = GetSetCountForSlot(slot, context.SetTarget),
-                Reps = GetRepTargetForSlot(slot, context.RepTarget, context.Goal),
+                Sets = GetSetCountForSlot(slot, context, variation),
+                Reps = GetRepTargetForSlot(slot, context, variation),
                 SuggestedWeight = "Bodyweight or light dumbbells.",
-                RestSeconds = GetRestSecondsForSlot(slot, context.RestSeconds, context.Goal),
+                RestSeconds = GetRestSecondsForSlot(slot, context, variation),
                 Instructions = "Step long enough to keep the front heel grounded and control each rep instead of rushing through the set.",
             },
         };
@@ -757,6 +973,50 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 StringComparer.Ordinal);
     }
 
+    private static IReadOnlyDictionary<string, int> BuildRecentExercisePenaltyLookup(IEnumerable<Workout> workouts)
+    {
+        return BuildWeightedRecentLookup(workouts, entry => NormalizeText(entry.ExerciseName));
+    }
+
+    private static IReadOnlyDictionary<string, int> BuildRecentExerciseFamilyPenaltyLookup(IEnumerable<Workout> workouts)
+    {
+        return BuildWeightedRecentLookup(workouts, entry => BuildExerciseFamilyKey(entry.ExerciseName));
+    }
+
+    private static IReadOnlyDictionary<string, int> BuildRecentMovementPatternPenaltyLookup(IEnumerable<Workout> workouts)
+    {
+        return BuildWeightedRecentLookup(workouts, entry => ResolveMovementPattern(
+            entry.ExerciseName,
+            [],
+            ResolveFocusGroup(entry.ExerciseName, []),
+            ResolveCategory(entry.ExerciseName, null, [])));
+    }
+
+    private static IReadOnlyDictionary<string, int> BuildWeightedRecentLookup(
+        IEnumerable<Workout> workouts,
+        Func<ExerciseEntry, string> keySelector)
+    {
+        var lookup = new Dictionary<string, int>(StringComparer.Ordinal);
+        var recentWorkoutList = workouts.ToList();
+
+        for (var workoutIndex = 0; workoutIndex < recentWorkoutList.Count; workoutIndex++)
+        {
+            var weight = Math.Max(1, 7 - workoutIndex);
+            foreach (var entry in recentWorkoutList[workoutIndex].ExerciseEntries)
+            {
+                var key = keySelector(entry);
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                lookup[key] = lookup.TryGetValue(key, out var current) ? current + weight : weight;
+            }
+        }
+
+        return lookup;
+    }
+
     private static string? BuildSuggestedWeight(
         CatalogExerciseCandidate candidate,
         WorkoutGenerationContext context,
@@ -780,44 +1040,123 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         };
     }
 
-    private static int GetSetCountForSlot(WorkoutSlot slot, int baseSetTarget)
+    private static int GetSetCountForSlot(
+        WorkoutSlot slot,
+        WorkoutGenerationContext context,
+        GenerationVariationProfile variation)
     {
-        if (slot.FocusGroup == "core")
+        var baseSetTarget = slot.FocusGroup == "core"
+            ? Math.Max(2, context.SetTarget - 1)
+            : slot.PreferredCategories.Contains("compound", StringComparer.Ordinal)
+                ? context.SetTarget
+                : Math.Max(2, context.SetTarget - 1);
+
+        var adjustment = slot.PreferredCategories.Contains("compound", StringComparer.Ordinal)
+            ? variation.CompoundSetAdjustment
+            : variation.AccessorySetAdjustment;
+        var minSets = slot.FocusGroup == "core"
+            ? 2
+            : context.FitnessLevel switch
+            {
+                "beginner" => 2,
+                "advanced" => 4,
+                _ => 3,
+            };
+        var maxSets = slot.FocusGroup == "core"
+            ? 4
+            : context.FitnessLevel switch
+            {
+                "beginner" => 3,
+                "advanced" => 5,
+                _ => 4,
+            };
+
+        if (slot.FocusGroup == "core" && context.Goal == "endurance")
         {
-            return Math.Max(2, baseSetTarget - 1);
+            maxSets = Math.Max(maxSets, 4);
         }
 
-        if (slot.PreferredCategories.Contains("compound", StringComparer.Ordinal))
-        {
-            return baseSetTarget;
-        }
-
-        return Math.Max(2, baseSetTarget - 1);
+        return Math.Clamp(baseSetTarget + adjustment, minSets, maxSets);
     }
 
-    private static string GetRepTargetForSlot(WorkoutSlot slot, string baseRepTarget, string goal)
+    private static string GetRepTargetForSlot(
+        WorkoutSlot slot,
+        WorkoutGenerationContext context,
+        GenerationVariationProfile variation)
     {
         if (slot.FocusGroup == "core")
         {
-            return goal == "strength" ? "8-12 controlled reps" : "12-15 reps";
+            return context.Goal == "strength"
+                ? "8-12 controlled reps"
+                : variation.RepStyle switch
+                {
+                    RepVariationStyle.Lower => "10-12 reps",
+                    RepVariationStyle.Higher => "12-15 reps",
+                    _ => "10-15 reps",
+                };
         }
 
-        return baseRepTarget;
+        var compoundBias = slot.PreferredCategories.Contains("compound", StringComparer.Ordinal);
+        return context.Goal switch
+        {
+            "strength" => compoundBias
+                ? variation.RepStyle switch
+                {
+                    RepVariationStyle.Lower => "5-6 reps",
+                    RepVariationStyle.Higher => "6-8 reps",
+                    _ => "5-8 reps",
+                }
+                : variation.RepStyle switch
+                {
+                    RepVariationStyle.Lower => "6-8 reps",
+                    RepVariationStyle.Higher => "8-10 reps",
+                    _ => "8-10 reps",
+                },
+            "muscle gain" => compoundBias
+                ? variation.RepStyle switch
+                {
+                    RepVariationStyle.Lower => "6-8 reps",
+                    RepVariationStyle.Higher => "10-12 reps",
+                    _ => "8-10 reps",
+                }
+                : variation.RepStyle switch
+                {
+                    RepVariationStyle.Lower => "8-10 reps",
+                    RepVariationStyle.Higher => "12-15 reps",
+                    _ => "10-12 reps",
+                },
+            "endurance" => variation.RepStyle switch
+            {
+                RepVariationStyle.Lower => "12-15 reps",
+                RepVariationStyle.Higher => "15-20 reps",
+                _ => "12-18 reps",
+            },
+            _ => variation.RepStyle switch
+            {
+                RepVariationStyle.Lower => "8-10 reps",
+                RepVariationStyle.Higher => "12-15 reps",
+                _ => "10-12 reps",
+            },
+        };
     }
 
-    private static int GetRestSecondsForSlot(WorkoutSlot slot, int baseRestSeconds, string goal)
+    private static int GetRestSecondsForSlot(
+        WorkoutSlot slot,
+        WorkoutGenerationContext context,
+        GenerationVariationProfile variation)
     {
+        var baseRestSeconds = context.RestSeconds;
         if (slot.FocusGroup == "core")
         {
-            return Math.Min(baseRestSeconds, 60);
+            return Math.Clamp(Math.Min(baseRestSeconds, 60) + variation.RestAdjustment, 30, 60);
         }
 
-        if (goal == "strength" && slot.PreferredCategories.Contains("compound", StringComparer.Ordinal))
+        if (context.Goal == "strength" && slot.PreferredCategories.Contains("compound", StringComparer.Ordinal))
         {
-            return Math.Max(baseRestSeconds, 120);
+            return Math.Clamp(Math.Max(baseRestSeconds, 120) + variation.RestAdjustment, 90, 150);
         }
 
-        return baseRestSeconds;
+        return Math.Clamp(baseRestSeconds + variation.RestAdjustment, 45, 120);
     }
 
     private static int GetMainExerciseCount(string workoutType, int durationMinutes)
@@ -876,8 +1215,9 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
 
     private static List<string> BuildPlanNotes(
         WorkoutGenerationContext context,
-        IReadOnlyCollection<AiWorkoutExerciseDto> mainExercises,
-        int recentWorkoutCount)
+        GeneratedMainWorkoutResult mainWorkout,
+        int recentWorkoutCount,
+        GenerationVariationProfile variation)
     {
         var notes = new List<string>
         {
@@ -890,7 +1230,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             notes.Add("Recent workout history is limited, so exercise rotation and weight guidance defaulted to conservative assumptions.");
         }
 
-        if (mainExercises.Any(exercise => exercise.ExerciseCatalogItemId is null))
+        if (mainWorkout.Exercises.Any(exercise => exercise.ExerciseCatalogItemId is null))
         {
             notes.Add("Some main-session movements fell back to safe generic exercises because the local catalog did not have a strong enough match.");
         }
@@ -898,6 +1238,33 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         if (context.TargetMuscles.Count > 0)
         {
             notes.Add($"Target muscles were prioritized in this order: {string.Join(", ", context.TargetMuscles.Select(FormatLabel))}.");
+        }
+
+        if (recentWorkoutCount >= 2)
+        {
+            notes.Add("Exercises from your last two workouts were deprioritized first, then similar movement families from the broader recent history were penalized to reduce repetition.");
+        }
+
+        if (mainWorkout.Summary.RotatedAwayFromRecentRepeatsCount > 0)
+        {
+            notes.Add($"This version actively rotated away from {mainWorkout.Summary.RotatedAwayFromRecentRepeatsCount} recently repeated slot candidate(s) where a strong alternative was available.");
+        }
+
+        if (mainWorkout.Summary.HighlightPatterns.Count > 0)
+        {
+            notes.Add($"This pass emphasized {string.Join(", ", mainWorkout.Summary.HighlightPatterns.Select(FormatLabel))} while keeping the split balanced.");
+        }
+
+        notes.Add(variation.RepStyle switch
+        {
+            RepVariationStyle.Lower => "Rep targets leaned slightly heavier inside the safe range to keep the session from repeating the exact same feel.",
+            RepVariationStyle.Higher => "Rep targets leaned slightly higher inside the safe range to add variation without changing the training goal.",
+            _ => "Rep targets stayed near the middle of the safe range, with small order and rest changes to keep repeated generations from looking identical.",
+        });
+
+        if (mainWorkout.Summary.MediaBackedExerciseCount > 0)
+        {
+            notes.Add("When scores were close, catalog exercises with stored media were slightly preferred so the plan stays easier to preview and coach from.");
         }
 
         if (context.Goal == "strength")
@@ -914,6 +1281,288 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         }
 
         return notes;
+    }
+
+    private static GenerationVariationProfile BuildVariationProfile(
+        WorkoutGenerationContext context,
+        Random random)
+    {
+        var compoundSetAdjustment = random.Next(2) == 0 ? 0 : -1;
+        var accessorySetAdjustment = random.Next(3) switch
+        {
+            0 => -1,
+            _ => 0,
+        };
+        var repStyle = (RepVariationStyle)random.Next(0, 3);
+        var restAdjustment = context.Goal switch
+        {
+            "strength" => random.Next(2) == 0 ? 0 : 15,
+            "muscle gain" => random.Next(3) switch
+            {
+                0 => -15,
+                1 => 0,
+                _ => 15,
+            },
+            _ => random.Next(2) == 0 ? -15 : 0,
+        };
+
+        return new GenerationVariationProfile
+        {
+            CompoundSetAdjustment = compoundSetAdjustment,
+            AccessorySetAdjustment = accessorySetAdjustment,
+            RepStyle = repStyle,
+            RestAdjustment = restAdjustment,
+        };
+    }
+
+    private static IReadOnlyList<string> GetPreferredPatternsForTargetMuscle(
+        string targetMuscle,
+        bool compoundBias,
+        Random random)
+    {
+        string[] primaryPatterns = targetMuscle switch
+        {
+            "chest" or "pectorals" => ["horizontal press", "angled press", "push bodyweight"],
+            "shoulders" or "deltoids" or "front delts" or "side delts" => ["vertical press", "lateral raise", "horizontal press"],
+            "triceps" => ["vertical press", "dip", "triceps extension"],
+            "back" or "lats" or "latissimus dorsi" or "rhomboids" or "traps" or "trapezius" => ["horizontal pull", "vertical pull", "rear delt"],
+            "biceps" or "forearms" => ["vertical pull", "horizontal pull", "curl"],
+            "glutes" or "gluteus" => ["hinge", "hip thrust", "lunge"],
+            "hamstrings" => ["hinge", "hamstring curl", "lunge"],
+            "quads" or "quadriceps" => ["squat", "lunge", "knee extension"],
+            "calves" => ["calf raise", "lunge", "squat"],
+            "abs" or "abdominals" or "obliques" or "core" or "lower back" or "erectors" => ["plank", "anti rotation", "core flexion"],
+            _ => ["squat", "horizontal press", "horizontal pull"],
+        };
+
+        string[] accessoryPatterns = targetMuscle switch
+        {
+            "chest" or "pectorals" => ["chest fly", "push bodyweight", "horizontal press"],
+            "shoulders" or "deltoids" or "front delts" or "side delts" => ["lateral raise", "vertical press", "rear delt"],
+            "triceps" => ["triceps extension", "dip", "push bodyweight"],
+            "back" or "lats" or "latissimus dorsi" or "rhomboids" or "traps" or "trapezius" => ["rear delt", "horizontal pull", "vertical pull"],
+            "biceps" or "forearms" => ["curl", "vertical pull", "horizontal pull"],
+            "glutes" or "gluteus" => ["hip thrust", "lunge", "hinge"],
+            "hamstrings" => ["hamstring curl", "hinge", "lunge"],
+            "quads" or "quadriceps" => ["knee extension", "lunge", "squat"],
+            "calves" => ["calf raise", "lunge", "squat"],
+            "abs" or "abdominals" or "obliques" or "core" or "lower back" or "erectors" => ["plank", "rotation", "anti rotation"],
+            _ => ["lunge", "push bodyweight", "horizontal pull"],
+        };
+
+        var pool = compoundBias
+            ? primaryPatterns.Concat(accessoryPatterns.Take(1))
+            : accessoryPatterns.Concat(primaryPatterns);
+
+        return DistinctShuffled(pool, random, 3);
+    }
+
+    private static IReadOnlyList<string> DistinctShuffled(
+        IEnumerable<string> values,
+        Random random,
+        int takeCount)
+    {
+        return values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(_ => random.Next())
+            .Take(takeCount)
+            .ToList();
+    }
+
+    private static List<T> Shuffle<T>(IEnumerable<T> items, Random random)
+    {
+        return items
+            .OrderBy(_ => random.Next())
+            .ToList();
+    }
+
+    private static int ScoreMovementPattern(string movementPattern, IReadOnlyList<string> preferredPatterns)
+    {
+        if (string.IsNullOrWhiteSpace(movementPattern) || preferredPatterns.Count == 0)
+        {
+            return 0;
+        }
+
+        for (var index = 0; index < preferredPatterns.Count; index++)
+        {
+            if (string.Equals(preferredPatterns[index], movementPattern, StringComparison.Ordinal))
+            {
+                return 18 - (index * 4);
+            }
+        }
+
+        return -4;
+    }
+
+    private static string BuildExerciseFamilyKey(string name)
+    {
+        var filteredTokens = NormalizeText(name)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(token => !ExerciseFamilyStopWords.Contains(token))
+            .Take(4)
+            .ToList();
+
+        return filteredTokens.Count == 0
+            ? NormalizeText(name)
+            : string.Join(' ', filteredTokens);
+    }
+
+    private static string ResolveMovementPattern(
+        string name,
+        IReadOnlyCollection<string> muscles,
+        string focusGroup,
+        string category)
+    {
+        var normalizedName = NormalizeText(name);
+
+        if (normalizedName.Contains("incline", StringComparison.Ordinal)
+            && normalizedName.Contains("press", StringComparison.Ordinal))
+        {
+            return "angled press";
+        }
+
+        if (normalizedName.Contains("bench", StringComparison.Ordinal)
+            || normalizedName.Contains("chest press", StringComparison.Ordinal)
+            || normalizedName.Contains("push up", StringComparison.Ordinal)
+            || normalizedName.Contains("pushup", StringComparison.Ordinal))
+        {
+            return "horizontal press";
+        }
+
+        if (normalizedName.Contains("overhead", StringComparison.Ordinal)
+            || normalizedName.Contains("shoulder press", StringComparison.Ordinal)
+            || normalizedName.Contains("arnold", StringComparison.Ordinal))
+        {
+            return "vertical press";
+        }
+
+        if (normalizedName.Contains("dip", StringComparison.Ordinal))
+        {
+            return "dip";
+        }
+
+        if (normalizedName.Contains("row", StringComparison.Ordinal))
+        {
+            return "horizontal pull";
+        }
+
+        if (normalizedName.Contains("pull up", StringComparison.Ordinal)
+            || normalizedName.Contains("pullup", StringComparison.Ordinal)
+            || normalizedName.Contains("chin up", StringComparison.Ordinal)
+            || normalizedName.Contains("pulldown", StringComparison.Ordinal)
+            || normalizedName.Contains("lat pull", StringComparison.Ordinal))
+        {
+            return "vertical pull";
+        }
+
+        if (normalizedName.Contains("curl", StringComparison.Ordinal))
+        {
+            return normalizedName.Contains("hamstring", StringComparison.Ordinal) || normalizedName.Contains("leg", StringComparison.Ordinal)
+                ? "hamstring curl"
+                : "curl";
+        }
+
+        if (normalizedName.Contains("face pull", StringComparison.Ordinal)
+            || normalizedName.Contains("rear delt", StringComparison.Ordinal))
+        {
+            return "rear delt";
+        }
+
+        if (normalizedName.Contains("shrug", StringComparison.Ordinal))
+        {
+            return "shrug";
+        }
+
+        if (normalizedName.Contains("squat", StringComparison.Ordinal))
+        {
+            return normalizedName.Contains("split", StringComparison.Ordinal) ? "lunge" : "squat";
+        }
+
+        if (normalizedName.Contains("deadlift", StringComparison.Ordinal)
+            || normalizedName.Contains("hinge", StringComparison.Ordinal)
+            || normalizedName.Contains("romanian", StringComparison.Ordinal)
+            || normalizedName.Contains("good morning", StringComparison.Ordinal))
+        {
+            return "hinge";
+        }
+
+        if (normalizedName.Contains("lunge", StringComparison.Ordinal)
+            || normalizedName.Contains("step up", StringComparison.Ordinal)
+            || normalizedName.Contains("stepup", StringComparison.Ordinal))
+        {
+            return "lunge";
+        }
+
+        if (normalizedName.Contains("thrust", StringComparison.Ordinal)
+            || normalizedName.Contains("bridge", StringComparison.Ordinal))
+        {
+            return "hip thrust";
+        }
+
+        if (normalizedName.Contains("extension", StringComparison.Ordinal)
+            && (normalizedName.Contains("leg", StringComparison.Ordinal) || muscles.Contains("quadriceps")))
+        {
+            return "knee extension";
+        }
+
+        if (normalizedName.Contains("calf", StringComparison.Ordinal))
+        {
+            return "calf raise";
+        }
+
+        if (normalizedName.Contains("lateral raise", StringComparison.Ordinal))
+        {
+            return "lateral raise";
+        }
+
+        if (normalizedName.Contains("fly", StringComparison.Ordinal) || normalizedName.Contains("pec deck", StringComparison.Ordinal))
+        {
+            return "chest fly";
+        }
+
+        if (normalizedName.Contains("pushdown", StringComparison.Ordinal)
+            || normalizedName.Contains("kickback", StringComparison.Ordinal)
+            || normalizedName.Contains("triceps", StringComparison.Ordinal))
+        {
+            return "triceps extension";
+        }
+
+        if (normalizedName.Contains("plank", StringComparison.Ordinal))
+        {
+            return "plank";
+        }
+
+        if (normalizedName.Contains("twist", StringComparison.Ordinal)
+            || normalizedName.Contains("rotation", StringComparison.Ordinal))
+        {
+            return "rotation";
+        }
+
+        if (normalizedName.Contains("pallof", StringComparison.Ordinal)
+            || normalizedName.Contains("dead bug", StringComparison.Ordinal)
+            || normalizedName.Contains("bird dog", StringComparison.Ordinal))
+        {
+            return "anti rotation";
+        }
+
+        if (normalizedName.Contains("crunch", StringComparison.Ordinal)
+            || normalizedName.Contains("sit up", StringComparison.Ordinal)
+            || normalizedName.Contains("situp", StringComparison.Ordinal)
+            || normalizedName.Contains("leg raise", StringComparison.Ordinal))
+        {
+            return "core flexion";
+        }
+
+        return focusGroup switch
+        {
+            "push" when category == "bodyweight" => "push bodyweight",
+            "push" => "horizontal press",
+            "pull" => "horizontal pull",
+            "lower" => "squat",
+            "core" => "plank",
+            _ => "full body",
+        };
     }
 
     private static string NormalizeGoal(string? goal, string? goalPhase)
@@ -1309,6 +1958,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         public int Id { get; init; }
         public string Name { get; init; } = string.Empty;
         public string NameNormalized { get; init; } = string.Empty;
+        public string FamilyKey { get; init; } = string.Empty;
         public string? Instructions { get; init; }
         public string? PrimaryMuscle { get; init; }
         public string? PrimaryMuscleNormalized { get; init; }
@@ -1319,6 +1969,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         public string? VideoUrl { get; init; }
         public string FocusGroup { get; init; } = "full-body";
         public string Category { get; init; } = "compound";
+        public string MovementPattern { get; init; } = "full body";
         public bool IsBodyweight { get; init; }
         public bool IsAdvanced { get; init; }
     }
@@ -1328,5 +1979,64 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         public string FocusGroup { get; init; } = "full-body";
         public string? TargetMuscle { get; init; }
         public IReadOnlyList<string> PreferredCategories { get; init; } = [];
+        public IReadOnlyList<string> PreferredPatterns { get; init; } = [];
+    }
+
+    private sealed class GeneratedMainWorkoutResult
+    {
+        public List<AiWorkoutExerciseDto> Exercises { get; init; } = [];
+        public WorkoutSelectionSummary Summary { get; init; } = new();
+    }
+
+    private sealed class WorkoutSelectionSummary
+    {
+        public int CatalogExerciseCount { get; set; }
+        public int FallbackExerciseCount { get; set; }
+        public int MediaBackedExerciseCount { get; set; }
+        public int RotatedAwayFromRecentRepeatsCount { get; set; }
+        public List<string> HighlightPatterns { get; } = [];
+
+        public void RecordMovementPattern(string movementPattern)
+        {
+            if (string.IsNullOrWhiteSpace(movementPattern)
+                || movementPattern == "full body"
+                || HighlightPatterns.Any(pattern => string.Equals(pattern, movementPattern, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            if (HighlightPatterns.Count < 3)
+            {
+                HighlightPatterns.Add(movementPattern);
+            }
+        }
+    }
+
+    private sealed class CandidateSelectionResult
+    {
+        public CatalogExerciseCandidate Candidate { get; init; } = null!;
+        public bool AvoidedRecentAlternative { get; init; }
+    }
+
+    private sealed class ScoredCandidate
+    {
+        public CatalogExerciseCandidate Candidate { get; init; } = null!;
+        public int Score { get; init; }
+        public int RecentCount { get; init; }
+    }
+
+    private sealed class GenerationVariationProfile
+    {
+        public int CompoundSetAdjustment { get; init; }
+        public int AccessorySetAdjustment { get; init; }
+        public RepVariationStyle RepStyle { get; init; } = RepVariationStyle.Standard;
+        public int RestAdjustment { get; init; }
+    }
+
+    private enum RepVariationStyle
+    {
+        Lower = 0,
+        Standard = 1,
+        Higher = 2,
     }
 }
