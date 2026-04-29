@@ -1,11 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useDeferredValue, useEffect, useState, type FormEvent } from 'react'
 import axios from 'axios'
 import { Dumbbell, PlayCircle } from 'lucide-react'
 import { generateAiWorkout } from '../api/aiWorkoutApi'
+import { searchExerciseCatalog } from '../api/exerciseCatalog'
 import { apiClient, getRequestErrorMessage } from '../lib/http'
 import { StateCard } from '../components/StateCard'
 import { VideoModal } from '../components/VideoModal'
 import type { AiWorkoutExercise, AiWorkoutGeneratePayload, AiWorkoutPlan } from '../types/aiWorkout'
+import type { ExerciseCatalogItem } from '../types/exerciseCatalog'
 
 type GoalOption = 'strength' | 'muscle-gain' | 'fat-loss' | 'general-fitness' | 'endurance' | 'custom'
 type WorkoutTypeOption = 'auto' | 'full-body' | 'upper' | 'lower' | 'push' | 'pull' | 'core'
@@ -31,7 +33,7 @@ type GeneratorFormState = {
   durationMinutes: string
   fitnessLevel: FitnessLevelOption
   targetMuscles: TargetMuscleValue[]
-  excludedExercises: string
+  excludedExercises: ExerciseCatalogItem[]
   includeWarmup: boolean
   includeCooldown: boolean
 }
@@ -78,10 +80,12 @@ const initialFormState: GeneratorFormState = {
   durationMinutes: '45',
   fitnessLevel: 'auto',
   targetMuscles: [],
-  excludedExercises: '',
+  excludedExercises: [],
   includeWarmup: true,
   includeCooldown: true,
 }
+
+const excludedExerciseSearchCache = new Map<string, ExerciseCatalogItem[]>()
 
 export function AiWorkoutGeneratorPage() {
   const [form, setForm] = useState<GeneratorFormState>(initialFormState)
@@ -325,16 +329,10 @@ export function AiWorkoutGeneratorPage() {
                 )}
               </div>
 
-              <label className="field field-span-2">
-                <span>Excluded exercises</span>
-                <input
-                  type="text"
-                  placeholder="Barbell bench press, walking lunge"
-                  value={form.excludedExercises}
-                  onChange={(event) => setForm((current) => ({ ...current, excludedExercises: event.target.value }))}
-                />
-                <small>Comma-separated names to avoid in the generated plan.</small>
-              </label>
+              <ExcludedExercisePickerField
+                selectedItems={form.excludedExercises}
+                onChange={(selectedItems) => setForm((current) => ({ ...current, excludedExercises: selectedItems }))}
+              />
             </div>
 
             <div className="ai-workout-toggle-grid">
@@ -480,7 +478,7 @@ function buildPayload(form: GeneratorFormState): AiWorkoutGeneratePayload {
     durationMinutes: form.durationMinutes.trim() ? Number(form.durationMinutes) : null,
     fitnessLevel: form.fitnessLevel === 'auto' ? null : form.fitnessLevel,
     targetMuscles: form.targetMuscles.length > 0 ? form.targetMuscles : null,
-    excludedExercises: splitCommaSeparatedValues(form.excludedExercises),
+    excludedExercises: form.excludedExercises.length > 0 ? form.excludedExercises.map((item) => item.name.trim()) : null,
     includeWarmup: form.includeWarmup,
     includeCooldown: form.includeCooldown,
   }
@@ -501,19 +499,205 @@ function mapGoalOptionToValue(goal: Exclude<GoalOption, 'custom'>) {
   }
 }
 
-function splitCommaSeparatedValues(value: string) {
-  const parts = value
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-
-  return parts.length > 0 ? parts : null
-}
-
 function orderTargetMuscles(values: TargetMuscleValue[]) {
   return targetMuscleOptions
     .map((option) => option.value)
     .filter((value) => values.includes(value))
+}
+
+function ExcludedExercisePickerField({
+  selectedItems,
+  onChange,
+}: {
+  selectedItems: ExerciseCatalogItem[]
+  onChange: (nextItems: ExerciseCatalogItem[]) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<ExerciseCatalogItem[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
+  const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null)
+  const deferredQuery = useDeferredValue(query)
+  const normalizedQuery = deferredQuery.trim().toLowerCase()
+
+  useEffect(() => {
+    let isCancelled = false
+
+    if (!isOpen) {
+      setResults([])
+      setIsLoading(false)
+      setSearchErrorMessage(null)
+      return
+    }
+
+    if (normalizedQuery.length < 2) {
+      setResults([])
+      setIsLoading(false)
+      setSearchErrorMessage(null)
+      return
+    }
+
+    const cachedResults = excludedExerciseSearchCache.get(normalizedQuery)
+    if (cachedResults) {
+      setResults(filterExcludedExerciseResults(cachedResults, selectedItems))
+      setIsLoading(false)
+      setSearchErrorMessage(null)
+      return
+    }
+
+    setIsLoading(true)
+    setSearchErrorMessage(null)
+
+    const timeoutId = window.setTimeout(() => {
+      void searchExerciseCatalog(deferredQuery.trim())
+        .then((nextResults) => {
+          if (isCancelled) {
+            return
+          }
+
+          excludedExerciseSearchCache.set(normalizedQuery, nextResults)
+          setResults(filterExcludedExerciseResults(nextResults, selectedItems))
+        })
+        .catch((error) => {
+          if (isCancelled) {
+            return
+          }
+
+          setResults([])
+          setSearchErrorMessage(getRequestErrorMessage(error, 'Unable to search the exercise catalog right now.'))
+        })
+        .finally(() => {
+          if (!isCancelled) {
+            setIsLoading(false)
+          }
+        })
+    }, 250)
+
+    return () => {
+      isCancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [deferredQuery, isOpen, normalizedQuery, selectedItems])
+
+  useEffect(() => {
+    if (normalizedQuery.length < 2) {
+      return
+    }
+
+    setResults((current) => filterExcludedExerciseResults(current, selectedItems))
+  }, [normalizedQuery, selectedItems])
+
+  function addItem(item: ExerciseCatalogItem) {
+    if (selectedItems.some((selectedItem) => selectedItem.id === item.id)) {
+      setQuery('')
+      setIsOpen(false)
+      return
+    }
+
+    onChange([...selectedItems, item])
+    setQuery('')
+    setResults([])
+    setIsOpen(false)
+  }
+
+  function removeItem(itemId: number) {
+    onChange(selectedItems.filter((item) => item.id !== itemId))
+  }
+
+  return (
+    <div className="field field-span-2 catalog-picker-field ai-workout-exclusion-picker">
+      <span>Excluded exercises</span>
+      <input
+        type="text"
+        placeholder="Search catalog exercises to exclude"
+        value={query}
+        onChange={(event) => {
+          setQuery(event.target.value)
+          setIsOpen(true)
+        }}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+        aria-expanded={isOpen}
+        aria-autocomplete="list"
+      />
+      <small>Search the existing exercise catalog, then add any movements you want the generator to avoid.</small>
+
+      {selectedItems.length > 0 ? (
+        <div className="ai-workout-selected-targets">
+          <div className="ai-workout-selected-targets-header">
+            <small>Excluded exercises</small>
+            <button
+              type="button"
+              className="ghost-button compact-button ai-workout-target-clear-button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => onChange([])}
+            >
+              Clear
+            </button>
+          </div>
+          <div className="ai-workout-exclusion-chip-list">
+            {selectedItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="ai-workout-target-chip ai-workout-target-chip-active ai-workout-exclusion-chip"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => removeItem(item.id)}
+              >
+                <span>{item.name}</span>
+                <span aria-hidden="true">×</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {isOpen ? (
+        <div className="catalog-suggestions-panel ai-workout-exclusion-suggestions" role="listbox" aria-label="Excluded exercise suggestions">
+          {normalizedQuery.length < 2 ? <p className="catalog-suggestion-status">Type at least 2 characters to search the catalog.</p> : null}
+          {normalizedQuery.length >= 2 && isLoading ? <p className="catalog-suggestion-status">Searching catalog...</p> : null}
+          {normalizedQuery.length >= 2 && !isLoading && searchErrorMessage ? (
+            <p className="catalog-suggestion-status field-error">{searchErrorMessage}</p>
+          ) : null}
+          {normalizedQuery.length >= 2 && !isLoading && !searchErrorMessage && results.length === 0 ? (
+            <p className="catalog-suggestion-status">No matching catalog exercises found for this search.</p>
+          ) : null}
+          {normalizedQuery.length >= 2 && !isLoading && !searchErrorMessage && results.length > 0 ? (
+            <div className="catalog-suggestion-list">
+              {results.slice(0, 8).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="catalog-suggestion-item"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => addItem(item)}
+                >
+                  <span className="catalog-suggestion-thumb catalog-selected-thumb-placeholder" aria-hidden="true">
+                    {item.name.slice(0, 1)}
+                  </span>
+                  <span className="catalog-suggestion-copy">
+                    <strong>{item.name}</strong>
+                    <span>
+                      {item.primaryMuscle ?? 'No muscle tag'}
+                      {item.equipment ? ` · ${item.equipment}` : ''}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function filterExcludedExerciseResults(
+  items: ExerciseCatalogItem[],
+  selectedItems: ExerciseCatalogItem[],
+) {
+  const selectedIds = new Set(selectedItems.map((item) => item.id))
+  return items.filter((item) => !selectedIds.has(item.id))
 }
 
 function PlanExerciseMedia({ exercise }: { exercise: AiWorkoutExercise }) {

@@ -8522,6 +8522,26 @@ body {
   justify-self: start;
 }
 
+.ai-workout-exclusion-picker {
+  position: relative;
+}
+
+.ai-workout-exclusion-suggestions {
+  top: calc(100% - 0.2rem);
+}
+
+.ai-workout-exclusion-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.ai-workout-exclusion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .ai-workout-toggle-grid {
   display: flex;
   flex-wrap: wrap;
@@ -8687,7 +8707,8 @@ body {
 
   .ai-workout-target-muscle-presets,
   .ai-workout-target-muscle-grid,
-  .ai-workout-selected-target-chips {
+  .ai-workout-selected-target-chips,
+  .ai-workout-exclusion-chip-list {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
