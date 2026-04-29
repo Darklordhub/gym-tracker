@@ -10,6 +10,19 @@ import type { AiWorkoutExercise, AiWorkoutGeneratePayload, AiWorkoutPlan } from 
 type GoalOption = 'strength' | 'muscle-gain' | 'fat-loss' | 'general-fitness' | 'endurance' | 'custom'
 type WorkoutTypeOption = 'auto' | 'full-body' | 'upper' | 'lower' | 'push' | 'pull' | 'core'
 type FitnessLevelOption = 'auto' | 'beginner' | 'intermediate' | 'advanced'
+type TargetMuscleValue =
+  | 'chest'
+  | 'back'
+  | 'shoulders'
+  | 'biceps'
+  | 'triceps'
+  | 'forearms'
+  | 'abs'
+  | 'core'
+  | 'glutes'
+  | 'quadriceps'
+  | 'hamstrings'
+  | 'calves'
 
 type GeneratorFormState = {
   goal: GoalOption
@@ -17,11 +30,46 @@ type GeneratorFormState = {
   preferredWorkoutType: WorkoutTypeOption
   durationMinutes: string
   fitnessLevel: FitnessLevelOption
-  targetMuscles: string
+  targetMuscles: TargetMuscleValue[]
   excludedExercises: string
   includeWarmup: boolean
   includeCooldown: boolean
 }
+
+type TargetMuscleOption = {
+  label: string
+  value: TargetMuscleValue
+}
+
+type TargetMusclePreset = {
+  label: string
+  muscles: TargetMuscleValue[]
+}
+
+const targetMuscleOptions: TargetMuscleOption[] = [
+  { label: 'Chest', value: 'chest' },
+  { label: 'Back', value: 'back' },
+  { label: 'Shoulders', value: 'shoulders' },
+  { label: 'Biceps', value: 'biceps' },
+  { label: 'Triceps', value: 'triceps' },
+  { label: 'Forearms', value: 'forearms' },
+  { label: 'Abs', value: 'abs' },
+  { label: 'Core', value: 'core' },
+  { label: 'Glutes', value: 'glutes' },
+  { label: 'Quadriceps', value: 'quadriceps' },
+  { label: 'Hamstrings', value: 'hamstrings' },
+  { label: 'Calves', value: 'calves' },
+]
+
+const targetMusclePresets: TargetMusclePreset[] = [
+  { label: 'Full Body', muscles: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'glutes', 'quadriceps', 'hamstrings', 'calves', 'core'] },
+  { label: 'Push', muscles: ['chest', 'shoulders', 'triceps'] },
+  { label: 'Pull', muscles: ['back', 'biceps', 'forearms'] },
+  { label: 'Upper Body', muscles: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'forearms'] },
+  { label: 'Lower Body', muscles: ['glutes', 'quadriceps', 'hamstrings', 'calves'] },
+]
+
+const targetMuscleLabelMap = new Map(targetMuscleOptions.map((option) => [option.value, option.label]))
 
 const initialFormState: GeneratorFormState = {
   goal: 'general-fitness',
@@ -29,7 +77,7 @@ const initialFormState: GeneratorFormState = {
   preferredWorkoutType: 'auto',
   durationMinutes: '45',
   fitnessLevel: 'auto',
-  targetMuscles: '',
+  targetMuscles: [],
   excludedExercises: '',
   includeWarmup: true,
   includeCooldown: true,
@@ -67,6 +115,29 @@ export function AiWorkoutGeneratorPage() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  function toggleTargetMuscle(value: TargetMuscleValue) {
+    setForm((current) => ({
+      ...current,
+      targetMuscles: current.targetMuscles.includes(value)
+        ? current.targetMuscles.filter((entry) => entry !== value)
+        : orderTargetMuscles([...current.targetMuscles, value]),
+    }))
+  }
+
+  function toggleTargetMusclePreset(preset: TargetMusclePreset) {
+    setForm((current) => {
+      const isSelected = preset.muscles.every((muscle) => current.targetMuscles.includes(muscle))
+      const nextValues = isSelected
+        ? current.targetMuscles.filter((muscle) => !preset.muscles.includes(muscle))
+        : Array.from(new Set([...current.targetMuscles, ...preset.muscles]))
+
+      return {
+        ...current,
+        targetMuscles: orderTargetMuscles(nextValues),
+      }
+    })
   }
 
   return (
@@ -186,16 +257,73 @@ export function AiWorkoutGeneratorPage() {
                 </select>
               </label>
 
-              <label className="field field-span-2">
+              <div className="field field-span-2 ai-workout-target-muscles-field">
                 <span>Target muscles</span>
-                <input
-                  type="text"
-                  placeholder="Chest, back, glutes"
-                  value={form.targetMuscles}
-                  onChange={(event) => setForm((current) => ({ ...current, targetMuscles: event.target.value }))}
-                />
-                <small>Comma-separated. Leave blank to let the workout type drive selection.</small>
-              </label>
+                <div className="ai-workout-target-muscle-presets" role="group" aria-label="Target muscle presets">
+                  {targetMusclePresets.map((preset) => {
+                    const isActive = preset.muscles.every((muscle) => form.targetMuscles.includes(muscle))
+
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        className={`ai-workout-target-chip ai-workout-target-chip-preset${isActive ? ' ai-workout-target-chip-active' : ''}`}
+                        aria-pressed={isActive}
+                        onClick={() => toggleTargetMusclePreset(preset)}
+                      >
+                        {preset.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="ai-workout-target-muscle-grid" role="group" aria-label="Target muscles">
+                  {targetMuscleOptions.map((option) => {
+                    const isActive = form.targetMuscles.includes(option.value)
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`ai-workout-target-chip${isActive ? ' ai-workout-target-chip-active' : ''}`}
+                        aria-pressed={isActive}
+                        onClick={() => toggleTargetMuscle(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {form.targetMuscles.length > 0 ? (
+                  <div className="ai-workout-selected-targets">
+                    <div className="ai-workout-selected-targets-header">
+                      <small>Selected muscles</small>
+                      <button
+                        type="button"
+                        className="ghost-button compact-button ai-workout-target-clear-button"
+                        onClick={() => setForm((current) => ({ ...current, targetMuscles: [] }))}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="ai-workout-selected-target-chips">
+                      {form.targetMuscles.map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          className="ai-workout-target-chip ai-workout-target-chip-active"
+                          onClick={() => toggleTargetMuscle(value)}
+                        >
+                          {targetMuscleLabelMap.get(value) ?? value}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <small>Pick one or more muscles, or leave everything unselected to let the workout type drive the session.</small>
+                )}
+              </div>
 
               <label className="field field-span-2">
                 <span>Excluded exercises</span>
@@ -351,7 +479,7 @@ function buildPayload(form: GeneratorFormState): AiWorkoutGeneratePayload {
     preferredWorkoutType: form.preferredWorkoutType === 'auto' ? null : form.preferredWorkoutType,
     durationMinutes: form.durationMinutes.trim() ? Number(form.durationMinutes) : null,
     fitnessLevel: form.fitnessLevel === 'auto' ? null : form.fitnessLevel,
-    targetMuscles: splitCommaSeparatedValues(form.targetMuscles),
+    targetMuscles: form.targetMuscles.length > 0 ? form.targetMuscles : null,
     excludedExercises: splitCommaSeparatedValues(form.excludedExercises),
     includeWarmup: form.includeWarmup,
     includeCooldown: form.includeCooldown,
@@ -380,6 +508,12 @@ function splitCommaSeparatedValues(value: string) {
     .filter(Boolean)
 
   return parts.length > 0 ? parts : null
+}
+
+function orderTargetMuscles(values: TargetMuscleValue[]) {
+  return targetMuscleOptions
+    .map((option) => option.value)
+    .filter((value) => values.includes(value))
 }
 
 function PlanExerciseMedia({ exercise }: { exercise: AiWorkoutExercise }) {

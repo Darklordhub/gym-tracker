@@ -8438,6 +8438,90 @@ body {
   gap: 0.9rem;
 }
 
+.ai-workout-target-muscles-field {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.ai-workout-target-muscle-presets,
+.ai-workout-target-muscle-grid,
+.ai-workout-selected-target-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.ai-workout-target-muscle-presets {
+  margin-top: 0.1rem;
+}
+
+.ai-workout-target-chip {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-overlay) 76%, transparent);
+  color: var(--text-secondary);
+  padding: 0.62rem 0.9rem;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.ai-workout-target-chip:hover {
+  border-color: color-mix(in srgb, var(--brand-accent) 34%, var(--border));
+  color: var(--text-strong);
+  transform: translateY(-1px);
+}
+
+.ai-workout-target-chip:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand-accent) 46%, white 10%);
+  outline-offset: 2px;
+}
+
+.ai-workout-target-chip-active {
+  border-color: color-mix(in srgb, var(--brand-accent) 54%, var(--border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--brand-accent) 24%, transparent), transparent),
+    color-mix(in srgb, var(--surface-overlay-strong) 88%, transparent);
+  color: var(--text-strong);
+  box-shadow: 0 10px 20px -18px color-mix(in srgb, var(--brand-accent) 48%, transparent);
+}
+
+.ai-workout-target-chip-preset {
+  border-style: dashed;
+}
+
+.ai-workout-selected-targets {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-overlay) 72%, transparent), transparent),
+    var(--surface-muted);
+}
+
+.ai-workout-selected-targets-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ai-workout-target-clear-button {
+  justify-self: start;
+}
+
 .ai-workout-toggle-grid {
   display: flex;
   flex-wrap: wrap;
@@ -8594,6 +8678,22 @@ body {
   .ai-workout-plan-summary,
   .ai-workout-exercise-card {
     grid-template-columns: 1fr;
+  }
+
+  .ai-workout-target-chip {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ai-workout-target-muscle-presets,
+  .ai-workout-target-muscle-grid,
+  .ai-workout-selected-target-chips {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ai-workout-selected-targets-header {
+    align-items: start;
   }
 
   .ai-workout-exercise-media {
