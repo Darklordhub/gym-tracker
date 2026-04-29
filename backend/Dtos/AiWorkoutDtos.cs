@@ -51,9 +51,16 @@ public class AiWorkoutExerciseDto
     public string? TargetMuscle { get; set; }
     public int Sets { get; set; }
     public string Reps { get; set; } = string.Empty;
+    public List<AiWorkoutSetDto> SuggestedSets { get; set; } = [];
     public string? SuggestedWeight { get; set; }
     public int RestSeconds { get; set; }
     public string Instructions { get; set; } = string.Empty;
     public string? ThumbnailUrl { get; set; }
     public string? VideoUrl { get; set; }
+}
+
+public class AiWorkoutSetDto
+{
+    public int Reps { get; set; }
+    public double WeightKg { get; set; }
 }

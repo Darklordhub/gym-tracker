@@ -9,6 +9,11 @@ export type AiWorkoutGeneratePayload = {
   includeCooldown: boolean
 }
 
+export type AiWorkoutSet = {
+  reps: number
+  weightKg: number
+}
+
 export type AiWorkoutExercise = {
   exerciseCatalogItemId: number | null
   name: string
@@ -16,6 +21,7 @@ export type AiWorkoutExercise = {
   targetMuscle: string | null
   sets: number
   reps: string
+  suggestedSets: AiWorkoutSet[]
   suggestedWeight: string | null
   restSeconds: number
   instructions: string

@@ -1,3 +1,4 @@
+using System.Globalization;
 using backend.Data;
 using backend.Dtos;
 using backend.Models;
@@ -656,22 +657,24 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         IReadOnlyDictionary<string, decimal> recentExerciseWeights,
         GenerationVariationProfile variation)
     {
-        return new AiWorkoutExerciseDto
-        {
-            ExerciseCatalogItemId = candidate.Id,
-            Name = candidate.Name,
-            Category = FormatLabel(candidate.Category),
-            TargetMuscle = candidate.PrimaryMuscle ?? FormatLabel(slot.TargetMuscle ?? candidate.FocusGroup),
-            Sets = GetSetCountForSlot(slot, context, variation),
-            Reps = GetRepTargetForSlot(slot, context, variation),
-            SuggestedWeight = BuildSuggestedWeight(candidate, context, recentExerciseWeights),
-            RestSeconds = GetRestSecondsForSlot(slot, context, variation),
-            Instructions = string.IsNullOrWhiteSpace(candidate.Instructions)
+        var sets = GetSetCountForSlot(slot, context, variation);
+        var reps = GetRepTargetForSlot(slot, context, variation);
+        var suggestedWeight = BuildSuggestedWeight(candidate, context, recentExerciseWeights);
+
+        return CreateExerciseDto(
+            exerciseCatalogItemId: candidate.Id,
+            name: candidate.Name,
+            category: FormatLabel(candidate.Category),
+            targetMuscle: candidate.PrimaryMuscle ?? FormatLabel(slot.TargetMuscle ?? candidate.FocusGroup),
+            sets: sets,
+            reps: reps,
+            suggestedWeight: suggestedWeight,
+            restSeconds: GetRestSecondsForSlot(slot, context, variation),
+            instructions: string.IsNullOrWhiteSpace(candidate.Instructions)
                 ? BuildFallbackInstruction(candidate.FocusGroup, candidate.Category)
                 : candidate.Instructions!,
-            ThumbnailUrl = candidate.ThumbnailUrl,
-            VideoUrl = candidate.VideoUrl,
-        };
+            thumbnailUrl: candidate.ThumbnailUrl,
+            videoUrl: candidate.VideoUrl);
     }
 
     private static List<WorkoutSlot> BuildMainSlots(WorkoutGenerationContext context, Random random)
@@ -797,54 +800,46 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
     {
         var movementPrep = context.WorkoutType switch
         {
-            "upper" or "push" or "pull" => new AiWorkoutExerciseDto
-            {
-                Name = "Shoulder and upper-back activation",
-                Category = "Warmup",
-                TargetMuscle = "Shoulders",
-                Sets = 2,
-                Reps = "10-12 reps",
-                RestSeconds = 30,
-                Instructions = "Use controlled shoulder circles, band pull-aparts, or scapular wall slides to raise temperature and open the upper body.",
-                SuggestedWeight = "Very light band or bodyweight only.",
-            },
-            "lower" or "legs" => new AiWorkoutExerciseDto
-            {
-                Name = "Hip and lower-body primer",
-                Category = "Warmup",
-                TargetMuscle = "Lower body",
-                Sets = 2,
-                Reps = "8-10 reps",
-                RestSeconds = 30,
-                Instructions = "Move through bodyweight squats, hip hinges, and lateral lunges to open the hips and knees before loading.",
-                SuggestedWeight = "Bodyweight only.",
-            },
-            _ => new AiWorkoutExerciseDto
-            {
-                Name = "Dynamic full-body prep",
-                Category = "Warmup",
-                TargetMuscle = "Full body",
-                Sets = 2,
-                Reps = "6-8 reps per side",
-                RestSeconds = 30,
-                Instructions = "Use a walking knee hug, inchworm, and world's-greatest-stretch sequence to prepare the whole body for the session.",
-                SuggestedWeight = "Bodyweight only.",
-            },
+            "upper" or "push" or "pull" => CreateExerciseDto(
+                name: "Shoulder and upper-back activation",
+                category: "Warmup",
+                targetMuscle: "Shoulders",
+                sets: 2,
+                reps: "10-12 reps",
+                suggestedWeight: "Very light band or bodyweight only.",
+                restSeconds: 30,
+                instructions: "Use controlled shoulder circles, band pull-aparts, or scapular wall slides to raise temperature and open the upper body."),
+            "lower" or "legs" => CreateExerciseDto(
+                name: "Hip and lower-body primer",
+                category: "Warmup",
+                targetMuscle: "Lower body",
+                sets: 2,
+                reps: "8-10 reps",
+                suggestedWeight: "Bodyweight only.",
+                restSeconds: 30,
+                instructions: "Move through bodyweight squats, hip hinges, and lateral lunges to open the hips and knees before loading."),
+            _ => CreateExerciseDto(
+                name: "Dynamic full-body prep",
+                category: "Warmup",
+                targetMuscle: "Full body",
+                sets: 2,
+                reps: "6-8 reps per side",
+                suggestedWeight: "Bodyweight only.",
+                restSeconds: 30,
+                instructions: "Use a walking knee hug, inchworm, and world's-greatest-stretch sequence to prepare the whole body for the session."),
         };
 
         return
         [
-            new AiWorkoutExerciseDto
-            {
-                Name = "Easy cardio ramp-up",
-                Category = "Warmup",
-                TargetMuscle = "Cardiovascular",
-                Sets = 1,
-                Reps = "3-5 min",
-                RestSeconds = 20,
-                Instructions = "Use a brisk walk, easy bike, or light row to bring your heart rate up gradually before the working sets begin.",
-                SuggestedWeight = "Keep intensity conversational.",
-            },
+            CreateExerciseDto(
+                name: "Easy cardio ramp-up",
+                category: "Warmup",
+                targetMuscle: "Cardiovascular",
+                sets: 1,
+                reps: "3-5 min",
+                suggestedWeight: "Keep intensity conversational.",
+                restSeconds: 20,
+                instructions: "Use a brisk walk, easy bike, or light row to bring your heart rate up gradually before the working sets begin."),
             movementPrep,
         ];
     }
@@ -862,28 +857,24 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
 
         return
         [
-            new AiWorkoutExerciseDto
-            {
-                Name = "Breathing downshift",
-                Category = "Cooldown",
-                TargetMuscle = "Recovery",
-                Sets = 1,
-                Reps = "2-3 min",
-                RestSeconds = 20,
-                Instructions = "Walk slowly or lie on your back and bring your breathing down with long exhales before finishing the session.",
-                SuggestedWeight = null,
-            },
-            new AiWorkoutExerciseDto
-            {
-                Name = stretchTarget,
-                Category = "Cooldown",
-                TargetMuscle = FormatLabel(context.WorkoutType == "full-body" ? "full body" : context.WorkoutType),
-                Sets = 1,
-                Reps = "30-45 sec per side",
-                RestSeconds = 20,
-                Instructions = "Choose the tightest muscles from the session and stretch them gently without forcing end ranges.",
-                SuggestedWeight = null,
-            },
+            CreateExerciseDto(
+                name: "Breathing downshift",
+                category: "Cooldown",
+                targetMuscle: "Recovery",
+                sets: 1,
+                reps: "2-3 min",
+                suggestedWeight: null,
+                restSeconds: 20,
+                instructions: "Walk slowly or lie on your back and bring your breathing down with long exhales before finishing the session."),
+            CreateExerciseDto(
+                name: stretchTarget,
+                category: "Cooldown",
+                targetMuscle: FormatLabel(context.WorkoutType == "full-body" ? "full body" : context.WorkoutType),
+                sets: 1,
+                reps: "30-45 sec per side",
+                suggestedWeight: null,
+                restSeconds: 20,
+                instructions: "Choose the tightest muscles from the session and stretch them gently without forcing end ranges."),
         ];
     }
 
@@ -894,61 +885,51 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
     {
         return slot.FocusGroup switch
         {
-            "push" => new AiWorkoutExerciseDto
-            {
-                Name = "Push-up",
-                Category = "Bodyweight",
-                TargetMuscle = "Chest",
-                Sets = GetSetCountForSlot(slot, context, variation),
-                Reps = GetRepTargetForSlot(slot, context, variation),
-                SuggestedWeight = "Bodyweight only.",
-                RestSeconds = GetRestSecondsForSlot(slot, context, variation),
-                Instructions = "Keep your ribs down, move through a full range, and stop 1-2 reps before form breaks.",
-            },
-            "pull" => new AiWorkoutExerciseDto
-            {
-                Name = "Band row or inverted row",
-                Category = "Bodyweight",
-                TargetMuscle = "Back",
-                Sets = GetSetCountForSlot(slot, context, variation),
-                Reps = GetRepTargetForSlot(slot, context, variation),
-                SuggestedWeight = "Use a band or setup that leaves 1-2 reps in reserve.",
-                RestSeconds = GetRestSecondsForSlot(slot, context, variation),
-                Instructions = "Keep the ribcage stacked, pull elbows back, and pause briefly when the shoulder blades retract.",
-            },
-            "lower" => new AiWorkoutExerciseDto
-            {
-                Name = "Goblet squat or split squat",
-                Category = "Compound",
-                TargetMuscle = "Quadriceps",
-                Sets = GetSetCountForSlot(slot, context, variation),
-                Reps = GetRepTargetForSlot(slot, context, variation),
-                SuggestedWeight = "Choose a controlled load that leaves 1-2 reps in reserve.",
-                RestSeconds = GetRestSecondsForSlot(slot, context, variation),
-                Instructions = "Move with full depth you can control, keep the feet planted, and maintain a steady torso position.",
-            },
-            "core" => new AiWorkoutExerciseDto
-            {
-                Name = "Front plank",
-                Category = "Core",
-                TargetMuscle = "Core",
-                Sets = GetSetCountForSlot(slot, context, variation),
-                Reps = context.Goal == "strength" ? "20-30 sec" : "30-45 sec",
-                SuggestedWeight = "Bodyweight only.",
-                RestSeconds = Math.Min(60, GetRestSecondsForSlot(slot, context, variation)),
-                Instructions = "Brace the trunk, squeeze glutes lightly, and hold a straight line without letting the low back sag.",
-            },
-            _ => new AiWorkoutExerciseDto
-            {
-                Name = "Walking lunge",
-                Category = "Bodyweight",
-                TargetMuscle = "Lower body",
-                Sets = GetSetCountForSlot(slot, context, variation),
-                Reps = GetRepTargetForSlot(slot, context, variation),
-                SuggestedWeight = "Bodyweight or light dumbbells.",
-                RestSeconds = GetRestSecondsForSlot(slot, context, variation),
-                Instructions = "Step long enough to keep the front heel grounded and control each rep instead of rushing through the set.",
-            },
+            "push" => CreateExerciseDto(
+                name: "Push-up",
+                category: "Bodyweight",
+                targetMuscle: "Chest",
+                sets: GetSetCountForSlot(slot, context, variation),
+                reps: GetRepTargetForSlot(slot, context, variation),
+                suggestedWeight: "Bodyweight only.",
+                restSeconds: GetRestSecondsForSlot(slot, context, variation),
+                instructions: "Keep your ribs down, move through a full range, and stop 1-2 reps before form breaks."),
+            "pull" => CreateExerciseDto(
+                name: "Band row or inverted row",
+                category: "Bodyweight",
+                targetMuscle: "Back",
+                sets: GetSetCountForSlot(slot, context, variation),
+                reps: GetRepTargetForSlot(slot, context, variation),
+                suggestedWeight: "Use a band or setup that leaves 1-2 reps in reserve.",
+                restSeconds: GetRestSecondsForSlot(slot, context, variation),
+                instructions: "Keep the ribcage stacked, pull elbows back, and pause briefly when the shoulder blades retract."),
+            "lower" => CreateExerciseDto(
+                name: "Goblet squat or split squat",
+                category: "Compound",
+                targetMuscle: "Quadriceps",
+                sets: GetSetCountForSlot(slot, context, variation),
+                reps: GetRepTargetForSlot(slot, context, variation),
+                suggestedWeight: "Choose a controlled load that leaves 1-2 reps in reserve.",
+                restSeconds: GetRestSecondsForSlot(slot, context, variation),
+                instructions: "Move with full depth you can control, keep the feet planted, and maintain a steady torso position."),
+            "core" => CreateExerciseDto(
+                name: "Front plank",
+                category: "Core",
+                targetMuscle: "Core",
+                sets: GetSetCountForSlot(slot, context, variation),
+                reps: context.Goal == "strength" ? "20-30 sec" : "30-45 sec",
+                suggestedWeight: "Bodyweight only.",
+                restSeconds: Math.Min(60, GetRestSecondsForSlot(slot, context, variation)),
+                instructions: "Brace the trunk, squeeze glutes lightly, and hold a straight line without letting the low back sag."),
+            _ => CreateExerciseDto(
+                name: "Walking lunge",
+                category: "Bodyweight",
+                targetMuscle: "Lower body",
+                sets: GetSetCountForSlot(slot, context, variation),
+                reps: GetRepTargetForSlot(slot, context, variation),
+                suggestedWeight: "Bodyweight or light dumbbells.",
+                restSeconds: GetRestSecondsForSlot(slot, context, variation),
+                instructions: "Step long enough to keep the front heel grounded and control each rep instead of rushing through the set."),
         };
     }
 
@@ -1038,6 +1019,128 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             "advanced" => "Use a challenging but repeatable load that keeps the target reps clean.",
             _ => "Choose a moderate load that leaves 1-2 reps in reserve.",
         };
+    }
+
+    private static AiWorkoutExerciseDto CreateExerciseDto(
+        string name,
+        string? category,
+        string? targetMuscle,
+        int sets,
+        string reps,
+        string? suggestedWeight,
+        int restSeconds,
+        string instructions,
+        int? exerciseCatalogItemId = null,
+        string? thumbnailUrl = null,
+        string? videoUrl = null)
+    {
+        var normalizedSetCount = Math.Max(1, sets);
+
+        return new AiWorkoutExerciseDto
+        {
+            ExerciseCatalogItemId = exerciseCatalogItemId,
+            Name = name,
+            Category = category,
+            TargetMuscle = targetMuscle,
+            Sets = normalizedSetCount,
+            Reps = reps,
+            SuggestedSets = BuildSuggestedSets(normalizedSetCount, reps, suggestedWeight),
+            SuggestedWeight = suggestedWeight,
+            RestSeconds = restSeconds,
+            Instructions = instructions,
+            ThumbnailUrl = thumbnailUrl,
+            VideoUrl = videoUrl,
+        };
+    }
+
+    private static List<AiWorkoutSetDto> BuildSuggestedSets(int setCount, string repsDisplay, string? suggestedWeightDisplay)
+    {
+        var concreteReps = BuildConcreteRepTargets(setCount, repsDisplay);
+        var weightKg = ParseSuggestedWeightKg(suggestedWeightDisplay);
+
+        return concreteReps
+            .Select(reps => new AiWorkoutSetDto
+            {
+                Reps = reps,
+                WeightKg = weightKg,
+            })
+            .ToList();
+    }
+
+    private static List<int> BuildConcreteRepTargets(int setCount, string repsDisplay)
+    {
+        var concreteRepTarget = ParseConcreteReps(repsDisplay);
+        return Enumerable
+            .Repeat(concreteRepTarget, Math.Max(1, setCount))
+            .ToList();
+    }
+
+    private static int ParseConcreteReps(string repsDisplay)
+    {
+        var numbers = ExtractNumericTokens(repsDisplay);
+        if (numbers.Count >= 2)
+        {
+            return Math.Clamp((int)Math.Round((numbers[0] + numbers[1]) / 2d, MidpointRounding.AwayFromZero), 1, 100);
+        }
+
+        if (numbers.Count == 1)
+        {
+            return Math.Clamp((int)Math.Round(numbers[0], MidpointRounding.AwayFromZero), 1, 100);
+        }
+
+        return 10;
+    }
+
+    private static double ParseSuggestedWeightKg(string? suggestedWeightDisplay)
+    {
+        var firstNumber = ExtractNumericTokens(suggestedWeightDisplay).FirstOrDefault();
+        if (firstNumber <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Clamp(firstNumber, 0, 500);
+    }
+
+    private static List<double> ExtractNumericTokens(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        var values = new List<double>();
+        var buffer = new List<char>();
+
+        foreach (var character in value)
+        {
+            if (char.IsDigit(character) || character == '.')
+            {
+                buffer.Add(character);
+                continue;
+            }
+
+            FlushNumericBuffer(buffer, values);
+        }
+
+        FlushNumericBuffer(buffer, values);
+        return values;
+    }
+
+    private static void FlushNumericBuffer(List<char> buffer, List<double> values)
+    {
+        if (buffer.Count == 0)
+        {
+            return;
+        }
+
+        var candidate = new string(buffer.ToArray());
+        if (double.TryParse(candidate, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+        {
+            values.Add(parsedValue);
+        }
+
+        buffer.Clear();
     }
 
     private static int GetSetCountForSlot(

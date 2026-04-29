@@ -8554,6 +8554,7 @@ body {
 }
 
 .ai-workout-plan-summary,
+.ai-workout-plan-actions-card,
 .ai-workout-section-card,
 .ai-workout-notes-card {
   display: grid;
@@ -8569,6 +8570,30 @@ body {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem;
   align-items: start;
+}
+
+.ai-workout-plan-actions-card {
+  gap: 0.9rem;
+}
+
+.ai-workout-plan-actions-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ai-workout-plan-actions-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.ai-workout-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.ai-workout-plan-actions .feedback {
+  margin: 0;
 }
 
 .ai-workout-plan-summary h3,
@@ -8715,6 +8740,11 @@ body {
 
   .ai-workout-selected-targets-header {
     align-items: start;
+  }
+
+  .ai-workout-plan-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .ai-workout-exercise-media {

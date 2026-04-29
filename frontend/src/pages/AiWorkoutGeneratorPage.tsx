@@ -1,8 +1,12 @@
 import { useDeferredValue, useEffect, useState, type FormEvent } from 'react'
 import axios from 'axios'
 import { Dumbbell, PlayCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { generateAiWorkout } from '../api/aiWorkoutApi'
 import { searchExerciseCatalog } from '../api/exerciseCatalog'
+import { createWorkout, startActiveWorkoutSession } from '../api/workouts'
+import { getTodayDateValue } from '../lib/format'
+import { buildActiveWorkoutSessionPayloadFromAiPlan, buildWorkoutPayloadFromAiPlan, hasLoggableAiWorkoutExercises } from '../lib/aiWorkoutPlanPayloads'
 import { apiClient, getRequestErrorMessage } from '../lib/http'
 import { StateCard } from '../components/StateCard'
 import { VideoModal } from '../components/VideoModal'
@@ -88,10 +92,15 @@ const initialFormState: GeneratorFormState = {
 const excludedExerciseSearchCache = new Map<string, ExerciseCatalogItem[]>()
 
 export function AiWorkoutGeneratorPage() {
+  const navigate = useNavigate()
   const [form, setForm] = useState<GeneratorFormState>(initialFormState)
   const [plan, setPlan] = useState<AiWorkoutPlan | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [planActionErrorMessage, setPlanActionErrorMessage] = useState<string | null>(null)
+  const [planActionFeedback, setPlanActionFeedback] = useState<string | null>(null)
+  const [isSavingWorkout, setIsSavingWorkout] = useState(false)
+  const [isStartingWorkout, setIsStartingWorkout] = useState(false)
   const [videoTarget, setVideoTarget] = useState<{ title: string; url: string } | null>(null)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -106,6 +115,8 @@ export function AiWorkoutGeneratorPage() {
     try {
       setIsGenerating(true)
       setErrorMessage(null)
+      setPlanActionErrorMessage(null)
+      setPlanActionFeedback(null)
       const nextPlan = await generateAiWorkout(payload)
       setPlan(nextPlan)
     } catch (error) {
@@ -118,6 +129,54 @@ export function AiWorkoutGeneratorPage() {
       setErrorMessage(getAiWorkoutGenerateErrorMessage(error))
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  async function handleSaveWorkout() {
+    if (!plan) {
+      return
+    }
+
+    if (!hasLoggableAiWorkoutExercises(plan)) {
+      setPlanActionFeedback(null)
+      setPlanActionErrorMessage('This plan does not contain any exercises that can be saved into the normal workout log.')
+      return
+    }
+
+    try {
+      setIsSavingWorkout(true)
+      setPlanActionErrorMessage(null)
+      setPlanActionFeedback(null)
+      await createWorkout(buildWorkoutPayloadFromAiPlan(plan, getTodayDateValue()))
+      setPlanActionFeedback('Workout saved to your normal history.')
+    } catch (error) {
+      setPlanActionErrorMessage(getRequestErrorMessage(error, 'Unable to save this generated workout.'))
+    } finally {
+      setIsSavingWorkout(false)
+    }
+  }
+
+  async function handleStartWorkout() {
+    if (!plan) {
+      return
+    }
+
+    if (!hasLoggableAiWorkoutExercises(plan)) {
+      setPlanActionFeedback(null)
+      setPlanActionErrorMessage('This plan does not contain any exercises that can start an active workout session.')
+      return
+    }
+
+    try {
+      setIsStartingWorkout(true)
+      setPlanActionErrorMessage(null)
+      setPlanActionFeedback(null)
+      await startActiveWorkoutSession(buildActiveWorkoutSessionPayloadFromAiPlan(plan))
+      navigate('/workouts')
+    } catch (error) {
+      setPlanActionErrorMessage(getAiWorkoutStartErrorMessage(error))
+    } finally {
+      setIsStartingWorkout(false)
     }
   }
 
@@ -152,7 +211,7 @@ export function AiWorkoutGeneratorPage() {
           <h1>AI Workout Generator</h1>
           <p className="hero-text">
             Build a structured workout from your local goals, recent training history, and the current exercise catalog.
-            This MVP stays deterministic and read-only, so nothing is saved until you choose to log a session yourself.
+            This MVP stays deterministic, then hands the finished plan back into your normal workout save and active-session flow.
           </p>
         </div>
 
@@ -361,7 +420,7 @@ export function AiWorkoutGeneratorPage() {
               <button type="submit" className="primary-button" disabled={isGenerating}>
                 {isGenerating ? 'Generating...' : 'Generate workout'}
               </button>
-              <span className="record-hint">Plans are preview-only in this MVP and never auto-create workout records.</span>
+              <span className="record-hint">Generate first, then save the plan into history or start it in the normal active workout flow.</span>
             </div>
           </form>
         </section>
@@ -395,6 +454,37 @@ export function AiWorkoutGeneratorPage() {
                   <span className="info-pill">{plan.estimatedDurationMinutes} min</span>
                   <span className="info-pill info-pill-strength">{plan.sections.length} sections</span>
                 </div>
+              </article>
+
+              <article className="ai-workout-plan-actions-card">
+                <div className="ai-workout-plan-actions-copy">
+                  <span className="stat-label">Use this plan</span>
+                  <p>
+                    Save it into workout history or start it as your active session. Both actions reuse the standard workout system.
+                  </p>
+                </div>
+
+                <div className="ai-workout-plan-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={handleStartWorkout}
+                    disabled={isStartingWorkout || isSavingWorkout}
+                  >
+                    {isStartingWorkout ? 'Starting...' : 'Start Workout'}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={handleSaveWorkout}
+                    disabled={isSavingWorkout || isStartingWorkout}
+                  >
+                    {isSavingWorkout ? 'Saving...' : 'Save Workout'}
+                  </button>
+                </div>
+
+                {planActionFeedback ? <p className="feedback success">{planActionFeedback}</p> : null}
+                {planActionErrorMessage ? <p className="feedback error">{planActionErrorMessage}</p> : null}
               </article>
 
               <div className="ai-workout-section-list">
@@ -795,4 +885,12 @@ function getAiWorkoutGenerateErrorMessage(error: unknown) {
   }
 
   return getRequestErrorMessage(error, 'Unable to generate an AI workout plan right now.')
+}
+
+function getAiWorkoutStartErrorMessage(error: unknown) {
+  if (axios.isAxiosError(error) && error.response?.status === 409) {
+    return 'An active workout session already exists. Open the Workouts page and continue or complete that session before starting this plan.'
+  }
+
+  return getRequestErrorMessage(error, 'Unable to start this generated workout right now.')
 }
