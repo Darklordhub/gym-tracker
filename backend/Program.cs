@@ -14,6 +14,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 var enableHttpsRedirection = builder.Configuration.GetValue("Http:UseHttpsRedirection", false);
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 var wgerOptions = builder.Configuration.GetSection(WgerOptions.SectionName).Get<WgerOptions>() ?? new WgerOptions();
+var nutritionOptions = builder.Configuration.GetSection(NutritionOptions.SectionName).Get<NutritionOptions>() ?? new NutritionOptions();
 var exerciseMediaEnrichmentOptions = builder.Configuration
     .GetSection(ExerciseMediaEnrichmentOptions.SectionName)
     .Get<ExerciseMediaEnrichmentOptions>() ?? new ExerciseMediaEnrichmentOptions();
@@ -40,10 +41,12 @@ if (string.IsNullOrWhiteSpace(jwtOptions.SigningKey) || jwtOptions.SigningKey.Le
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<WgerOptions>(builder.Configuration.GetSection(WgerOptions.SectionName));
+builder.Services.Configure<NutritionOptions>(builder.Configuration.GetSection(NutritionOptions.SectionName));
 builder.Services.Configure<ExerciseMediaEnrichmentOptions>(builder.Configuration.GetSection(ExerciseMediaEnrichmentOptions.SectionName));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddMemoryCache();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
@@ -55,7 +58,18 @@ builder.Services.AddScoped<ProgressiveOverloadService>();
 builder.Services.AddScoped<ExerciseCatalogService>();
 builder.Services.AddScoped<ExerciseCatalogSeedService>();
 builder.Services.AddScoped<IAiWorkoutGeneratorService, AiWorkoutGeneratorService>();
+builder.Services.AddScoped<INutritionService, NutritionService>();
 builder.Services.AddScoped<ExerciseCatalogMediaEnrichmentService>();
+builder.Services.AddHttpClient<UsdaNutritionProvider>(httpClient =>
+{
+    httpClient.BaseAddress = new Uri(
+        nutritionOptions.UsdaBaseUrl.EndsWith('/')
+            ? nutritionOptions.UsdaBaseUrl
+            : $"{nutritionOptions.UsdaBaseUrl}/");
+    httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+    httpClient.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddScoped<INutritionProvider>(serviceProvider => serviceProvider.GetRequiredService<UsdaNutritionProvider>());
 builder.Services.AddHttpClient<ExerciseMediaUrlValidationService>(httpClient =>
 {
     httpClient.Timeout = TimeSpan.FromSeconds(Math.Clamp(exerciseMediaEnrichmentOptions.UrlValidationTimeoutSeconds, 3, 60));
