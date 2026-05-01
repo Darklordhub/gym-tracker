@@ -15,6 +15,7 @@ import {
   Shield,
   SunMedium,
   TrendingUp,
+  UtensilsCrossed,
   UserRound,
 } from 'lucide-react'
 import './App.css'
@@ -29,6 +30,7 @@ import { AiWorkoutGeneratorPage } from './pages/AiWorkoutGeneratorPage'
 import { ExerciseLibraryPage } from './pages/ExerciseLibraryPage'
 import { ExerciseProgressPage } from './pages/ExerciseProgressPage'
 import { LoginPage } from './pages/LoginPage'
+import { NutritionPage } from './pages/NutritionPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { WeightPage } from './pages/WeightPage'
@@ -43,6 +45,7 @@ type IconName =
   | 'workouts'
   | 'aiWorkout'
   | 'progress'
+  | 'nutrition'
   | 'cycle'
   | 'profile'
   | 'admin'
@@ -62,6 +65,7 @@ const primaryNavItems: readonly NavItem[] = [
   { to: '/weight', label: 'Weight', icon: 'weight' },
   { to: '/workouts', label: 'Workouts', icon: 'workouts' },
   { to: '/ai-workout-generator', label: 'AI Workout Generator', icon: 'aiWorkout' },
+  { to: '/nutrition', label: 'Nutrition', icon: 'nutrition' },
   { to: '/exercise-library', label: 'Exercise Library', icon: 'library' },
   { to: '/exercise-progress', label: 'Exercise Progress', icon: 'progress' },
   { to: '/cycle', label: 'Cycle', icon: 'cycle' },
@@ -88,6 +92,11 @@ const routeMeta: Record<string, { title: string; eyebrow: string; description: s
     title: 'AI Workout Generator',
     eyebrow: 'Generator',
     description: 'Create a read-only workout blueprint from your goals, recent logs, and the current exercise catalog.',
+  },
+  '/nutrition': {
+    title: 'Nutrition Builder',
+    eyebrow: 'Nutrition',
+    description: 'Search USDA foods, manage meals by day, and keep nutrition edits isolated from legacy calorie logs.',
   },
   '/exercise-library': {
     title: 'Exercise Library',
@@ -147,6 +156,7 @@ function App() {
           <Route path="/weight" element={<WeightPage />} />
           <Route path="/workouts" element={<WorkoutsPage />} />
           <Route path="/ai-workout-generator" element={<AiWorkoutGeneratorPage />} />
+          <Route path="/nutrition" element={<NutritionPage />} />
           <Route path="/exercise-library" element={<ExerciseLibraryPage />} />
           <Route path="/exercise-progress" element={<ExerciseProgressPage />} />
           <Route path="/cycle" element={<CyclePage />} />
@@ -647,6 +657,8 @@ function getNavMeta(pathname: string) {
       return 'Session logs'
     case '/ai-workout-generator':
       return 'Generator'
+    case '/nutrition':
+      return 'Meals'
     case '/exercise-library':
       return 'Catalog'
     case '/exercise-progress':
@@ -683,6 +695,7 @@ function AppIcon({ name }: { name: IconName }) {
     weight: Scale,
     workouts: Dumbbell,
     aiWorkout: Sparkles,
+    nutrition: UtensilsCrossed,
     progress: TrendingUp,
     library: BookOpen,
     cycle: Activity,
