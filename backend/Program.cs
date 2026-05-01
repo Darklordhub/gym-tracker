@@ -169,12 +169,13 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseMigration");
+    var logger = app.Logger;
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var legacyDataMigrationService = scope.ServiceProvider.GetRequiredService<LegacyDataMigrationService>();
     var exerciseCatalogSeedService = scope.ServiceProvider.GetRequiredService<ExerciseCatalogSeedService>();
 
     const int maxMigrationAttempts = 10;
+    var initializationSucceeded = false;
 
     for (var attempt = 1; attempt <= maxMigrationAttempts; attempt++)
     {
@@ -183,6 +184,10 @@ using (var scope = app.Services.CreateScope())
             dbContext.Database.Migrate();
             await legacyDataMigrationService.MigrateAsync();
             await exerciseCatalogSeedService.SeedAsync();
+            initializationSucceeded = true;
+            logger.LogInformation(
+                "Database migrations and startup data initialization completed successfully on attempt {Attempt}.",
+                attempt);
             break;
         }
         catch (Exception exception) when (attempt < maxMigrationAttempts)
@@ -193,8 +198,29 @@ using (var scope = app.Services.CreateScope())
                 attempt,
                 maxMigrationAttempts);
 
-            Thread.Sleep(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromSeconds(5));
         }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "Database migration and startup data initialization failed on final attempt {Attempt} of {MaxAttempts}.",
+                attempt,
+                maxMigrationAttempts);
+
+            if (!app.Environment.IsProduction())
+            {
+                throw;
+            }
+
+            logger.LogWarning(
+                "Application startup will continue without applying database migrations because the environment is Production.");
+        }
+    }
+
+    if (!initializationSucceeded)
+    {
+        logger.LogWarning("Database startup initialization did not complete successfully.");
     }
 }
 
