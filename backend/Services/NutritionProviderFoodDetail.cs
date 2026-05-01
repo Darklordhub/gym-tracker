@@ -1,6 +1,6 @@
-namespace backend.Contracts;
+namespace backend.Services;
 
-public class FoodDetailDto
+public class NutritionProviderFoodDetail
 {
     public string Source { get; set; } = string.Empty;
     public string ExternalId { get; set; } = string.Empty;
@@ -17,4 +17,6 @@ public class FoodDetailDto
     public decimal? FiberGramsPer100Grams { get; set; }
     public decimal? SugarGramsPer100Grams { get; set; }
     public string[] SupportedUnits { get; set; } = [];
+    public IReadOnlyList<NutritionProviderPortion> Portions { get; set; } = [];
+    public string? ProviderPayloadJson { get; set; }
 }

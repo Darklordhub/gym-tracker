@@ -12,7 +12,7 @@ public interface INutritionProvider
         int pageSize,
         CancellationToken cancellationToken);
 
-    Task<FoodDetailDto?> GetFoodDetailAsync(
+    Task<NutritionProviderFoodDetail?> GetFoodDetailAsync(
         string externalId,
         CancellationToken cancellationToken);
 }

@@ -49,7 +49,7 @@ public class UsdaNutritionProvider : INutritionProvider
         return foods.Select(MapSearchResult).ToList();
     }
 
-    public async Task<FoodDetailDto?> GetFoodDetailAsync(
+    public async Task<NutritionProviderFoodDetail?> GetFoodDetailAsync(
         string externalId,
         CancellationToken cancellationToken)
     {
@@ -169,7 +169,7 @@ public class UsdaNutritionProvider : INutritionProvider
         };
     }
 
-    private static FoodDetailDto MapFoodDetail(UsdaFoodDetailResponse food)
+    private static NutritionProviderFoodDetail MapFoodDetail(UsdaFoodDetailResponse food)
     {
         var nutrients = ResolvePer100GramNutrients(
             food.DataType,
@@ -178,21 +178,27 @@ public class UsdaNutritionProvider : INutritionProvider
             food.LabelNutrients,
             food.FoodNutrients);
         var supportsGramCalculations = nutrients.HasAnyValue;
+        var providerPortions = BuildProviderPortions(food, supportsGramCalculations);
 
-        return new FoodDetailDto
+        return new NutritionProviderFoodDetail
         {
             Source = SourceName,
             ExternalId = food.FdcId.ToString(),
             Name = food.Description?.Trim() ?? string.Empty,
             BrandName = NormalizeOptionalText(food.BrandOwner),
+            FoodType = NormalizeOptionalText(food.DataType),
             FoodCategory = NormalizeOptionalText(food.FoodCategory),
             DataType = NormalizeOptionalText(food.DataType),
+            Barcode = NormalizeOptionalText(food.GtinUpc),
             CaloriesPer100Grams = nutrients.CaloriesPer100Grams,
             ProteinGramsPer100Grams = nutrients.ProteinGramsPer100Grams,
             CarbsGramsPer100Grams = nutrients.CarbsGramsPer100Grams,
             FatGramsPer100Grams = nutrients.FatGramsPer100Grams,
             FiberGramsPer100Grams = nutrients.FiberGramsPer100Grams,
+            SugarGramsPer100Grams = nutrients.SugarGramsPer100Grams,
             SupportedUnits = supportsGramCalculations ? GramSupportedUnits : [],
+            Portions = providerPortions,
+            ProviderPayloadJson = JsonSerializer.Serialize(food, UsdaNutritionJsonContext.Default.UsdaFoodDetailResponse),
         };
     }
 
@@ -235,7 +241,8 @@ public class UsdaNutritionProvider : INutritionProvider
             ScaleValue(labelNutrients.Protein?.Value, multiplier),
             ScaleValue(labelNutrients.Carbohydrates?.Value, multiplier),
             ScaleValue(labelNutrients.Fat?.Value, multiplier),
-            ScaleValue(labelNutrients.Fiber?.Value, multiplier));
+            ScaleValue(labelNutrients.Fiber?.Value, multiplier),
+            ScaleValue(labelNutrients.Sugars?.Value, multiplier));
 
         return snapshot.HasAnyValue;
     }
@@ -262,7 +269,12 @@ public class UsdaNutritionProvider : INutritionProvider
             FindNutrientAmount(foodNutrients, nutrientNumber: "1003", nutrientName: "Protein", requiredUnit: "G"),
             FindNutrientAmount(foodNutrients, nutrientNumber: "1005", nutrientName: "Carbohydrate, by difference", requiredUnit: "G"),
             FindNutrientAmount(foodNutrients, nutrientNumber: "1004", nutrientName: "Total lipid (fat)", requiredUnit: "G"),
-            FindNutrientAmount(foodNutrients, nutrientNumber: "1079", nutrientName: "Fiber, total dietary", requiredUnit: "G"));
+            FindNutrientAmount(foodNutrients, nutrientNumber: "1079", nutrientName: "Fiber, total dietary", requiredUnit: "G"),
+            FindFirstNutrientAmount(
+                foodNutrients,
+                requiredUnit: "G",
+                ("2000", "Sugars, total including NLEA"),
+                ("1063", "Sugars, total NLEA")));
 
         return snapshot.HasAnyValue;
     }
@@ -290,6 +302,87 @@ public class UsdaNutritionProvider : INutritionProvider
         }
 
         return null;
+    }
+
+    private static decimal? FindFirstNutrientAmount(
+        IReadOnlyList<UsdaFoodNutrient> nutrients,
+        string requiredUnit,
+        params (string NutrientNumber, string NutrientName)[] candidates)
+    {
+        foreach (var candidate in candidates)
+        {
+            var value = FindNutrientAmount(
+                nutrients,
+                candidate.NutrientNumber,
+                candidate.NutrientName,
+                requiredUnit);
+
+            if (value.HasValue)
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<NutritionProviderPortion> BuildProviderPortions(
+        UsdaFoodDetailResponse food,
+        bool supportsGramCalculations)
+    {
+        var portions = new List<NutritionProviderPortion>();
+
+        if (supportsGramCalculations)
+        {
+            portions.Add(new NutritionProviderPortion
+            {
+                UnitName = "g",
+                Amount = 1m,
+                GramWeight = 1m,
+                ProviderPortionId = null,
+                IsDefault = true,
+            });
+        }
+
+        foreach (var portion in food.FoodPortions)
+        {
+            if (!portion.GramWeight.HasValue || portion.GramWeight.Value <= 0)
+            {
+                continue;
+            }
+
+            var unitName = NormalizePortionUnitName(portion);
+
+            if (string.IsNullOrWhiteSpace(unitName))
+            {
+                continue;
+            }
+
+            portions.Add(new NutritionProviderPortion
+            {
+                UnitName = unitName,
+                Amount = portion.Amount.GetValueOrDefault(1m) <= 0 ? 1m : portion.Amount!.Value,
+                GramWeight = portion.GramWeight.Value,
+                ProviderPortionId = portion.Id?.ToString(),
+                IsDefault = false,
+            });
+        }
+
+        return portions;
+    }
+
+    private static string? NormalizePortionUnitName(UsdaFoodPortion portion)
+    {
+        var measureUnit = NormalizeOptionalText(portion.MeasureUnit?.Abbreviation)
+            ?? NormalizeOptionalText(portion.MeasureUnit?.Name);
+
+        if (!string.IsNullOrWhiteSpace(measureUnit))
+        {
+            return measureUnit;
+        }
+
+        return NormalizeOptionalText(portion.PortionDescription)
+            ?? NormalizeOptionalText(portion.Modifier);
     }
 
     private static bool IsGramUnit(string? unit)
@@ -330,16 +423,18 @@ public class UsdaNutritionProvider : INutritionProvider
         decimal? ProteinGramsPer100Grams,
         decimal? CarbsGramsPer100Grams,
         decimal? FatGramsPer100Grams,
-        decimal? FiberGramsPer100Grams)
+        decimal? FiberGramsPer100Grams,
+        decimal? SugarGramsPer100Grams)
     {
-        public static readonly NutrientSnapshot Empty = new(null, null, null, null, null);
+        public static readonly NutrientSnapshot Empty = new(null, null, null, null, null, null);
 
         public bool HasAnyValue =>
             CaloriesPer100Grams.HasValue
             || ProteinGramsPer100Grams.HasValue
             || CarbsGramsPer100Grams.HasValue
             || FatGramsPer100Grams.HasValue
-            || FiberGramsPer100Grams.HasValue;
+            || FiberGramsPer100Grams.HasValue
+            || SugarGramsPer100Grams.HasValue;
     }
 }
 
@@ -413,6 +508,12 @@ internal sealed class UsdaFoodDetailResponse
 
     [JsonPropertyName("foodNutrients")]
     public List<UsdaFoodNutrient> FoodNutrients { get; set; } = [];
+
+    [JsonPropertyName("gtinUpc")]
+    public string? GtinUpc { get; set; }
+
+    [JsonPropertyName("foodPortions")]
+    public List<UsdaFoodPortion> FoodPortions { get; set; } = [];
 }
 
 internal sealed class UsdaLabelNutrients
@@ -431,6 +532,9 @@ internal sealed class UsdaLabelNutrients
 
     [JsonPropertyName("fiber")]
     public UsdaNutrientValue? Fiber { get; set; }
+
+    [JsonPropertyName("sugars")]
+    public UsdaNutrientValue? Sugars { get; set; }
 }
 
 internal sealed class UsdaNutrientValue
@@ -467,4 +571,34 @@ internal sealed class UsdaNutrientMetadata
 
     [JsonPropertyName("unitName")]
     public string? UnitName { get; set; }
+}
+
+internal sealed class UsdaFoodPortion
+{
+    [JsonPropertyName("id")]
+    public int? Id { get; set; }
+
+    [JsonPropertyName("amount")]
+    public decimal? Amount { get; set; }
+
+    [JsonPropertyName("gramWeight")]
+    public decimal? GramWeight { get; set; }
+
+    [JsonPropertyName("modifier")]
+    public string? Modifier { get; set; }
+
+    [JsonPropertyName("portionDescription")]
+    public string? PortionDescription { get; set; }
+
+    [JsonPropertyName("measureUnit")]
+    public UsdaMeasureUnit? MeasureUnit { get; set; }
+}
+
+internal sealed class UsdaMeasureUnit
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("abbreviation")]
+    public string? Abbreviation { get; set; }
 }

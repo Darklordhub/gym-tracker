@@ -3,6 +3,7 @@ namespace backend.Configuration;
 public class NutritionOptions
 {
     public const string SectionName = "Nutrition";
+    public const int CatalogFreshnessDays = 30;
 
     public string? UsdaApiKey { get; set; }
     public string UsdaBaseUrl { get; set; } = "https://api.nal.usda.gov/fdc/v1/";

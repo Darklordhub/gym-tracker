@@ -27,6 +27,8 @@ public class AppDbContext : DbContext
     public DbSet<UserReadinessLog> UserReadinessLogs => Set<UserReadinessLog>();
     public DbSet<UserCalorieLog> UserCalorieLogs => Set<UserCalorieLog>();
     public DbSet<ExerciseCatalogItem> ExerciseCatalogItems => Set<ExerciseCatalogItem>();
+    public DbSet<NutritionCatalogItem> NutritionCatalogItems => Set<NutritionCatalogItem>();
+    public DbSet<NutritionCatalogPortion> NutritionCatalogPortions => Set<NutritionCatalogPortion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -164,6 +166,42 @@ public class AppDbContext : DbContext
             .Property(item => item.IsManuallyEdited)
             .HasDefaultValue(false);
 
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .Property(item => item.Source)
+            .HasMaxLength(40);
+
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .Property(item => item.ExternalId)
+            .HasMaxLength(120);
+
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .Property(item => item.Name)
+            .HasMaxLength(240);
+
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .Property(item => item.BrandName)
+            .HasMaxLength(240);
+
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .Property(item => item.FoodType)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .Property(item => item.Barcode)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .Property(item => item.ProviderPayloadJson)
+            .HasColumnType("jsonb");
+
+        modelBuilder.Entity<NutritionCatalogPortion>()
+            .Property(portion => portion.UnitName)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<NutritionCatalogPortion>()
+            .Property(portion => portion.ProviderPortionId)
+            .HasMaxLength(120);
+
         modelBuilder.Entity<GoalSettings>()
             .Property(goalSettings => goalSettings.CalorieTargetMode)
             .HasMaxLength(20)
@@ -241,6 +279,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(log => log.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<NutritionCatalogPortion>()
+            .HasOne(portion => portion.NutritionCatalogItem)
+            .WithMany(item => item.Portions)
+            .HasForeignKey(portion => portion.NutritionCatalogItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<GoalSettings>()
             .HasIndex(goalSettings => goalSettings.UserId)
             .IsUnique();
@@ -271,6 +315,16 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ExerciseCatalogItem>()
             .HasIndex(item => new { item.Source, item.ExternalId })
             .IsUnique();
+
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .HasIndex(item => new { item.Source, item.ExternalId })
+            .IsUnique();
+
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .HasIndex(item => item.Name);
+
+        modelBuilder.Entity<NutritionCatalogItem>()
+            .HasIndex(item => item.Barcode);
 
         modelBuilder.Entity<WeightEntry>()
             .HasIndex(weightEntry => new { weightEntry.UserId, weightEntry.Date });
