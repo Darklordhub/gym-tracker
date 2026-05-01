@@ -1,3 +1,11 @@
+export type NutritionFoodPortion = {
+  unitName: string | null
+  amount: number | null
+  gramWeight: number | null
+  providerPortionId: string | null
+  isDefault: boolean
+}
+
 export type NutritionFoodSearchResult = {
   source: string
   externalId: string
@@ -27,6 +35,7 @@ export type NutritionFoodDetail = {
   fiberGramsPer100Grams: number | null
   sugarGramsPer100Grams: number | null
   supportedUnits: string[]
+  portions?: NutritionFoodPortion[] | null
 }
 
 export type UserMealItem = {

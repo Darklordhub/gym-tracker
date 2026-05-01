@@ -13,7 +13,7 @@ import {
 } from '../api/nutritionApi'
 import { StateCard } from '../components/StateCard'
 import { formatDate, getTodayDateValue } from '../lib/format'
-import { getRequestErrorMessage } from '../lib/http'
+import { getRequestErrorMessage, isNotFoundError } from '../lib/http'
 import type {
   DailyMeals,
   NutritionFoodDetail,
@@ -37,6 +37,7 @@ const MEAL_TYPE_OPTIONS = [
 
 type MealTypeValue = (typeof MEAL_TYPE_OPTIONS)[number]['value']
 type PageFeedback = { tone: 'success' | 'error'; message: string } | null
+type FoodResolutionState = 'usable' | 'unusable' | 'error'
 type MealGroup = {
   key: string
   label: string
@@ -47,6 +48,11 @@ type CreateMealFormState = {
   mealType: MealTypeValue
   title: string
   notes: string
+}
+type FoodDetailStatus = {
+  canAdd: boolean
+  hasCalories: boolean
+  message: string | null
 }
 
 const initialCreateMealFormState = (): CreateMealFormState => ({
@@ -76,10 +82,12 @@ export function NutritionPage() {
   const [searchResults, setSearchResults] = useState<NutritionFoodSearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null)
+
   const [selectedFoodSummary, setSelectedFoodSummary] = useState<NutritionFoodSearchResult | null>(null)
   const [selectedFoodDetail, setSelectedFoodDetail] = useState<NutritionFoodDetail | null>(null)
-  const [isLoadingFoodDetail, setIsLoadingFoodDetail] = useState(false)
-  const [foodDetailErrorMessage, setFoodDetailErrorMessage] = useState<string | null>(null)
+  const [selectedFoodLoading, setSelectedFoodLoading] = useState(false)
+  const [selectedFoodError, setSelectedFoodError] = useState<string | null>(null)
+  const [foodResolutionByKey, setFoodResolutionByKey] = useState<Record<string, FoodResolutionState>>({})
   const [quantityInput, setQuantityInput] = useState('100')
   const [unit, setUnit] = useState(GRAM_UNIT)
   const [isAddingItem, setIsAddingItem] = useState(false)
@@ -101,6 +109,14 @@ export function NutritionPage() {
   }, [searchQuery])
 
   useEffect(() => {
+    if (debouncedSearchQuery.length === 0) {
+      latestSearchRequestRef.current += 1
+      setSearchResults([])
+      setSearchErrorMessage(null)
+      setIsSearching(false)
+      return
+    }
+
     if (debouncedSearchQuery.length < SEARCH_MIN_CHARACTERS) {
       latestSearchRequestRef.current += 1
       setSearchResults([])
@@ -128,7 +144,7 @@ export function NutritionPage() {
         }
 
         setSearchResults([])
-        setSearchErrorMessage(getRequestErrorMessage(error, 'Unable to search foods right now.'))
+        setSearchErrorMessage(getRequestErrorMessage(error, 'Unable to search USDA foods right now.'))
       } finally {
         if (requestId === latestSearchRequestRef.current) {
           setIsSearching(false)
@@ -139,47 +155,9 @@ export function NutritionPage() {
     void runSearch()
   }, [debouncedSearchQuery])
 
-  useEffect(() => {
-  if (!selectedFoodSummary) {
-      setSelectedFoodDetail(null)
-      setFoodDetailErrorMessage(null)
-      setIsLoadingFoodDetail(false)
-      return
-    }
-
-    const selectedFood = selectedFoodSummary
-    const requestId = ++latestFoodDetailRequestRef.current
-
-    async function loadFoodDetail() {
-      try {
-        setIsLoadingFoodDetail(true)
-        setFoodDetailErrorMessage(null)
-        const detail = await getFoodDetail(selectedFood.source, selectedFood.externalId)
-
-        if (requestId !== latestFoodDetailRequestRef.current) {
-          return
-        }
-
-        setSelectedFoodDetail(detail)
-      } catch (error) {
-        if (requestId !== latestFoodDetailRequestRef.current) {
-          return
-        }
-
-        setSelectedFoodDetail(null)
-        setFoodDetailErrorMessage(getRequestErrorMessage(error, 'Unable to load food details.'))
-      } finally {
-        if (requestId === latestFoodDetailRequestRef.current) {
-          setIsLoadingFoodDetail(false)
-        }
-      }
-    }
-
-    void loadFoodDetail()
-  }, [selectedFoodSummary])
-
   const activeDailyMeals = dailyMeals?.date === selectedDate ? dailyMeals : null
   const mealCount = activeDailyMeals?.meals.length ?? 0
+  const groupedMeals = buildMealGroups(activeDailyMeals?.meals ?? [])
   const targetMeal = activeDailyMeals?.meals.find((meal) => meal.id === targetMealId) ?? null
   const quantityValue = parsePositiveNumber(quantityInput)
   const quantityError =
@@ -188,14 +166,27 @@ export function NutritionPage() {
       : quantityValue === null
         ? 'Enter a quantity greater than zero.'
         : null
-  const selectedFoodPreview = buildFoodPreview(selectedFoodDetail, quantityValue)
-  const groupedMeals = buildMealGroups(activeDailyMeals?.meals ?? [])
+  const foodDetailStatus = getFoodDetailStatus(selectedFoodDetail)
+  const addFoodValidationMessage = getAddFoodValidationMessage({
+    selectedFoodSummary,
+    selectedFoodDetail,
+    selectedFoodError,
+    selectedFoodLoading,
+    targetMealId,
+    quantityError,
+    unit,
+    foodDetailStatus,
+  })
   const canAddFoodToMeal =
-    Boolean(targetMealId)
-    && Boolean(selectedFoodDetail)
+    Boolean(selectedFoodDetail)
+    && foodDetailStatus.canAdd
+    && Boolean(targetMealId)
     && !quantityError
+    && unit === GRAM_UNIT
+    && !selectedFoodLoading
+    && !selectedFoodError
     && !isAddingItem
-    && !isLoadingFoodDetail
+  const selectedFoodPreview = buildFoodPreview(selectedFoodDetail, quantityValue)
 
   async function loadDailyMeals(dateValue: string, preferredMealId?: number | null) {
     const requestId = ++latestMealsRequestRef.current
@@ -229,6 +220,47 @@ export function NutritionPage() {
       if (requestId === latestMealsRequestRef.current) {
         setIsLoadingMeals(false)
         setIsRefreshingMeals(false)
+      }
+    }
+  }
+
+  async function handleSelectFood(food: NutritionFoodSearchResult) {
+    const requestId = ++latestFoodDetailRequestRef.current
+    const foodKey = buildFoodKey(food.source, food.externalId)
+
+    setSelectedFoodSummary(food)
+    setSelectedFoodDetail(null)
+    setSelectedFoodError(null)
+    setSelectedFoodLoading(true)
+    setPageFeedback(null)
+
+    try {
+      const detail = await getFoodDetail(food.source, food.externalId)
+
+      if (requestId !== latestFoodDetailRequestRef.current) {
+        return
+      }
+
+      const detailStatus = getFoodDetailStatus(detail)
+      setSelectedFoodDetail(detail)
+      setFoodResolutionByKey((current) => ({
+        ...current,
+        [foodKey]: detailStatus.canAdd ? 'usable' : 'unusable',
+      }))
+    } catch (error) {
+      if (requestId !== latestFoodDetailRequestRef.current) {
+        return
+      }
+
+      setSelectedFoodDetail(null)
+      setSelectedFoodError(buildFoodDetailErrorMessage(error))
+      setFoodResolutionByKey((current) => ({
+        ...current,
+        [foodKey]: 'error',
+      }))
+    } finally {
+      if (requestId === latestFoodDetailRequestRef.current) {
+        setSelectedFoodLoading(false)
       }
     }
   }
@@ -307,18 +339,11 @@ export function NutritionPage() {
   async function handleAddMealItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!selectedFoodDetail) {
-      setPageFeedback({ tone: 'error', message: 'Select a food before adding it to a meal.' })
-      return
-    }
-
-    if (!targetMealId) {
-      setPageFeedback({ tone: 'error', message: 'Create or select a meal before adding food.' })
-      return
-    }
-
-    if (!quantityValue) {
-      setPageFeedback({ tone: 'error', message: quantityError ?? 'Enter a valid quantity.' })
+    if (!selectedFoodDetail || addFoodValidationMessage || !quantityValue || !targetMealId) {
+      setPageFeedback({
+        tone: 'error',
+        message: addFoodValidationMessage ?? 'Select a usable USDA food before adding it to a meal.',
+      })
       return
     }
 
@@ -387,33 +412,30 @@ export function NutritionPage() {
 
   return (
     <main className="page-shell nutrition-shell">
-      <section className="hero-panel nutrition-hero">
-        <div className="nutrition-hero-copy">
+      <section className="panel nutrition-toolbar-panel">
+        <div className="nutrition-toolbar-copy">
           <span className="eyebrow">FORGE / Nutrition</span>
           <h1>Nutrition</h1>
-          <p className="hero-text">
-            Search USDA foods, build gram-based meals, and manage a day of intake without changing the legacy calorie log yet.
+          <p>
+            Search USDA foods, load reliable detail before adding anything, and manage daily meals without changing the existing calorie log.
           </p>
-          <div className="nutrition-hero-pills">
-            <span className="info-pill">{mealCount} {mealCount === 1 ? 'meal' : 'meals'}</span>
-            <span className="info-pill info-pill-strength">{targetMeal ? `Target: ${getMealDisplayName(targetMeal)}` : 'No target meal yet'}</span>
-          </div>
         </div>
 
-        <div className="nutrition-hero-side">
-          <article className="forge-focus-card nutrition-hero-focus">
-            <span className="stat-label">Active date</span>
-            <strong>{activeDailyMeals ? formatDate(activeDailyMeals.date) : formatDate(selectedDate)}</strong>
-            <p>Meals stay local to the nutrition workspace until calorie-log integration lands in a later phase.</p>
-            <label className="field nutrition-date-field">
-              <span>Date</span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-              />
-            </label>
-          </article>
+        <div className="nutrition-toolbar-controls">
+          <label className="field nutrition-toolbar-date-field">
+            <span>Date</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+            />
+          </label>
+
+          <div className="nutrition-toolbar-pills">
+            <span className="info-pill">{mealCount} {mealCount === 1 ? 'meal' : 'meals'}</span>
+            <span className="info-pill">{activeDailyMeals ? formatDate(activeDailyMeals.date) : formatDate(selectedDate)}</span>
+            <span className="info-pill info-pill-strength">{targetMeal ? `Target: ${getMealDisplayName(targetMeal)}` : 'Select a target meal'}</span>
+          </div>
         </div>
       </section>
 
@@ -429,7 +451,7 @@ export function NutritionPage() {
             <div className="panel-header">
               <div>
                 <h2>Daily summary</h2>
-                <p>Daily totals reflect saved meals only. Existing calorie tracking remains unchanged.</p>
+                <p>These totals come from saved meals only. Existing calorie tracking remains untouched until a later phase.</p>
               </div>
               {isRefreshingMeals ? <span className="record-hint">Refreshing day…</span> : null}
             </div>
@@ -448,7 +470,7 @@ export function NutritionPage() {
             <div className="panel-header">
               <div>
                 <h2>Create meal</h2>
-                <p>Add a meal to the selected date before assigning foods from the search panel.</p>
+                <p>Add a meal for the selected date, then target it from the nutrition sidebar.</p>
               </div>
             </div>
 
@@ -499,13 +521,13 @@ export function NutritionPage() {
                       notes: event.target.value,
                     }))
                   }
-                  rows={3}
-                  placeholder="Optional notes for this meal"
+                  rows={2}
+                  placeholder="Optional notes"
                 />
               </label>
 
-              <div className="action-row action-row-inline">
-                <button type="submit" className="primary-button" disabled={isCreatingMeal}>
+              <div className="action-row nutrition-create-meal-actions">
+                <button type="submit" className="primary-button compact-button" disabled={isCreatingMeal}>
                   <Plus aria-hidden="true" focusable="false" strokeWidth={1.9} />
                   {isCreatingMeal ? 'Creating meal...' : 'Add meal'}
                 </button>
@@ -517,6 +539,13 @@ export function NutritionPage() {
             <StateCard title="Daily meals unavailable" description={mealsErrorMessage} tone="error" />
           ) : isLoadingMeals && !activeDailyMeals ? (
             <StateCard title="Loading meals" description="Pulling your saved meals for the selected day." loading />
+          ) : mealCount === 0 ? (
+            <section className="panel nutrition-empty-day-panel">
+              <StateCard
+                title="No meals for this day yet"
+                description="Create your first meal for the selected date, then use the USDA search panel to add foods."
+              />
+            </section>
           ) : (
             <div className="nutrition-meal-groups">
               {groupedMeals.map((group) => (
@@ -532,7 +561,7 @@ export function NutritionPage() {
                   {group.meals.length === 0 ? (
                     <StateCard
                       title={`No ${group.label.toLowerCase()} meals`}
-                      description="Create a meal for this group, then add foods from the search panel."
+                      description="Create a meal in this group when you need a separate slot for food items."
                     />
                   ) : (
                     <div className="nutrition-meal-card-list">
@@ -565,7 +594,7 @@ export function NutritionPage() {
             <div className="panel-header">
               <div>
                 <h2>Food search</h2>
-                <p>Search USDA foods, inspect the normalized detail, then add a gram-based amount to a meal.</p>
+                <p>Search USDA foods, then select a result to load usable gram-based nutrition details.</p>
               </div>
             </div>
 
@@ -583,7 +612,7 @@ export function NutritionPage() {
                 </div>
               </label>
 
-              <label className="field">
+              <label className="field nutrition-target-meal-field">
                 <span>Target meal</span>
                 <select
                   value={targetMealId ?? ''}
@@ -596,6 +625,9 @@ export function NutritionPage() {
                     </option>
                   ))}
                 </select>
+                {selectedFoodSummary && !targetMealId ? (
+                  <span className="field-error">Select a meal before adding a food item.</span>
+                ) : null}
               </label>
             </div>
 
@@ -604,8 +636,8 @@ export function NutritionPage() {
                 <StateCard title="Search unavailable" description={searchErrorMessage} tone="error" />
               ) : debouncedSearchQuery.length === 0 ? (
                 <StateCard
-                  title="Search nutrition data"
-                  description="Type at least two characters to start searching USDA foods."
+                  title="Search USDA foods"
+                  description="Type at least two characters to start searching and then load detail nutrition for a result."
                 />
               ) : debouncedSearchQuery.length < SEARCH_MIN_CHARACTERS ? (
                 <StateCard
@@ -615,135 +647,182 @@ export function NutritionPage() {
               ) : isSearching ? (
                 <StateCard title="Searching foods" description="Looking up USDA foods for the current query." loading />
               ) : searchResults.length === 0 ? (
-                <StateCard title="No foods found" description="Try a broader term or a less specific phrase." />
+                <StateCard title="No foods found" description="Try a broader search term or another USDA phrasing." />
               ) : (
                 <div className="nutrition-search-result-list">
-                  {searchResults.map((food) => {
-                    const isSelected = buildFoodKey(food.source, food.externalId) === buildFoodKey(selectedFoodSummary?.source, selectedFoodSummary?.externalId)
-
-                    return (
-                      <button
-                        key={buildFoodKey(food.source, food.externalId)}
-                        type="button"
-                        className={isSelected ? 'nutrition-search-result nutrition-search-result-active' : 'nutrition-search-result'}
-                        onClick={() => setSelectedFoodSummary(food)}
-                      >
-                        <div className="nutrition-search-result-header">
-                          <div>
-                            <strong>{food.name}</strong>
-                            {food.brandName ? <p>{food.brandName}</p> : null}
-                          </div>
-                          <span className="info-pill">{formatSourceLabel(food.source)}</span>
-                        </div>
-
-                        <div className="nutrition-search-result-macros">
-                          <span>{formatNutritionValue(food.caloriesPer100Grams)} kcal</span>
-                          <span>P {formatNutritionValue(food.proteinGramsPer100Grams)} g</span>
-                          <span>C {formatNutritionValue(food.carbsGramsPer100Grams)} g</span>
-                          <span>F {formatNutritionValue(food.fatGramsPer100Grams)} g</span>
-                        </div>
-                      </button>
-                    )
-                  })}
+                  {searchResults.map((food) => (
+                    <SearchResultCard
+                      key={buildFoodKey(food.source, food.externalId)}
+                      food={food}
+                      isSelected={buildFoodKey(food.source, food.externalId) === buildFoodKey(selectedFoodSummary?.source, selectedFoodSummary?.externalId)}
+                      isLoading={selectedFoodLoading && buildFoodKey(food.source, food.externalId) === buildFoodKey(selectedFoodSummary?.source, selectedFoodSummary?.externalId)}
+                      resolutionState={foodResolutionByKey[buildFoodKey(food.source, food.externalId)]}
+                      onSelect={() => void handleSelectFood(food)}
+                    />
+                  ))}
                 </div>
               )}
             </div>
+          </section>
 
-            <div className="nutrition-food-preview">
-              <div className="panel-header nutrition-preview-header">
-                <div>
-                  <h2>Selected food</h2>
-                  <p>Preview uses the normalized per-100g values returned by the backend.</p>
-                </div>
+          <section className="panel nutrition-preview-panel">
+            <div className="panel-header">
+              <div>
+                <h2>Selected food</h2>
+                <p>Only detail nutrition from the backend can unlock the meal builder.</p>
               </div>
-
-              {foodDetailErrorMessage ? (
-                <StateCard title="Food detail unavailable" description={foodDetailErrorMessage} tone="error" />
-              ) : isLoadingFoodDetail ? (
-                <StateCard title="Loading food detail" description="Pulling the latest cached nutrition detail." loading />
-              ) : !selectedFoodDetail ? (
-                <StateCard
-                  title="No food selected"
-                  description="Choose a search result to preview calories and macros before adding it to a meal."
-                />
-              ) : (
-                <form className="nutrition-add-item-form" onSubmit={handleAddMealItem}>
-                  <div className="nutrition-preview-card">
-                    <div className="nutrition-preview-heading">
-                      <div>
-                        <strong>{selectedFoodDetail.name}</strong>
-                        {selectedFoodDetail.brandName ? <p>{selectedFoodDetail.brandName}</p> : null}
-                      </div>
-                      <span className="info-pill">{formatSourceLabel(selectedFoodDetail.source)}</span>
-                    </div>
-
-                    <div className="nutrition-preview-pills">
-                      {selectedFoodDetail.foodCategory ? <span className="info-pill">{selectedFoodDetail.foodCategory}</span> : null}
-                      {selectedFoodDetail.foodType ? <span className="info-pill">{selectedFoodDetail.foodType}</span> : null}
-                      {selectedFoodDetail.dataType ? <span className="info-pill">{selectedFoodDetail.dataType}</span> : null}
-                    </div>
-
-                    <div className="nutrition-preview-grid">
-                      <NutritionPreviewMetric label="Calories / 100g" value={selectedFoodDetail.caloriesPer100Grams} unit="kcal" />
-                      <NutritionPreviewMetric label="Protein / 100g" value={selectedFoodDetail.proteinGramsPer100Grams} unit="g" />
-                      <NutritionPreviewMetric label="Carbs / 100g" value={selectedFoodDetail.carbsGramsPer100Grams} unit="g" />
-                      <NutritionPreviewMetric label="Fat / 100g" value={selectedFoodDetail.fatGramsPer100Grams} unit="g" />
-                      <NutritionPreviewMetric label="Fiber / 100g" value={selectedFoodDetail.fiberGramsPer100Grams} unit="g" />
-                      <NutritionPreviewMetric label="Sugar / 100g" value={selectedFoodDetail.sugarGramsPer100Grams} unit="g" />
-                    </div>
-                  </div>
-
-                  <div className="nutrition-add-item-controls">
-                    <label className="field">
-                      <span>Quantity</span>
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        inputMode="decimal"
-                        value={quantityInput}
-                        onChange={(event) => setQuantityInput(event.target.value)}
-                      />
-                      {quantityError ? <span className="field-error">{quantityError}</span> : null}
-                    </label>
-
-                    <label className="field">
-                      <span>Unit</span>
-                      <select value={unit} onChange={(event) => setUnit(event.target.value)}>
-                        <option value="g">Grams</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <div className="nutrition-calculation-preview">
-                    <span className="stat-label">Preview for {quantityValue ? `${formatNutritionValue(quantityValue)} g` : 'selected amount'}</span>
-                    <div className="nutrition-calculation-preview-grid">
-                      <NutritionPreviewMetric label="Calories" value={selectedFoodPreview.calories} unit="kcal" />
-                      <NutritionPreviewMetric label="Protein" value={selectedFoodPreview.protein} unit="g" />
-                      <NutritionPreviewMetric label="Carbs" value={selectedFoodPreview.carbs} unit="g" />
-                      <NutritionPreviewMetric label="Fat" value={selectedFoodPreview.fat} unit="g" />
-                    </div>
-                  </div>
-
-                  {!targetMeal ? (
-                    <div className="feedback error">
-                      Create or select a meal for this date before adding food items.
-                    </div>
-                  ) : null}
-
-                  <div className="action-row action-row-inline">
-                    <button type="submit" className="primary-button" disabled={!canAddFoodToMeal}>
-                      <UtensilsCrossed aria-hidden="true" focusable="false" strokeWidth={1.9} />
-                      {isAddingItem ? 'Adding food...' : `Add food to ${targetMeal ? getMealDisplayName(targetMeal) : 'selected meal'}`}
-                    </button>
-                  </div>
-                </form>
-              )}
             </div>
+
+            {selectedFoodError ? (
+              <StateCard title="Food detail unavailable" description={selectedFoodError} tone="error" />
+            ) : selectedFoodLoading ? (
+              <StateCard title="Loading food detail" description="Fetching the normalized USDA detail for the selected result." loading />
+            ) : !selectedFoodSummary ? (
+              <StateCard
+                title="No food selected"
+                description="Choose a USDA result from the search panel to load calories, macros, and gram-based support."
+              />
+            ) : !selectedFoodDetail ? (
+              <StateCard
+                title="Food detail unavailable"
+                description="This USDA result could not be prepared for preview. Try another result."
+                tone="error"
+              />
+            ) : (
+              <form className="nutrition-add-item-form" onSubmit={handleAddMealItem}>
+                <div className={foodDetailStatus.canAdd ? 'nutrition-preview-card nutrition-preview-card-usable' : 'nutrition-preview-card nutrition-preview-card-unusable'}>
+                  <div className="nutrition-preview-heading">
+                    <div>
+                      <span className="stat-label">USDA detail</span>
+                      <strong>{selectedFoodDetail.name}</strong>
+                      <p>{buildSelectedFoodDescription(selectedFoodDetail)}</p>
+                    </div>
+                    <span className="info-pill">{formatSourceLabel(selectedFoodDetail.source)}</span>
+                  </div>
+
+                  <div className="nutrition-preview-pills">
+                    {selectedFoodDetail.foodCategory ? <span className="info-pill">{selectedFoodDetail.foodCategory}</span> : null}
+                    {selectedFoodDetail.foodType ? <span className="info-pill">{selectedFoodDetail.foodType}</span> : null}
+                    {hasSupportedGramUnit(selectedFoodDetail) ? <span className="info-pill info-pill-strength">Gram-ready</span> : <span className="info-pill">No gram support</span>}
+                  </div>
+
+                  <div className="nutrition-preview-grid">
+                    <NutritionPreviewMetric label="Calories / 100g" value={selectedFoodDetail.caloriesPer100Grams} unit="kcal" />
+                    <NutritionPreviewMetric label="Protein / 100g" value={selectedFoodDetail.proteinGramsPer100Grams} unit="g" />
+                    <NutritionPreviewMetric label="Carbs / 100g" value={selectedFoodDetail.carbsGramsPer100Grams} unit="g" />
+                    <NutritionPreviewMetric label="Fat / 100g" value={selectedFoodDetail.fatGramsPer100Grams} unit="g" />
+                    <NutritionPreviewMetric label="Fiber / 100g" value={selectedFoodDetail.fiberGramsPer100Grams} unit="g" />
+                    <NutritionPreviewMetric label="Sugar / 100g" value={selectedFoodDetail.sugarGramsPer100Grams} unit="g" />
+                  </div>
+                </div>
+
+                <div className="nutrition-add-item-controls">
+                  <label className="field">
+                    <span>Quantity</span>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={quantityInput}
+                      onChange={(event) => setQuantityInput(event.target.value)}
+                    />
+                    {quantityError ? <span className="field-error">{quantityError}</span> : null}
+                  </label>
+
+                  <label className="field">
+                    <span>Unit</span>
+                    <select value={unit} onChange={(event) => setUnit(event.target.value)}>
+                      <option value="g">Grams</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="nutrition-calculation-preview">
+                  <span className="stat-label">Preview for {quantityValue ? `${formatNutritionValue(quantityValue)} g` : 'selected amount'}</span>
+                  <div className="nutrition-calculation-preview-grid">
+                    <NutritionPreviewMetric label="Calories" value={selectedFoodPreview.calories} unit="kcal" />
+                    <NutritionPreviewMetric label="Protein" value={selectedFoodPreview.protein} unit="g" />
+                    <NutritionPreviewMetric label="Carbs" value={selectedFoodPreview.carbs} unit="g" />
+                    <NutritionPreviewMetric label="Fat" value={selectedFoodPreview.fat} unit="g" />
+                  </div>
+                </div>
+
+                {foodDetailStatus.message ? (
+                  <div className="feedback error">{foodDetailStatus.message}</div>
+                ) : null}
+
+                {!foodDetailStatus.message && selectedFoodDetail.caloriesPer100Grams !== null && !hasPrimaryMacroData(selectedFoodDetail) ? (
+                  <div className="nutrition-preview-note">
+                    Only calorie data is available for this USDA item. Macro fields may stay unavailable.
+                  </div>
+                ) : null}
+
+                {addFoodValidationMessage && addFoodValidationMessage !== foodDetailStatus.message ? (
+                  <div className="feedback error">{addFoodValidationMessage}</div>
+                ) : null}
+
+                <div className="action-row action-row-inline">
+                  <button type="submit" className="primary-button" disabled={!canAddFoodToMeal}>
+                    <UtensilsCrossed aria-hidden="true" focusable="false" strokeWidth={1.9} />
+                    {isAddingItem ? 'Adding food...' : `Add food to ${targetMeal ? getMealDisplayName(targetMeal) : 'selected meal'}`}
+                  </button>
+                </div>
+              </form>
+            )}
           </section>
         </aside>
       </section>
     </main>
+  )
+}
+
+function SearchResultCard({
+  food,
+  isSelected,
+  isLoading,
+  resolutionState,
+  onSelect,
+}: {
+  food: NutritionFoodSearchResult
+  isSelected: boolean
+  isLoading: boolean
+  resolutionState?: FoodResolutionState
+  onSelect: () => void
+}) {
+  const statusMessage = isLoading
+    ? 'Loading nutrition details...'
+    : resolutionState === 'usable'
+      ? 'Nutrition details ready'
+      : resolutionState === 'unusable'
+        ? 'No usable gram-based nutrition'
+        : resolutionState === 'error'
+          ? 'Detail unavailable. Try another result.'
+          : 'Select to load nutrition details'
+
+  return (
+    <button
+      type="button"
+      className={isSelected ? 'nutrition-search-result nutrition-search-result-active' : 'nutrition-search-result'}
+      onClick={onSelect}
+    >
+      <div className="nutrition-search-result-header">
+        <div className="nutrition-search-result-copy">
+          <strong>{food.name}</strong>
+          <p>{buildSearchResultDescription(food)}</p>
+        </div>
+        <span className="info-pill">{formatSourceLabel(food.source)}</span>
+      </div>
+
+      <div className="nutrition-search-result-footer">
+        <span className={resolutionState === 'error' || resolutionState === 'unusable' ? 'nutrition-search-result-hint nutrition-search-result-hint-warning' : 'nutrition-search-result-hint'}>
+          {statusMessage}
+        </span>
+        {food.caloriesPer100Grams !== null ? (
+          <span className="info-pill">{formatNutritionValue(food.caloriesPer100Grams)} kcal / 100g</span>
+        ) : null}
+      </div>
+    </button>
   )
 }
 
@@ -817,7 +896,7 @@ function MealCard({
   return (
     <article className={isTargetMeal ? 'nutrition-meal-card nutrition-meal-card-target' : 'nutrition-meal-card'}>
       <div className="nutrition-meal-card-header">
-        <div>
+        <div className="nutrition-meal-card-heading">
           <span className="stat-label">{formatMealType(meal.mealType)}</span>
           <h3>{getMealDisplayName(meal)}</h3>
           <p>{meal.notes ?? 'No notes added for this meal.'}</p>
@@ -864,19 +943,12 @@ function MealCard({
         <form className="nutrition-meal-edit-form" onSubmit={handleMealSave}>
           <label className="field">
             <span>Meal date</span>
-            <input
-              type="date"
-              value={dateInput}
-              onChange={(event) => setDateInput(event.target.value)}
-            />
+            <input type="date" value={dateInput} onChange={(event) => setDateInput(event.target.value)} />
           </label>
 
           <label className="field">
             <span>Meal type</span>
-            <select
-              value={mealTypeInput}
-              onChange={(event) => setMealTypeInput(event.target.value)}
-            >
+            <select value={mealTypeInput} onChange={(event) => setMealTypeInput(event.target.value)}>
               {MEAL_TYPE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -899,7 +971,7 @@ function MealCard({
           <label className="field nutrition-meal-edit-notes">
             <span>Notes</span>
             <textarea
-              rows={3}
+              rows={2}
               maxLength={500}
               value={notesInput}
               onChange={(event) => setNotesInput(event.target.value)}
@@ -907,7 +979,7 @@ function MealCard({
             />
           </label>
 
-          <div className="action-row">
+          <div className="action-row nutrition-meal-edit-actions">
             <button
               type="submit"
               className="primary-button compact-button"
@@ -923,14 +995,14 @@ function MealCard({
       {meal.items.length === 0 ? (
         <div className="nutrition-empty-items">
           <strong>No foods added yet.</strong>
-          <p>Use the search panel to add gram-based items into this meal.</p>
+          <p>Use the USDA search panel to add gram-based items into this meal.</p>
         </div>
       ) : (
         <div className="nutrition-item-list">
           {meal.items.map((item) => {
             const quantityDraft = quantityDrafts[item.id] ?? item.quantity.toString()
             const itemQuantityValue = parsePositiveNumber(quantityDraft)
-            const quantityError =
+            const itemQuantityError =
               quantityDraft.trim().length > 0 && itemQuantityValue === null
                 ? 'Enter a valid gram amount.'
                 : null
@@ -940,7 +1012,7 @@ function MealCard({
                 <div className="nutrition-item-copy">
                   <div>
                     <strong>{item.foodNameSnapshot}</strong>
-                    {item.brandNameSnapshot ? <p>{item.brandNameSnapshot}</p> : null}
+                    <p>{buildMealItemDescription(item)}</p>
                   </div>
                   <div className="nutrition-item-pills">
                     <span className="info-pill">{formatSourceLabel(item.sourceProvider)}</span>
@@ -967,7 +1039,7 @@ function MealCard({
                         }))
                       }
                     />
-                    {quantityError ? <span className="field-error">{quantityError}</span> : null}
+                    {itemQuantityError ? <span className="field-error">{itemQuantityError}</span> : null}
                   </label>
 
                   <div className="action-row nutrition-item-action-row">
@@ -975,7 +1047,7 @@ function MealCard({
                       type="button"
                       className="ghost-button compact-button"
                       onClick={() => void handleItemSave(item)}
-                      disabled={updatingItemId === item.id || Boolean(quantityError) || !itemQuantityValue}
+                      disabled={updatingItemId === item.id || Boolean(itemQuantityError) || !itemQuantityValue}
                     >
                       {updatingItemId === item.id ? 'Updating...' : 'Update'}
                     </button>
@@ -1028,7 +1100,7 @@ function NutritionPreviewMetric({
   return (
     <div className="nutrition-preview-metric">
       <span>{label}</span>
-      <strong>{value === null ? 'N/A' : `${formatNutritionValue(value)} ${unit}`}</strong>
+      <strong>{value === null ? 'Unavailable' : `${formatNutritionValue(value)} ${unit}`}</strong>
     </div>
   )
 }
@@ -1083,13 +1155,129 @@ function buildFoodPreview(food: NutritionFoodDetail | null, quantity: number | n
   }
 }
 
-function scaleFromHundredGrams(valuePer100Grams: number | null | undefined, quantity: number | null) {
-  if (quantity === null) {
-    return 0
+function getFoodDetailStatus(food: NutritionFoodDetail | null): FoodDetailStatus {
+  if (!food) {
+    return {
+      canAdd: false,
+      hasCalories: false,
+      message: null,
+    }
   }
 
-  if (valuePer100Grams === null || valuePer100Grams === undefined) {
-    return 0
+  if (!hasSupportedGramUnit(food)) {
+    return {
+      canAdd: false,
+      hasCalories: false,
+      message: 'This USDA item does not include usable gram-based nutrition. Please choose another result.',
+    }
+  }
+
+  if (food.caloriesPer100Grams === null) {
+    return {
+      canAdd: false,
+      hasCalories: false,
+      message: 'This USDA item does not include usable calorie data. Please choose another result.',
+    }
+  }
+
+  return {
+    canAdd: true,
+    hasCalories: true,
+    message: null,
+  }
+}
+
+function getAddFoodValidationMessage({
+  selectedFoodSummary,
+  selectedFoodDetail,
+  selectedFoodError,
+  selectedFoodLoading,
+  targetMealId,
+  quantityError,
+  unit,
+  foodDetailStatus,
+}: {
+  selectedFoodSummary: NutritionFoodSearchResult | null
+  selectedFoodDetail: NutritionFoodDetail | null
+  selectedFoodError: string | null
+  selectedFoodLoading: boolean
+  targetMealId: number | null
+  quantityError: string | null
+  unit: string
+  foodDetailStatus: FoodDetailStatus
+}) {
+  if (!selectedFoodSummary) {
+    return null
+  }
+
+  if (selectedFoodLoading) {
+    return 'Nutrition detail is still loading for the selected USDA result.'
+  }
+
+  if (selectedFoodError) {
+    return selectedFoodError
+  }
+
+  if (!selectedFoodDetail) {
+    return 'Select a USDA result to load usable nutrition details.'
+  }
+
+  if (foodDetailStatus.message) {
+    return foodDetailStatus.message
+  }
+
+  if (!targetMealId) {
+    return 'Select a target meal before adding this food item.'
+  }
+
+  if (unit !== GRAM_UNIT) {
+    return 'Only gram-based quantities are supported right now.'
+  }
+
+  if (quantityError) {
+    return quantityError
+  }
+
+  return null
+}
+
+function buildFoodDetailErrorMessage(error: unknown) {
+  if (isNotFoundError(error)) {
+    return 'This USDA result could not be loaded. Try another result.'
+  }
+
+  return getRequestErrorMessage(error, 'Unable to load nutrition details for this USDA result.')
+}
+
+function buildSearchResultDescription(food: NutritionFoodSearchResult) {
+  return food.brandName ?? food.foodCategory ?? food.dataType ?? 'Select to load nutrition details'
+}
+
+function buildSelectedFoodDescription(food: NutritionFoodDetail) {
+  return food.brandName ?? food.foodCategory ?? food.dataType ?? 'USDA nutrition detail'
+}
+
+function buildMealItemDescription(item: UserMealItem) {
+  return item.brandNameSnapshot
+    ? `${item.brandNameSnapshot} · ${formatNutritionValue(item.quantity)} g`
+    : `${formatNutritionValue(item.quantity)} g`
+}
+
+function hasSupportedGramUnit(food: NutritionFoodDetail) {
+  return food.supportedUnits.some((unitValue) => ['g', 'gram', 'grams'].includes(unitValue.trim().toLowerCase()))
+}
+
+function hasPrimaryMacroData(food: NutritionFoodDetail) {
+  return (
+    food.proteinGramsPer100Grams !== null
+    || food.carbsGramsPer100Grams !== null
+    || food.fatGramsPer100Grams !== null
+  )
+}
+
+function scaleFromHundredGrams(valuePer100Grams: number | null | undefined, quantity: number | null) {
+  if (quantity === null || valuePer100Grams === null || valuePer100Grams === undefined) {
+    return null
   }
 
   return roundToTwo((valuePer100Grams * quantity) / 100)
