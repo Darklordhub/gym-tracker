@@ -26,6 +26,8 @@ public class AppDbContext : DbContext
     public DbSet<UserCycleSymptomLog> UserCycleSymptomLogs => Set<UserCycleSymptomLog>();
     public DbSet<UserReadinessLog> UserReadinessLogs => Set<UserReadinessLog>();
     public DbSet<UserCalorieLog> UserCalorieLogs => Set<UserCalorieLog>();
+    public DbSet<UserMeal> UserMeals => Set<UserMeal>();
+    public DbSet<UserMealItem> UserMealItems => Set<UserMealItem>();
     public DbSet<ExerciseCatalogItem> ExerciseCatalogItems => Set<ExerciseCatalogItem>();
     public DbSet<NutritionCatalogItem> NutritionCatalogItems => Set<NutritionCatalogItem>();
     public DbSet<NutritionCatalogPortion> NutritionCatalogPortions => Set<NutritionCatalogPortion>();
@@ -89,6 +91,38 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserCalorieLog>()
             .Property(log => log.Notes)
             .HasMaxLength(500);
+
+        modelBuilder.Entity<UserMeal>()
+            .Property(meal => meal.MealType)
+            .HasMaxLength(40);
+
+        modelBuilder.Entity<UserMeal>()
+            .Property(meal => meal.Title)
+            .HasMaxLength(160);
+
+        modelBuilder.Entity<UserMeal>()
+            .Property(meal => meal.Notes)
+            .HasMaxLength(500);
+
+        modelBuilder.Entity<UserMealItem>()
+            .Property(item => item.FoodNameSnapshot)
+            .HasMaxLength(240);
+
+        modelBuilder.Entity<UserMealItem>()
+            .Property(item => item.BrandNameSnapshot)
+            .HasMaxLength(240);
+
+        modelBuilder.Entity<UserMealItem>()
+            .Property(item => item.SourceProvider)
+            .HasMaxLength(40);
+
+        modelBuilder.Entity<UserMealItem>()
+            .Property(item => item.ExternalFoodId)
+            .HasMaxLength(120);
+
+        modelBuilder.Entity<UserMealItem>()
+            .Property(item => item.Unit)
+            .HasMaxLength(20);
 
         modelBuilder.Entity<ExerciseCatalogItem>()
             .Property(item => item.Source)
@@ -279,6 +313,24 @@ public class AppDbContext : DbContext
             .HasForeignKey(log => log.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<UserMeal>()
+            .HasOne(meal => meal.User)
+            .WithMany(user => user.Meals)
+            .HasForeignKey(meal => meal.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserMealItem>()
+            .HasOne(item => item.UserMeal)
+            .WithMany(meal => meal.Items)
+            .HasForeignKey(item => item.UserMealId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserMealItem>()
+            .HasOne(item => item.NutritionCatalogItem)
+            .WithMany()
+            .HasForeignKey(item => item.NutritionCatalogItemId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<NutritionCatalogPortion>()
             .HasOne(portion => portion.NutritionCatalogItem)
             .WithMany(item => item.Portions)
@@ -307,6 +359,18 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserCalorieLog>()
             .HasIndex(log => new { log.UserId, log.Date })
             .IsUnique();
+
+        modelBuilder.Entity<UserMeal>()
+            .HasIndex(meal => new { meal.UserId, meal.Date });
+
+        modelBuilder.Entity<UserMeal>()
+            .HasIndex(meal => new { meal.UserId, meal.MealType, meal.Date });
+
+        modelBuilder.Entity<UserMealItem>()
+            .HasIndex(item => item.UserMealId);
+
+        modelBuilder.Entity<UserMealItem>()
+            .HasIndex(item => item.NutritionCatalogItemId);
 
         modelBuilder.Entity<ExerciseCatalogItem>()
             .HasIndex(item => item.Slug)
