@@ -24,7 +24,7 @@ import type {
   UserMealItem,
 } from '../types/nutrition'
 
-const SEARCH_PAGE_SIZE = 12
+const SEARCH_PAGE_SIZE = 8
 const SEARCH_MIN_CHARACTERS = 2
 const SEARCH_DEBOUNCE_MS = 350
 const GRAM_UNIT = 'g'
@@ -37,7 +37,6 @@ const MEAL_TYPE_OPTIONS = [
 
 type MealTypeValue = (typeof MEAL_TYPE_OPTIONS)[number]['value']
 type PageFeedback = { tone: 'success' | 'error'; message: string } | null
-type FoodResolutionState = 'usable' | 'unusable' | 'error'
 type MealGroup = {
   key: string
   label: string
@@ -81,13 +80,14 @@ export function NutritionPage() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<NutritionFoodSearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [isCheckingSearchResults, setIsCheckingSearchResults] = useState(false)
   const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null)
+  const [hiddenSearchResultCount, setHiddenSearchResultCount] = useState(0)
 
   const [selectedFoodSummary, setSelectedFoodSummary] = useState<NutritionFoodSearchResult | null>(null)
   const [selectedFoodDetail, setSelectedFoodDetail] = useState<NutritionFoodDetail | null>(null)
   const [selectedFoodLoading, setSelectedFoodLoading] = useState(false)
   const [selectedFoodError, setSelectedFoodError] = useState<string | null>(null)
-  const [foodResolutionByKey, setFoodResolutionByKey] = useState<Record<string, FoodResolutionState>>({})
   const [quantityInput, setQuantityInput] = useState('100')
   const [unit, setUnit] = useState(GRAM_UNIT)
   const [isAddingItem, setIsAddingItem] = useState(false)
@@ -95,6 +95,7 @@ export function NutritionPage() {
   const latestMealsRequestRef = useRef(0)
   const latestSearchRequestRef = useRef(0)
   const latestFoodDetailRequestRef = useRef(0)
+  const foodDetailCacheRef = useRef<Record<string, NutritionFoodDetail>>({})
 
   useEffect(() => {
     void loadDailyMeals(selectedDate)
@@ -114,6 +115,9 @@ export function NutritionPage() {
       setSearchResults([])
       setSearchErrorMessage(null)
       setIsSearching(false)
+      setIsCheckingSearchResults(false)
+      setHiddenSearchResultCount(0)
+      clearSelectedFoodPreview()
       return
     }
 
@@ -122,6 +126,9 @@ export function NutritionPage() {
       setSearchResults([])
       setSearchErrorMessage(null)
       setIsSearching(false)
+      setIsCheckingSearchResults(false)
+      setHiddenSearchResultCount(0)
+      clearSelectedFoodPreview()
       return
     }
 
@@ -130,24 +137,31 @@ export function NutritionPage() {
     async function runSearch() {
       try {
         setIsSearching(true)
+        setIsCheckingSearchResults(false)
         setSearchErrorMessage(null)
+        setSearchResults([])
+        setHiddenSearchResultCount(0)
+        clearSelectedFoodPreview()
+
         const results = await searchFoods(debouncedSearchQuery, 1, SEARCH_PAGE_SIZE)
 
         if (requestId !== latestSearchRequestRef.current) {
           return
         }
 
-        setSearchResults(results)
+        await resolveSearchResults(results, requestId)
       } catch (error) {
         if (requestId !== latestSearchRequestRef.current) {
           return
         }
 
         setSearchResults([])
+        setHiddenSearchResultCount(0)
         setSearchErrorMessage(getRequestErrorMessage(error, 'Unable to search USDA foods right now.'))
       } finally {
         if (requestId === latestSearchRequestRef.current) {
           setIsSearching(false)
+          setIsCheckingSearchResults(false)
         }
       }
     }
@@ -224,9 +238,90 @@ export function NutritionPage() {
     }
   }
 
+  async function resolveSearchResults(results: NutritionFoodSearchResult[], requestId: number) {
+    if (results.length === 0) {
+      setSearchResults([])
+      setHiddenSearchResultCount(0)
+      return
+    }
+
+    setIsCheckingSearchResults(true)
+
+    const resolvedResults = await Promise.all(
+      results.map(async (food) => {
+        const foodKey = buildFoodKey(food.source, food.externalId)
+        const cachedDetail = foodDetailCacheRef.current[foodKey]
+
+        if (cachedDetail) {
+          const detailStatus = getFoodDetailStatus(cachedDetail)
+          return {
+            food,
+            detail: cachedDetail,
+            state: detailStatus.canAdd ? 'usable' : 'unusable',
+          } as const
+        }
+
+        try {
+          const detail = await getFoodDetail(food.source, food.externalId)
+          foodDetailCacheRef.current[foodKey] = detail
+          const detailStatus = getFoodDetailStatus(detail)
+
+          return {
+            food,
+            detail,
+            state: detailStatus.canAdd ? 'usable' : 'unusable',
+          } as const
+        } catch {
+          return {
+            food,
+            detail: null,
+            state: 'error',
+          } as const
+        }
+      }),
+    )
+
+    if (requestId !== latestSearchRequestRef.current) {
+      return
+    }
+
+    const nextSearchResults: NutritionFoodSearchResult[] = []
+
+    for (const result of resolvedResults) {
+      if (result.state === 'usable') {
+        nextSearchResults.push(result.food)
+      }
+    }
+
+    setSearchResults(nextSearchResults)
+    setHiddenSearchResultCount(results.length - nextSearchResults.length)
+  }
+
   async function handleSelectFood(food: NutritionFoodSearchResult) {
     const requestId = ++latestFoodDetailRequestRef.current
     const foodKey = buildFoodKey(food.source, food.externalId)
+    const cachedDetail = foodDetailCacheRef.current[foodKey]
+
+    if (cachedDetail) {
+      const detailStatus = getFoodDetailStatus(cachedDetail)
+
+      if (!detailStatus.canAdd) {
+        setSearchResults((current) =>
+          current.filter((entry) => buildFoodKey(entry.source, entry.externalId) !== foodKey),
+        )
+        clearSelectedFoodPreview()
+        setSelectedFoodError(
+          detailStatus.message ?? 'This USDA item does not include usable gram-based nutrition. Please choose another result.',
+        )
+        return
+      }
+
+      setSelectedFoodSummary(food)
+      setSelectedFoodDetail(cachedDetail)
+      setSelectedFoodError(null)
+      setSelectedFoodLoading(false)
+      return
+    }
 
     setSelectedFoodSummary(food)
     setSelectedFoodDetail(null)
@@ -242,11 +337,22 @@ export function NutritionPage() {
       }
 
       const detailStatus = getFoodDetailStatus(detail)
+      foodDetailCacheRef.current[foodKey] = detail
+
+      if (!detailStatus.canAdd) {
+        setSearchResults((current) =>
+          current.filter((entry) => buildFoodKey(entry.source, entry.externalId) !== foodKey),
+        )
+        clearSelectedFoodPreview()
+        setSelectedFoodError(
+          detailStatus.message ?? 'This USDA item does not include usable gram-based nutrition. Please choose another result.',
+        )
+        setHiddenSearchResultCount((current) => current + 1)
+        return
+      }
+
+      setSelectedFoodSummary(food)
       setSelectedFoodDetail(detail)
-      setFoodResolutionByKey((current) => ({
-        ...current,
-        [foodKey]: detailStatus.canAdd ? 'usable' : 'unusable',
-      }))
     } catch (error) {
       if (requestId !== latestFoodDetailRequestRef.current) {
         return
@@ -254,15 +360,30 @@ export function NutritionPage() {
 
       setSelectedFoodDetail(null)
       setSelectedFoodError(buildFoodDetailErrorMessage(error))
-      setFoodResolutionByKey((current) => ({
-        ...current,
-        [foodKey]: 'error',
-      }))
     } finally {
       if (requestId === latestFoodDetailRequestRef.current) {
         setSelectedFoodLoading(false)
       }
     }
+  }
+
+  function clearSelectedFoodPreview() {
+    setSelectedFoodSummary(null)
+    setSelectedFoodDetail(null)
+    setSelectedFoodError(null)
+    setSelectedFoodLoading(false)
+  }
+
+  function handleClearSearch() {
+    latestSearchRequestRef.current += 1
+    setSearchQuery('')
+    setDebouncedSearchQuery('')
+    setSearchResults([])
+    setIsSearching(false)
+    setIsCheckingSearchResults(false)
+    setSearchErrorMessage(null)
+    setHiddenSearchResultCount(0)
+    clearSelectedFoodPreview()
   }
 
   async function handleCreateMeal(event: FormEvent<HTMLFormElement>) {
@@ -610,6 +731,7 @@ export function NutritionPage() {
                     placeholder="Chicken breast, oats, banana..."
                   />
                 </div>
+                <small>Search specific USDA foods such as chicken breast raw, white rice cooked, egg whole, banana raw.</small>
               </label>
 
               <label className="field nutrition-target-meal-field">
@@ -631,6 +753,24 @@ export function NutritionPage() {
               </label>
             </div>
 
+            <div className="nutrition-search-toolbar">
+              <span className="record-hint">
+                {isCheckingSearchResults
+                  ? 'Checking nutrition details...'
+                  : hiddenSearchResultCount > 0
+                    ? `${hiddenSearchResultCount} USDA result${hiddenSearchResultCount === 1 ? '' : 's'} hidden because they do not include usable gram-based nutrition.`
+                    : 'Only foods with usable gram-based nutrition are shown.'}
+              </span>
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                onClick={handleClearSearch}
+                disabled={!searchQuery && searchResults.length === 0 && !selectedFoodSummary}
+              >
+                Clear
+              </button>
+            </div>
+
             <div className="nutrition-search-results">
               {searchErrorMessage ? (
                 <StateCard title="Search unavailable" description={searchErrorMessage} tone="error" />
@@ -644,10 +784,19 @@ export function NutritionPage() {
                   title="Keep typing"
                   description={`Use at least ${SEARCH_MIN_CHARACTERS} characters before search starts.`}
                 />
+              ) : isCheckingSearchResults ? (
+                <StateCard
+                  title="Checking nutrition details"
+                  description="Filtering USDA results down to foods with usable gram-based nutrition."
+                  loading
+                />
               ) : isSearching ? (
                 <StateCard title="Searching foods" description="Looking up USDA foods for the current query." loading />
               ) : searchResults.length === 0 ? (
-                <StateCard title="No foods found" description="Try a broader search term or another USDA phrasing." />
+                <StateCard
+                  title="No gram-based nutrition found"
+                  description="Try a more specific food, e.g. 'chicken breast raw' or 'rice cooked'."
+                />
               ) : (
                 <div className="nutrition-search-result-list">
                   {searchResults.map((food) => (
@@ -656,7 +805,6 @@ export function NutritionPage() {
                       food={food}
                       isSelected={buildFoodKey(food.source, food.externalId) === buildFoodKey(selectedFoodSummary?.source, selectedFoodSummary?.externalId)}
                       isLoading={selectedFoodLoading && buildFoodKey(food.source, food.externalId) === buildFoodKey(selectedFoodSummary?.source, selectedFoodSummary?.externalId)}
-                      resolutionState={foodResolutionByKey[buildFoodKey(food.source, food.externalId)]}
                       onSelect={() => void handleSelectFood(food)}
                     />
                   ))}
@@ -781,24 +929,16 @@ function SearchResultCard({
   food,
   isSelected,
   isLoading,
-  resolutionState,
   onSelect,
 }: {
   food: NutritionFoodSearchResult
   isSelected: boolean
   isLoading: boolean
-  resolutionState?: FoodResolutionState
   onSelect: () => void
 }) {
   const statusMessage = isLoading
     ? 'Loading nutrition details...'
-    : resolutionState === 'usable'
-      ? 'Nutrition details ready'
-      : resolutionState === 'unusable'
-        ? 'No usable gram-based nutrition'
-        : resolutionState === 'error'
-          ? 'Detail unavailable. Try another result.'
-          : 'Select to load nutrition details'
+    : 'Select to load nutrition details'
 
   return (
     <button
@@ -815,9 +955,7 @@ function SearchResultCard({
       </div>
 
       <div className="nutrition-search-result-footer">
-        <span className={resolutionState === 'error' || resolutionState === 'unusable' ? 'nutrition-search-result-hint nutrition-search-result-hint-warning' : 'nutrition-search-result-hint'}>
-          {statusMessage}
-        </span>
+        <span className="nutrition-search-result-hint">{statusMessage}</span>
         {food.caloriesPer100Grams !== null ? (
           <span className="info-pill">{formatNutritionValue(food.caloriesPer100Grams)} kcal / 100g</span>
         ) : null}

@@ -8754,7 +8754,8 @@ body {
 
 .nutrition-shell {
   gap: 20px;
-  overflow-x: clip;
+  overflow-x: hidden;
+  padding-bottom: 56px;
 }
 
 .nutrition-toolbar-panel,
@@ -8773,7 +8774,7 @@ body {
 
 .nutrition-toolbar-panel {
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
-  align-items: center;
+  align-items: start;
   padding: 22px 24px;
 }
 
@@ -8982,8 +8983,8 @@ body {
 }
 
 .nutrition-search-panel {
-  position: sticky;
-  top: 108px;
+  position: static;
+  top: auto;
   align-self: start;
 }
 
@@ -9006,6 +9007,14 @@ body {
 
 .nutrition-target-meal-field {
   grid-column: 1 / -1;
+}
+
+.nutrition-search-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .nutrition-search-input-shell {
@@ -9157,11 +9166,6 @@ body {
   .nutrition-toolbar-pills {
     justify-content: flex-start;
   }
-
-  .nutrition-search-panel {
-    position: static;
-    top: auto;
-  }
 }
 
 @media (max-width: 980px) {
@@ -9192,6 +9196,10 @@ body {
   .nutrition-meal-card-actions,
   .nutrition-item-action-row {
     justify-content: stretch;
+  }
+
+  .nutrition-search-toolbar {
+    align-items: stretch;
   }
 }
 
