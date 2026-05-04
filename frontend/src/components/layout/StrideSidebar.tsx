@@ -1,12 +1,6 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-
-export type StrideSidebarNavItem = {
-  to: string
-  label: string
-  icon: ReactNode
-  meta: string
-}
+import type { StrideSidebarNavItem } from './strideLayoutTypes'
 
 type StrideSidebarProps = {
   isOpen: boolean

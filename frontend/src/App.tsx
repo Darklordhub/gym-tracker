@@ -37,48 +37,21 @@ import { WeightPage } from './pages/WeightPage'
 import { WorkoutsPage } from './pages/WorkoutsPage'
 import { generateNotifications, type AppNotification } from './lib/notifications'
 import { StrideShell } from './components/layout/StrideShell'
-import { StrideSidebar, type StrideSidebarNavItem } from './components/layout/StrideSidebar'
+import { StrideSidebar } from './components/layout/StrideSidebar'
 import { StrideTopbar } from './components/layout/StrideTopbar'
+import type {
+  IconName,
+  StrideSidebarNavItem,
+  StrideTopbarMeta,
+  ThemeMode,
+} from './components/layout/strideLayoutTypes'
+import {
+  adminNavItems,
+  getNavMeta,
+  primaryNavItems,
+} from './components/layout/strideNavigation'
 
-type ThemeMode = 'light' | 'dark'
-type IconName =
-  | 'dashboard'
-  | 'weight'
-  | 'workouts'
-  | 'aiWorkout'
-  | 'progress'
-  | 'nutrition'
-  | 'cycle'
-  | 'profile'
-  | 'admin'
-  | 'library'
-  | 'moon'
-  | 'sun'
-  | 'logout'
-
-type NavItem = {
-  to: string
-  label: string
-  icon: IconName
-}
-
-const primaryNavItems: readonly NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { to: '/weight', label: 'Weight', icon: 'weight' },
-  { to: '/workouts', label: 'Workouts', icon: 'workouts' },
-  { to: '/ai-workout-generator', label: 'AI Workout Generator', icon: 'aiWorkout' },
-  { to: '/nutrition', label: 'Nutrition', icon: 'nutrition' },
-  { to: '/exercise-library', label: 'Exercise Library', icon: 'library' },
-  { to: '/exercise-progress', label: 'Exercise Progress', icon: 'progress' },
-  { to: '/cycle', label: 'Cycle', icon: 'cycle' },
-  { to: '/profile', label: 'Profile', icon: 'profile' },
-] as const
-
-const adminNavItems: readonly NavItem[] = [
-  { to: '/admin', label: 'Admin', icon: 'admin' },
-] as const
-
-const routeMeta: Record<string, { title: string; eyebrow: string; description: string }> = {
+const routeMeta: Record<string, StrideTopbarMeta> = {
   '/dashboard': {
     title: 'Command Center',
     eyebrow: 'Overview',
@@ -479,33 +452,6 @@ function getStoredReadNotificationIds() {
     return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : []
   } catch {
     return []
-  }
-}
-
-function getNavMeta(pathname: string) {
-  switch (pathname) {
-    case '/dashboard':
-      return 'Overview'
-    case '/weight':
-      return 'Body metrics'
-    case '/workouts':
-      return 'Session logs'
-    case '/ai-workout-generator':
-      return 'Generator'
-    case '/nutrition':
-      return 'Meals'
-    case '/exercise-library':
-      return 'Catalog'
-    case '/exercise-progress':
-      return 'Lift history'
-    case '/cycle':
-      return 'Readiness'
-    case '/profile':
-      return 'Account'
-    case '/admin':
-      return 'Controls'
-    default:
-      return 'Workspace'
   }
 }
 

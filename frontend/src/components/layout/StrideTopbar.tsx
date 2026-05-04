@@ -1,12 +1,7 @@
 import type { ReactNode, RefObject } from 'react'
 import { formatDate } from '../../lib/format'
 import type { AppNotification } from '../../lib/notifications'
-
-export type StrideTopbarMeta = {
-  title: string
-  eyebrow: string
-  description: string
-}
+import type { StrideTopbarMeta } from './strideLayoutTypes'
 
 type StrideTopbarProps = {
   isMobileNavOpen: boolean
