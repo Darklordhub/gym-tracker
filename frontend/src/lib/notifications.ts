@@ -83,7 +83,7 @@ export function generateNotifications(
         new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
     )
     .slice(0, 5)
-    .map(({ priority, ...notification }) => notification)
+    .map(({ ...notification }) => notification)
 }
 
 function getDaysSince(date: string, now: Date) {

@@ -19,7 +19,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import './App.css'
-import { useAuth } from './auth/AuthContext'
+import { useAuth } from './auth/useAuth'
 import { fetchCycleSettings } from './api/cycle'
 import { fetchGoals } from './api/goals'
 import { fetchWorkouts } from './api/workouts'
@@ -230,24 +230,6 @@ function AppLayout({
   const themeToggleLabel = `Switch to ${theme === 'light' ? 'dark' : 'light'} mode`
   const themeButtonLabel = theme === 'light' ? 'Dark mode' : 'Light mode'
 
-  async function loadNotifications() {
-    try {
-      const [workoutData, goalData] = await Promise.all([fetchWorkouts(), fetchGoals().catch(() => null)])
-      setNotifications(generateNotifications(workoutData, goalData))
-    } catch {
-      setNotifications([])
-    }
-  }
-
-  async function loadCycleVisibility() {
-    try {
-      const settings = await fetchCycleSettings()
-      setIsCycleEnabled(settings.isEnabled)
-    } catch {
-      setIsCycleEnabled(false)
-    }
-  }
-
   function markNotificationAsRead(notificationId: string) {
     setReadNotificationIds((current) => {
       if (current.includes(notificationId)) {
@@ -267,16 +249,56 @@ function AppLayout({
   }
 
   useEffect(() => {
-    setIsMobileNavOpen(false)
-    setIsNotificationsOpen(false)
+    const timeoutId = window.setTimeout(() => {
+      setIsMobileNavOpen(false)
+      setIsNotificationsOpen(false)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [location.pathname])
 
   useEffect(() => {
-    void loadNotifications()
+    let isCancelled = false
+
+    void (async () => {
+      try {
+        const [workoutData, goalData] = await Promise.all([fetchWorkouts(), fetchGoals().catch(() => null)])
+
+        if (!isCancelled) {
+          setNotifications(generateNotifications(workoutData, goalData))
+        }
+      } catch {
+        if (!isCancelled) {
+          setNotifications([])
+        }
+      }
+    })()
+
+    return () => {
+      isCancelled = true
+    }
   }, [location.pathname])
 
   useEffect(() => {
-    void loadCycleVisibility()
+    let isCancelled = false
+
+    void (async () => {
+      try {
+        const settings = await fetchCycleSettings()
+
+        if (!isCancelled) {
+          setIsCycleEnabled(settings.isEnabled)
+        }
+      } catch {
+        if (!isCancelled) {
+          setIsCycleEnabled(false)
+        }
+      }
+    })()
+
+    return () => {
+      isCancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -301,17 +323,6 @@ function AppLayout({
   }, [])
 
   useEffect(() => {
-    const notificationIds = new Set(notifications.map((notification) => notification.id))
-    setReadNotificationIds((current) => {
-      const next = current.filter((id) => notificationIds.has(id))
-      if (next.length !== current.length) {
-        window.localStorage.setItem(NOTIFICATION_READ_STORAGE_KEY, JSON.stringify(next))
-      }
-      return next
-    })
-  }, [notifications])
-
-  useEffect(() => {
     if (!isMobileNavOpen) {
       document.body.classList.remove('nav-open')
       return
@@ -333,10 +344,23 @@ function AppLayout({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  const visibleReadNotificationIds = useMemo(() => {
+    const notificationIds = new Set(notifications.map((notification) => notification.id))
+    return readNotificationIds.filter((notificationId) => notificationIds.has(notificationId))
+  }, [notifications, readNotificationIds])
   const unreadCount = useMemo(
-    () => notifications.filter((notification) => !readNotificationIds.includes(notification.id)).length,
-    [notifications, readNotificationIds],
+    () => notifications.filter((notification) => !visibleReadNotificationIds.includes(notification.id)).length,
+    [notifications, visibleReadNotificationIds],
   )
+
+  useEffect(() => {
+    if (visibleReadNotificationIds.length !== readNotificationIds.length) {
+      window.localStorage.setItem(
+        NOTIFICATION_READ_STORAGE_KEY,
+        JSON.stringify(visibleReadNotificationIds),
+      )
+    }
+  }, [readNotificationIds.length, visibleReadNotificationIds])
 
   return (
     <div className="forge-shell">
@@ -492,11 +516,11 @@ function AppLayout({
                 notifications={notifications}
                 unreadCount={unreadCount}
                 isOpen={isNotificationsOpen}
-                onToggle={() => setIsNotificationsOpen((current) => !current)}
-                onMarkRead={markNotificationAsRead}
-                onMarkAllRead={markAllNotificationsAsRead}
-                readNotificationIds={readNotificationIds}
-              />
+              onToggle={() => setIsNotificationsOpen((current) => !current)}
+              onMarkRead={markNotificationAsRead}
+              onMarkAllRead={markAllNotificationsAsRead}
+              readNotificationIds={visibleReadNotificationIds}
+            />
 
               <button
                 type="button"

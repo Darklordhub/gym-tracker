@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState, type FormEvent } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from 'react'
 import axios from 'axios'
 import { Dumbbell, PlayCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -609,36 +609,35 @@ function ExcludedExercisePickerField({
   const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null)
   const deferredQuery = useDeferredValue(query)
   const normalizedQuery = deferredQuery.trim().toLowerCase()
+  const cachedResults = normalizedQuery.length >= 2
+    ? excludedExerciseSearchCache.get(normalizedQuery) ?? null
+    : null
+  const visibleResults = useMemo(
+    () =>
+      !isOpen || normalizedQuery.length < 2
+        ? []
+        : filterExcludedExerciseResults(cachedResults ?? results, selectedItems),
+    [cachedResults, isOpen, normalizedQuery, results, selectedItems],
+  )
+  const isSearchingResults = isOpen && normalizedQuery.length >= 2 && !cachedResults && isLoading
+  const activeSearchErrorMessage =
+    isOpen && normalizedQuery.length >= 2 && !cachedResults ? searchErrorMessage : null
 
   useEffect(() => {
     let isCancelled = false
 
-    if (!isOpen) {
-      setResults([])
-      setIsLoading(false)
-      setSearchErrorMessage(null)
+    if (!isOpen || normalizedQuery.length < 2 || cachedResults) {
       return
     }
-
-    if (normalizedQuery.length < 2) {
-      setResults([])
-      setIsLoading(false)
-      setSearchErrorMessage(null)
-      return
-    }
-
-    const cachedResults = excludedExerciseSearchCache.get(normalizedQuery)
-    if (cachedResults) {
-      setResults(filterExcludedExerciseResults(cachedResults, selectedItems))
-      setIsLoading(false)
-      setSearchErrorMessage(null)
-      return
-    }
-
-    setIsLoading(true)
-    setSearchErrorMessage(null)
 
     const timeoutId = window.setTimeout(() => {
+      if (isCancelled) {
+        return
+      }
+
+      setIsLoading(true)
+      setSearchErrorMessage(null)
+
       void searchExerciseCatalog(deferredQuery.trim())
         .then((nextResults) => {
           if (isCancelled) {
@@ -646,7 +645,7 @@ function ExcludedExercisePickerField({
           }
 
           excludedExerciseSearchCache.set(normalizedQuery, nextResults)
-          setResults(filterExcludedExerciseResults(nextResults, selectedItems))
+          setResults(nextResults)
         })
         .catch((error) => {
           if (isCancelled) {
@@ -667,15 +666,7 @@ function ExcludedExercisePickerField({
       isCancelled = true
       window.clearTimeout(timeoutId)
     }
-  }, [deferredQuery, isOpen, normalizedQuery, selectedItems])
-
-  useEffect(() => {
-    if (normalizedQuery.length < 2) {
-      return
-    }
-
-    setResults((current) => filterExcludedExerciseResults(current, selectedItems))
-  }, [normalizedQuery, selectedItems])
+  }, [cachedResults, deferredQuery, isOpen, normalizedQuery])
 
   function addItem(item: ExerciseCatalogItem) {
     if (selectedItems.some((selectedItem) => selectedItem.id === item.id)) {
@@ -745,16 +736,16 @@ function ExcludedExercisePickerField({
       {isOpen ? (
         <div className="catalog-suggestions-panel ai-workout-exclusion-suggestions" role="listbox" aria-label="Excluded exercise suggestions">
           {normalizedQuery.length < 2 ? <p className="catalog-suggestion-status">Type at least 2 characters to search the catalog.</p> : null}
-          {normalizedQuery.length >= 2 && isLoading ? <p className="catalog-suggestion-status">Searching catalog...</p> : null}
-          {normalizedQuery.length >= 2 && !isLoading && searchErrorMessage ? (
-            <p className="catalog-suggestion-status field-error">{searchErrorMessage}</p>
+          {normalizedQuery.length >= 2 && isSearchingResults ? <p className="catalog-suggestion-status">Searching catalog...</p> : null}
+          {normalizedQuery.length >= 2 && !isSearchingResults && activeSearchErrorMessage ? (
+            <p className="catalog-suggestion-status field-error">{activeSearchErrorMessage}</p>
           ) : null}
-          {normalizedQuery.length >= 2 && !isLoading && !searchErrorMessage && results.length === 0 ? (
+          {normalizedQuery.length >= 2 && !isSearchingResults && !activeSearchErrorMessage && visibleResults.length === 0 ? (
             <p className="catalog-suggestion-status">No matching catalog exercises found for this search.</p>
           ) : null}
-          {normalizedQuery.length >= 2 && !isLoading && !searchErrorMessage && results.length > 0 ? (
+          {normalizedQuery.length >= 2 && !isSearchingResults && !activeSearchErrorMessage && visibleResults.length > 0 ? (
             <div className="catalog-suggestion-list">
-              {results.slice(0, 8).map((item) => (
+              {visibleResults.slice(0, 8).map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -792,13 +783,27 @@ function filterExcludedExerciseResults(
 
 function PlanExerciseMedia({ exercise }: { exercise: AiWorkoutExercise }) {
   const mediaUrl = resolvePlanMediaUrl(exercise.thumbnailUrl)
+
+  if (!mediaUrl) {
+    return (
+      <div className="ai-workout-exercise-media ai-workout-exercise-media-placeholder" aria-hidden="true">
+        <span className="exercise-library-item-media-fallback-icon">
+          <Dumbbell aria-hidden="true" focusable="false" strokeWidth={1.8} />
+        </span>
+        <span className="record-hint">No media</span>
+      </div>
+    )
+  }
+
+  return (
+    <PlanExerciseMediaImage key={mediaUrl} mediaUrl={mediaUrl} name={exercise.name} />
+  )
+}
+
+function PlanExerciseMediaImage({ mediaUrl, name }: { mediaUrl: string; name: string }) {
   const [hasError, setHasError] = useState(false)
 
-  useEffect(() => {
-    setHasError(false)
-  }, [mediaUrl])
-
-  if (!mediaUrl || hasError) {
+  if (hasError) {
     return (
       <div className="ai-workout-exercise-media ai-workout-exercise-media-placeholder" aria-hidden="true">
         <span className="exercise-library-item-media-fallback-icon">
@@ -813,7 +818,7 @@ function PlanExerciseMedia({ exercise }: { exercise: AiWorkoutExercise }) {
     <div className="ai-workout-exercise-media">
       <img
         src={mediaUrl}
-        alt={exercise.name}
+        alt={name}
         loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"

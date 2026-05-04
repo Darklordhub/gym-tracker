@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { PencilLine, Plus, Save, Search, Trash2, UtensilsCrossed, X } from 'lucide-react'
 import {
   addMealItem,
@@ -99,10 +99,7 @@ export function NutritionPage() {
   const latestSearchRequestRef = useRef(0)
   const latestFoodDetailRequestRef = useRef(0)
   const foodDetailCacheRef = useRef<Record<string, NutritionFoodDetail>>({})
-
-  useEffect(() => {
-    void loadDailyMeals(selectedDate)
-  }, [selectedDate])
+  const loadedMealsDateRef = useRef<string | null>(null)
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -212,9 +209,18 @@ export function NutritionPage() {
   const selectedFoodPreview = buildFoodPreview(selectedFoodDetail, quantityValue)
   const canSwitchToMeals = Boolean(activeConflictMessage)
 
-  async function loadDailyMeals(dateValue: string, preferredMealId?: number | null) {
+  const syncDailyMealsState = useCallback((nextDailyMeals: DailyMeals, preferredMealId?: number | null) => {
+    loadedMealsDateRef.current = nextDailyMeals.date
+    setDailyMeals(nextDailyMeals)
+    setManualModeConflictMessage(nextDailyMeals.conflictMessage ?? null)
+    setTargetMealId((currentTargetMealId) =>
+      resolveTargetMealId(nextDailyMeals.meals, preferredMealId ?? null, currentTargetMealId),
+    )
+  }, [])
+
+  const loadDailyMeals = useCallback(async (dateValue: string, preferredMealId?: number | null) => {
     const requestId = ++latestMealsRequestRef.current
-    const isHardLoad = !dailyMeals || dailyMeals.date !== dateValue
+    const isHardLoad = loadedMealsDateRef.current !== dateValue
 
     try {
       if (isHardLoad) {
@@ -243,15 +249,11 @@ export function NutritionPage() {
         setIsRefreshingMeals(false)
       }
     }
-  }
+  }, [syncDailyMealsState])
 
-  function syncDailyMealsState(nextDailyMeals: DailyMeals, preferredMealId?: number | null) {
-    setDailyMeals(nextDailyMeals)
-    setManualModeConflictMessage(nextDailyMeals.conflictMessage ?? null)
-    setTargetMealId((currentTargetMealId) =>
-      resolveTargetMealId(nextDailyMeals.meals, preferredMealId ?? null, currentTargetMealId),
-    )
-  }
+  useEffect(() => {
+    void loadDailyMeals(selectedDate)
+  }, [loadDailyMeals, selectedDate])
 
   function captureMealModeConflict(error: unknown) {
     if (!isConflictError(error)) {
@@ -805,7 +807,7 @@ export function NutritionPage() {
                     <div className="nutrition-meal-card-list">
                       {group.meals.map((meal) => (
                         <MealCard
-                          key={meal.id}
+                          key={`${meal.id}:${meal.updatedAt}`}
                           meal={meal}
                           isTargetMeal={meal.id === targetMealId}
                           isSaving={savingMealId === meal.id}
@@ -1112,14 +1114,6 @@ function MealCard({
   const [dateInput, setDateInput] = useState(meal.date)
   const [mealTypeInput, setMealTypeInput] = useState(normalizeMealTypeForInput(meal.mealType))
   const [quantityDrafts, setQuantityDrafts] = useState<Record<number, string>>(() => buildQuantityDrafts(meal.items))
-
-  useEffect(() => {
-    setTitleInput(meal.title ?? '')
-    setNotesInput(meal.notes ?? '')
-    setDateInput(meal.date)
-    setMealTypeInput(normalizeMealTypeForInput(meal.mealType))
-    setQuantityDrafts(buildQuantityDrafts(meal.items))
-  }, [meal])
 
   async function handleMealSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { changePassword, fetchProfile, updateProfile } from '../api/profile'
 import { fetchCycleGuidance, fetchCycleSettings, updateCycleSettings } from '../api/cycle'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import { StateCard } from '../components/StateCard'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
@@ -72,11 +72,7 @@ export function ProfilePage() {
   const [cycleError, setCycleError] = useState<string | null>(null)
   const [cycleMessage, setCycleMessage] = useState<string | null>(null)
 
-  useEffect(() => {
-    void loadProfile()
-  }, [])
-
-  async function loadProfile() {
+  const loadProfile = useCallback(async () => {
     try {
       setIsLoading(true)
       setLoadError(null)
@@ -97,7 +93,11 @@ export function ProfilePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [setCurrentUser])
+
+  useEffect(() => {
+    void loadProfile()
+  }, [loadProfile])
 
   async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

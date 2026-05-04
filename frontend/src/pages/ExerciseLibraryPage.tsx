@@ -459,37 +459,58 @@ function ExerciseLibraryMedia({
   className?: string
 }) {
   const thumbnailUrl = resolveExerciseLibraryMediaUrl(item.thumbnailUrl ?? item.localMediaPath)
-  const [hasInternalError, setHasInternalError] = useState(false)
-  const [hasLoaded, setHasLoaded] = useState(false)
-
-  useEffect(() => {
-    setHasInternalError(false)
-    setHasLoaded(false)
-  }, [thumbnailUrl])
-
-  const showImage = Boolean(thumbnailUrl) && !isBroken && !hasInternalError
+  const showImage = Boolean(thumbnailUrl) && !isBroken
 
   return (
     <div className={showImage ? className : `${className} exercise-library-item-media-fallback`} aria-hidden={showImage ? undefined : 'true'}>
       {showImage ? (
-        <img
-          src={thumbnailUrl!}
-          alt={item.name}
+        <ExerciseLibraryMediaImage
+          key={thumbnailUrl!}
+          thumbnailUrl={thumbnailUrl!}
+          itemName={item.name}
           loading={loading}
-          decoding="async"
-          referrerPolicy="no-referrer"
-          className={hasLoaded ? 'is-loaded' : undefined}
-          onLoad={() => setHasLoaded(true)}
-          onError={(event) => {
-            event.currentTarget.style.display = 'none'
-            setHasInternalError(true)
-            onError()
-          }}
+          onError={onError}
         />
       ) : (
         <ExerciseLibraryMediaPlaceholder name={item.name} />
       )}
     </div>
+  )
+}
+
+function ExerciseLibraryMediaImage({
+  thumbnailUrl,
+  itemName,
+  onError,
+  loading,
+}: {
+  thumbnailUrl: string
+  itemName: string
+  onError: () => void
+  loading: 'eager' | 'lazy'
+}) {
+  const [hasInternalError, setHasInternalError] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
+
+  if (hasInternalError) {
+    return <ExerciseLibraryMediaPlaceholder name={itemName} />
+  }
+
+  return (
+    <img
+      src={thumbnailUrl}
+      alt={itemName}
+      loading={loading}
+      decoding="async"
+      referrerPolicy="no-referrer"
+      className={hasLoaded ? 'is-loaded' : undefined}
+      onLoad={() => setHasLoaded(true)}
+      onError={(event) => {
+        event.currentTarget.style.display = 'none'
+        setHasInternalError(true)
+        onError()
+      }}
+    />
   )
 }
 

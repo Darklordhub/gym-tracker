@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { fetchLatestCalorieLog, fetchRecentCalorieLogs, upsertCalorieLog } from '../api/calories'
 import { fetchLatestReadinessLog, fetchRecentReadinessLogs, upsertReadinessLog } from '../api/readiness'
 import { fetchCycleGuidance } from '../api/cycle'
@@ -73,9 +73,90 @@ export function DashboardPage() {
   const [isEditingCalories, setIsEditingCalories] = useState(false)
   const [trainingRecommendation, setTrainingRecommendation] = useState<TrainingRecommendation | null>(null)
 
+  const applyGoalState = useCallback((nextGoals: GoalSettings) => {
+    setGoals(nextGoals)
+    setGoalForm({
+      targetBodyWeightKg:
+        nextGoals.targetBodyWeightKg === null ? '' : nextGoals.targetBodyWeightKg.toString(),
+      weeklyWorkoutTarget:
+        nextGoals.weeklyWorkoutTarget === null ? '' : nextGoals.weeklyWorkoutTarget.toString(),
+      fitnessPhase: nextGoals.fitnessPhase,
+      dailyCalorieTarget:
+        nextGoals.dailyCalorieTarget === null ? '' : nextGoals.dailyCalorieTarget.toString(),
+      calorieTargetMode: nextGoals.calorieTargetMode,
+    })
+  }, [])
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setErrorMessage(null)
+      setGoalMessage(null)
+      setGoalErrorMessage(null)
+      setReadinessMessage(null)
+      setReadinessErrorMessage(null)
+      setCalorieMessage(null)
+      setCalorieErrorMessage(null)
+
+      const [
+        workoutData,
+        weightData,
+        goalsData,
+        cycleGuidanceData,
+        latestReadinessLog,
+        latestCalorieLog,
+        recentReadinessData,
+        recentCalorieData,
+        dailyTrainingRecommendation,
+      ] =
+        await Promise.all([
+          fetchWorkouts(),
+          fetchWeightEntries(),
+          fetchGoals(),
+          fetchCycleGuidance().catch(() => null),
+          fetchLatestReadinessLog().catch(() => null),
+          fetchLatestCalorieLog().catch(() => null),
+          fetchRecentReadinessLogs(7).catch(() => []),
+          fetchRecentCalorieLogs(7).catch(() => []),
+          fetchDailyTrainingRecommendation().catch(() => null),
+        ])
+
+      setWorkouts(workoutData)
+      setWeightEntries(weightData)
+      applyGoalState(goalsData)
+      setCycleGuidance(cycleGuidanceData)
+      setReadinessLog(latestReadinessLog)
+      setCalorieLog(latestCalorieLog)
+      setRecentReadinessLogs(recentReadinessData)
+      setRecentCalorieLogs(recentCalorieData)
+      setTrainingRecommendation(dailyTrainingRecommendation)
+      if (latestReadinessLog?.date === getTodayDateValue()) {
+        setReadinessForm({
+          energyLevel: latestReadinessLog.energyLevel,
+          sorenessLevel: latestReadinessLog.sorenessLevel,
+          sleepQuality: latestReadinessLog.sleepQuality,
+          motivationLevel: latestReadinessLog.motivationLevel,
+          notes: latestReadinessLog.notes ?? '',
+        })
+        setIsEditingReadiness(false)
+      }
+      if (latestCalorieLog?.date === getTodayDateValue()) {
+        setCalorieForm({
+          caloriesConsumed: latestCalorieLog.caloriesConsumed.toString(),
+          notes: latestCalorieLog.notes ?? '',
+        })
+        setIsEditingCalories(false)
+      }
+    } catch (error) {
+      setErrorMessage(getRequestErrorMessage(error, 'Unable to load dashboard data.'))
+    } finally {
+      setIsLoading(false)
+    }
+  }, [applyGoalState])
+
   useEffect(() => {
     void loadDashboard()
-  }, [])
+  }, [loadDashboard])
 
   const metrics = useMemo(() => {
     const now = new Date()
@@ -195,73 +276,6 @@ export function DashboardPage() {
     [calorieBalance, cycleGuidance, goals, readinessLog, trainingScore, workouts],
   )
 
-  async function loadDashboard() {
-    try {
-      setIsLoading(true)
-      setErrorMessage(null)
-      setGoalMessage(null)
-      setGoalErrorMessage(null)
-      setReadinessMessage(null)
-      setReadinessErrorMessage(null)
-      setCalorieMessage(null)
-      setCalorieErrorMessage(null)
-
-      const [
-        workoutData,
-        weightData,
-        goalsData,
-        cycleGuidanceData,
-        latestReadinessLog,
-        latestCalorieLog,
-        recentReadinessData,
-        recentCalorieData,
-        dailyTrainingRecommendation,
-      ] =
-        await Promise.all([
-        fetchWorkouts(),
-        fetchWeightEntries(),
-        fetchGoals(),
-        fetchCycleGuidance().catch(() => null),
-        fetchLatestReadinessLog().catch(() => null),
-        fetchLatestCalorieLog().catch(() => null),
-        fetchRecentReadinessLogs(7).catch(() => []),
-        fetchRecentCalorieLogs(7).catch(() => []),
-        fetchDailyTrainingRecommendation().catch(() => null),
-      ])
-
-      setWorkouts(workoutData)
-      setWeightEntries(weightData)
-      applyGoalState(goalsData)
-      setCycleGuidance(cycleGuidanceData)
-      setReadinessLog(latestReadinessLog)
-      setCalorieLog(latestCalorieLog)
-      setRecentReadinessLogs(recentReadinessData)
-      setRecentCalorieLogs(recentCalorieData)
-      setTrainingRecommendation(dailyTrainingRecommendation)
-      if (latestReadinessLog?.date === getTodayDateValue()) {
-        setReadinessForm({
-          energyLevel: latestReadinessLog.energyLevel,
-          sorenessLevel: latestReadinessLog.sorenessLevel,
-          sleepQuality: latestReadinessLog.sleepQuality,
-          motivationLevel: latestReadinessLog.motivationLevel,
-          notes: latestReadinessLog.notes ?? '',
-        })
-        setIsEditingReadiness(false)
-      }
-      if (latestCalorieLog?.date === getTodayDateValue()) {
-        setCalorieForm({
-          caloriesConsumed: latestCalorieLog.caloriesConsumed.toString(),
-          notes: latestCalorieLog.notes ?? '',
-        })
-        setIsEditingCalories(false)
-      }
-    } catch (error) {
-      setErrorMessage(getRequestErrorMessage(error, 'Unable to load dashboard data.'))
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   async function refreshTrainingRecommendation() {
     try {
       setTrainingRecommendation(await fetchDailyTrainingRecommendation())
@@ -295,20 +309,6 @@ export function DashboardPage() {
     } finally {
       setIsSavingGoals(false)
     }
-  }
-
-  function applyGoalState(nextGoals: GoalSettings) {
-    setGoals(nextGoals)
-    setGoalForm({
-      targetBodyWeightKg:
-        nextGoals.targetBodyWeightKg === null ? '' : nextGoals.targetBodyWeightKg.toString(),
-      weeklyWorkoutTarget:
-        nextGoals.weeklyWorkoutTarget === null ? '' : nextGoals.weeklyWorkoutTarget.toString(),
-      fitnessPhase: nextGoals.fitnessPhase,
-      dailyCalorieTarget:
-        nextGoals.dailyCalorieTarget === null ? '' : nextGoals.dailyCalorieTarget.toString(),
-      calorieTargetMode: nextGoals.calorieTargetMode,
-    })
   }
 
   async function handleReadinessSubmit(event: FormEvent<HTMLFormElement>) {

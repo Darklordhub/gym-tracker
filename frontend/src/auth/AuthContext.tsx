@@ -1,34 +1,15 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type PropsWithChildren,
 } from 'react'
 import { fetchCurrentUser, login as loginRequest, register as registerRequest } from '../api/auth'
+import { AuthContext, type AuthContextValue, type StoredAuthState } from './auth-context'
 import { setTokenGetter, setUnauthorizedHandler } from '../lib/http'
-import type { AuthResponse, AuthUser, LoginPayload, RegisterPayload } from '../types/auth'
-
-type StoredAuthState = {
-  token: string
-  expiresAtUtc: string
-  user: AuthUser
-}
-
-type AuthContextValue = {
-  authState: StoredAuthState | null
-  isAuthenticated: boolean
-  isInitializing: boolean
-  login: (payload: LoginPayload) => Promise<void>
-  register: (payload: RegisterPayload) => Promise<void>
-  setCurrentUser: (user: AuthUser) => void
-  logout: () => void
-}
+import type { AuthResponse, AuthUser } from '../types/auth'
 
 const storageKey = 'gym-tracker-auth'
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 function readStoredAuthState(): StoredAuthState | null {
   const rawValue = window.localStorage.getItem(storageKey)
@@ -194,14 +175,4 @@ export function AuthProvider({ children }: PropsWithChildren) {
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider.')
-  }
-
-  return context
 }

@@ -11,7 +11,7 @@ import {
   updateAdminUserStatus,
 } from '../api/admin'
 import { StateCard } from '../components/StateCard'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth } from '../auth/useAuth'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage, isForbiddenError } from '../lib/http'
 import type {

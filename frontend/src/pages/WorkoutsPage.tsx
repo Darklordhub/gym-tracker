@@ -2112,13 +2112,27 @@ function ExerciseHelpCard({
 
 function ExerciseHelpMedia({ item }: { item: ExerciseCatalogItem }) {
   const mediaUrl = resolveCatalogMediaUrl(item.thumbnailUrl ?? item.localMediaPath)
+
+  if (!mediaUrl) {
+    return (
+      <div className="exercise-help-media exercise-help-media-placeholder" aria-hidden="true">
+        <span className="exercise-library-item-media-fallback-icon">
+          <Dumbbell aria-hidden="true" focusable="false" strokeWidth={1.8} />
+        </span>
+        <span className="record-hint">No media yet</span>
+      </div>
+    )
+  }
+
+  return (
+    <ExerciseHelpMediaImage key={mediaUrl} itemName={item.name} mediaUrl={mediaUrl} />
+  )
+}
+
+function ExerciseHelpMediaImage({ itemName, mediaUrl }: { itemName: string; mediaUrl: string }) {
   const [hasError, setHasError] = useState(false)
 
-  useEffect(() => {
-    setHasError(false)
-  }, [mediaUrl])
-
-  if (!mediaUrl || hasError) {
+  if (hasError) {
     return (
       <div className="exercise-help-media exercise-help-media-placeholder" aria-hidden="true">
         <span className="exercise-library-item-media-fallback-icon">
@@ -2133,7 +2147,7 @@ function ExerciseHelpMedia({ item }: { item: ExerciseCatalogItem }) {
     <div className="exercise-help-media">
       <img
         src={mediaUrl}
-        alt={item.name}
+        alt={itemName}
         loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
@@ -2208,29 +2222,32 @@ function ExerciseCatalogPickerField({
   const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null)
   const deferredExerciseName = useDeferredValue(exercise.exerciseName)
   const normalizedQuery = deferredExerciseName.trim().toLowerCase()
+  const cachedResults = normalizedQuery.length >= 2
+    ? exerciseCatalogSearchCache.get(normalizedQuery) ?? null
+    : null
+  const visibleResults = useMemo(
+    () => (!isOpen || normalizedQuery.length < 2 ? [] : cachedResults ?? results),
+    [cachedResults, isOpen, normalizedQuery, results],
+  )
+  const isSearchingResults = isOpen && normalizedQuery.length >= 2 && !cachedResults && isLoading
+  const activeSearchErrorMessage =
+    isOpen && normalizedQuery.length >= 2 && !cachedResults ? searchErrorMessage : null
 
   useEffect(() => {
     let isCancelled = false
 
-    if (!isOpen || normalizedQuery.length < 2) {
-      setResults([])
-      setIsLoading(false)
-      setSearchErrorMessage(null)
+    if (!isOpen || normalizedQuery.length < 2 || cachedResults) {
       return
     }
-
-    const cachedResults = exerciseCatalogSearchCache.get(normalizedQuery)
-    if (cachedResults) {
-      setResults(cachedResults)
-      setIsLoading(false)
-      setSearchErrorMessage(null)
-      return
-    }
-
-    setIsLoading(true)
-    setSearchErrorMessage(null)
 
     const timeoutId = window.setTimeout(() => {
+      if (isCancelled) {
+        return
+      }
+
+      setIsLoading(true)
+      setSearchErrorMessage(null)
+
       void searchExerciseCatalog(deferredExerciseName.trim())
         .then((nextResults) => {
           if (isCancelled) {
@@ -2259,7 +2276,7 @@ function ExerciseCatalogPickerField({
       isCancelled = true
       window.clearTimeout(timeoutId)
     }
-  }, [deferredExerciseName, isOpen, normalizedQuery])
+  }, [cachedResults, deferredExerciseName, isOpen, normalizedQuery])
 
   return (
     <div className="catalog-picker-field">
@@ -2309,14 +2326,14 @@ function ExerciseCatalogPickerField({
 
       {isOpen && normalizedQuery.length >= 2 ? (
         <div className="catalog-suggestions-panel" role="listbox" aria-label="Exercise catalog suggestions">
-          {isLoading ? <p className="catalog-suggestion-status">Searching catalog...</p> : null}
-          {!isLoading && searchErrorMessage ? <p className="catalog-suggestion-status field-error">{searchErrorMessage}</p> : null}
-          {!isLoading && !searchErrorMessage && results.length === 0 ? (
+          {isSearchingResults ? <p className="catalog-suggestion-status">Searching catalog...</p> : null}
+          {!isSearchingResults && activeSearchErrorMessage ? <p className="catalog-suggestion-status field-error">{activeSearchErrorMessage}</p> : null}
+          {!isSearchingResults && !activeSearchErrorMessage && visibleResults.length === 0 ? (
             <p className="catalog-suggestion-status">No catalog matches. You can still keep the current manual name.</p>
           ) : null}
-          {!isLoading && !searchErrorMessage && results.length > 0 ? (
+          {!isSearchingResults && !activeSearchErrorMessage && visibleResults.length > 0 ? (
             <div className="catalog-suggestion-list">
-              {results.slice(0, 6).map((item) => (
+              {visibleResults.slice(0, 6).map((item) => (
                 <button
                   key={item.id}
                   type="button"
