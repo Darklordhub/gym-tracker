@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
@@ -35,8 +35,10 @@ import { ProfilePage } from './pages/ProfilePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { WeightPage } from './pages/WeightPage'
 import { WorkoutsPage } from './pages/WorkoutsPage'
-import { formatDate } from './lib/format'
 import { generateNotifications, type AppNotification } from './lib/notifications'
+import { StrideShell } from './components/layout/StrideShell'
+import { StrideSidebar, type StrideSidebarNavItem } from './components/layout/StrideSidebar'
+import { StrideTopbar } from './components/layout/StrideTopbar'
 
 type ThemeMode = 'light' | 'dark'
 type IconName =
@@ -213,6 +215,8 @@ function AppLayout({
   const { authState, logout } = useAuth()
   const location = useLocation()
   const accountLabel = authState?.user.displayName || authState?.user.fullName || authState?.user.email
+  const accountRole = authState?.user.role ?? 'User'
+  const accountInitials = getInitials(accountLabel)
   const isAdmin = authState?.user.role === 'Admin'
   const [isCycleEnabled, setIsCycleEnabled] = useState(false)
   const visiblePrimaryNavItems = primaryNavItems.filter((item) => item.to !== '/cycle' || isCycleEnabled)
@@ -362,288 +366,73 @@ function AppLayout({
     }
   }, [readNotificationIds.length, visibleReadNotificationIds])
 
+  const sidebarPrimaryNavItems: StrideSidebarNavItem[] = visiblePrimaryNavItems.map((item) => ({
+    to: item.to,
+    label: item.label,
+    icon: <AppIcon name={item.icon} />,
+    meta: getNavMeta(item.to),
+  }))
+  const sidebarAdminNavItems: StrideSidebarNavItem[] = visibleAdminNavItems.map((item) => ({
+    to: item.to,
+    label: item.label,
+    icon: <AppIcon name={item.icon} />,
+    meta: 'Protected controls',
+  }))
+
   return (
-    <div className="forge-shell">
-      <div className={isMobileNavOpen ? 'shell-backdrop shell-backdrop-visible' : 'shell-backdrop'} onClick={() => setIsMobileNavOpen(false)} aria-hidden="true" />
-
-      <aside
-        id="primary-navigation"
-        className={isMobileNavOpen ? 'app-sidebar app-sidebar-open' : 'app-sidebar'}
-      >
-        <div className="sidebar-inner">
-          <div className="sidebar-brand">
-            <div className="brand-mark" aria-hidden="true">
-              <span />
-            </div>
-            <div className="sidebar-brand-copy">
-              <span className="brand-kicker">FORGE</span>
-              <strong className="brand-name">{APP_BRAND_NAME}</strong>
-              <p className="brand-subtitle">Track training, recovery, and progress in one controlled workspace.</p>
-            </div>
-          </div>
-
-          <div className="sidebar-section">
-            <div className="sidebar-section-header">
-              <span>Main navigation</span>
-              <span className="sidebar-section-count">{visiblePrimaryNavItems.length}</span>
-            </div>
-            <nav className="sidebar-nav" aria-label="Main navigation">
-              {visiblePrimaryNavItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  title={item.label}
-                  className={({ isActive }) => (isActive ? 'sidebar-link sidebar-link-active' : 'sidebar-link')}
-                  onClick={() => setIsMobileNavOpen(false)}
-                >
-                  <span className="sidebar-link-icon" aria-hidden="true">
-                    <AppIcon name={item.icon} />
-                  </span>
-                  <span className="sidebar-link-copy">
-                    <span className="sidebar-link-label">{item.label}</span>
-                    <span className="sidebar-link-meta">{getNavMeta(item.to)}</span>
-                  </span>
-                </NavLink>
-              ))}
-            </nav>
-          </div>
-
-          {visibleAdminNavItems.length > 0 ? (
-            <div className="sidebar-section sidebar-section-admin">
-              <div className="sidebar-section-header">
-                <span>Admin</span>
-                <span className="sidebar-section-count">Restricted</span>
-              </div>
-              <nav className="sidebar-nav sidebar-nav-secondary" aria-label="Admin navigation">
-                {visibleAdminNavItems.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    title={item.label}
-                    className={({ isActive }) => (isActive ? 'sidebar-link sidebar-link-active' : 'sidebar-link')}
-                    onClick={() => setIsMobileNavOpen(false)}
-                  >
-                    <span className="sidebar-link-icon" aria-hidden="true">
-                      <AppIcon name={item.icon} />
-                    </span>
-                    <span className="sidebar-link-copy">
-                      <span className="sidebar-link-label">{item.label}</span>
-                      <span className="sidebar-link-meta">Protected controls</span>
-                    </span>
-                  </NavLink>
-                ))}
-              </nav>
-            </div>
-          ) : null}
-
-          <div className="sidebar-section sidebar-section-secondary">
-            <div className="sidebar-section-header">
-              <span>Account</span>
-              <span className="status-pill status-pill-lime">{authState?.user.role ?? 'User'}</span>
-            </div>
-            <div className="account-panel">
-              <div className="user-pill">
-                <div className="avatar-ring" aria-hidden="true">
-                  <div className="avatar-inner">{getInitials(accountLabel)}</div>
-                </div>
-                <div className="user-copy">
-                  <strong title={authState?.user.email}>{accountLabel}</strong>
-                  <span>{authState?.user.role ?? 'User'} access</span>
-                </div>
-              </div>
-
-              <div className="sidebar-actions">
-                <button
-                  type="button"
-                  className="ghost-button sidebar-action-button"
-                  onClick={onToggleTheme}
-                  aria-label={themeToggleLabel}
-                  title={themeToggleLabel}
-                >
-                  <AppIcon name={theme === 'light' ? 'moon' : 'sun'} />
-                  <span className="sidebar-action-label">{themeButtonLabel}</span>
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button sidebar-action-button"
-                  onClick={logout}
-                  aria-label="Log out"
-                  title="Log out"
-                >
-                  <AppIcon name="logout" />
-                  <span className="sidebar-action-label">Log out</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <div className="app-main">
-        <header className="app-topbar">
-          <div className="topbar-left">
-            <button
-              type="button"
-              className="topbar-icon-button mobile-nav-toggle"
-              aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
-              aria-expanded={isMobileNavOpen}
-              aria-controls="primary-navigation"
-              onClick={() => setIsMobileNavOpen((current) => !current)}
-            >
-              <HamburgerIcon />
-              <span className="sr-only">{isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}</span>
-            </button>
-
-            <div className="topbar-breadcrumb">
-              <span>{APP_BRAND_SHORT}</span>
-              <span className="sep">/</span>
-              <span>{topbarMeta.eyebrow}</span>
-              <span className="sep">/</span>
-              <span className="current">{topbarMeta.title}</span>
-            </div>
-
-            <div className="topbar-title-block">
-              <span className="topbar-kicker">{topbarMeta.eyebrow}</span>
-              <strong>{topbarMeta.title}</strong>
-              <p>{topbarMeta.description}</p>
-            </div>
-          </div>
-
-          <div className="tb-right">
-            <div className="topbar-actions-cluster">
-              <NotificationCenter
-                containerRef={notificationCenterRef}
-                notifications={notifications}
-                unreadCount={unreadCount}
-                isOpen={isNotificationsOpen}
-              onToggle={() => setIsNotificationsOpen((current) => !current)}
-              onMarkRead={markNotificationAsRead}
-              onMarkAllRead={markAllNotificationsAsRead}
-              readNotificationIds={visibleReadNotificationIds}
-            />
-
-              <button
-                type="button"
-                className="topbar-icon-button"
-                onClick={onToggleTheme}
-                aria-label={themeToggleLabel}
-                title={themeToggleLabel}
-              >
-                <ThemeIcon theme={theme} />
-              </button>
-            </div>
-
-            <div className="topbar-user">
-              <div className="avatar-ring" aria-hidden="true">
-                <div className="avatar-inner">{getInitials(accountLabel)}</div>
-              </div>
-              <div className="topbar-user-copy">
-                <strong title={authState?.user.email}>{accountLabel}</strong>
-                <span>{authState?.user.role ?? 'User'} account</span>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main className="app-content">
-          <div className="content-container">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-    </div>
-  )
-}
-
-function NotificationCenter({
-  containerRef,
-  notifications,
-  unreadCount,
-  isOpen,
-  onToggle,
-  onMarkRead,
-  onMarkAllRead,
-  readNotificationIds,
-}: {
-  containerRef: React.RefObject<HTMLDivElement | null>
-  notifications: AppNotification[]
-  unreadCount: number
-  isOpen: boolean
-  onToggle: () => void
-  onMarkRead: (notificationId: string) => void
-  onMarkAllRead: () => void
-  readNotificationIds: string[]
-}) {
-  return (
-    <div className="notification-center" ref={containerRef}>
-      <button
-        type="button"
-        className={isOpen ? 'topbar-icon-button notification-toggle notification-toggle-open' : 'topbar-icon-button notification-toggle'}
-        aria-expanded={isOpen}
-        aria-controls="notification-panel"
-        aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
-        onClick={onToggle}
-      >
-        <span className="notification-bell" aria-hidden="true"><BellIcon /></span>
-        {unreadCount > 0 ? <span className="notification-indicator">{unreadCount}</span> : null}
-      </button>
-
-      {isOpen ? (
-        <div id="notification-panel" className="notification-panel" role="dialog" aria-label="Notifications">
-          <div className="notification-panel-header">
-            <div>
-              <strong>Notifications</strong>
-              <p>Generated from recent workouts, goals, and progression signals.</p>
-            </div>
-            {notifications.length > 0 ? (
-              <button type="button" className="ghost-button compact-button" onClick={onMarkAllRead}>
-                Mark all read
-              </button>
-            ) : null}
-          </div>
-
-          {notifications.length === 0 ? (
-            <div className="notification-empty">
-              <strong>No notifications</strong>
-              <p>Reminders and achievements will surface here when your data suggests them.</p>
-            </div>
-          ) : (
-            <div className="notification-list">
-              {notifications.map((notification) => {
-                const isRead = readNotificationIds.includes(notification.id)
-
-                return (
-                  <article
-                    key={notification.id}
-                    className={isRead ? 'notification-card notification-card-read' : 'notification-card'}
-                  >
-                    <div className="notification-card-header">
-                      <div className="notification-card-copy">
-                        <span className="stat-label">{formatNotificationType(notification.type)}</span>
-                        <strong>{notification.title}</strong>
-                      </div>
-                      {!isRead ? <span className="notification-dot" aria-hidden="true" /> : null}
-                    </div>
-                    <p>{notification.message}</p>
-                    <div className="notification-card-footer">
-                      <span className="record-hint">{formatDate(notification.createdAt)}</span>
-                      <button
-                        type="button"
-                        className="ghost-button compact-button"
-                        onClick={() => onMarkRead(notification.id)}
-                        disabled={isRead}
-                      >
-                        {isRead ? 'Read' : 'Mark read'}
-                      </button>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      ) : null}
-    </div>
+    <StrideShell
+      isMobileNavOpen={isMobileNavOpen}
+      onCloseMobileNav={() => setIsMobileNavOpen(false)}
+      sidebar={(
+        <StrideSidebar
+          isOpen={isMobileNavOpen}
+          brandName={APP_BRAND_NAME}
+          brandKicker="FORGE"
+          brandSubtitle="Track training, recovery, and progress in one controlled workspace."
+          primaryNavItems={sidebarPrimaryNavItems}
+          adminNavItems={sidebarAdminNavItems}
+          onNavigate={() => setIsMobileNavOpen(false)}
+          roleLabel={accountRole}
+          accountLabel={accountLabel}
+          accountEmail={authState?.user.email}
+          accountInitials={accountInitials}
+          themeToggleLabel={themeToggleLabel}
+          themeButtonLabel={themeButtonLabel}
+          themeIcon={<AppIcon name={theme === 'light' ? 'moon' : 'sun'} />}
+          logoutIcon={<AppIcon name="logout" />}
+          onToggleTheme={onToggleTheme}
+          onLogout={logout}
+        />
+      )}
+      topbar={(
+        <StrideTopbar
+          isMobileNavOpen={isMobileNavOpen}
+          onToggleMobileNav={() => setIsMobileNavOpen((current) => !current)}
+          navigationControlsId="primary-navigation"
+          brandShort={APP_BRAND_SHORT}
+          topbarMeta={topbarMeta}
+          notificationCenterRef={notificationCenterRef}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          isNotificationsOpen={isNotificationsOpen}
+          onToggleNotifications={() => setIsNotificationsOpen((current) => !current)}
+          onMarkNotificationRead={markNotificationAsRead}
+          onMarkAllNotificationsRead={markAllNotificationsAsRead}
+          readNotificationIds={visibleReadNotificationIds}
+          menuIcon={<HamburgerIcon />}
+          notificationBellIcon={<BellIcon />}
+          themeIcon={<ThemeIcon theme={theme} />}
+          themeToggleLabel={themeToggleLabel}
+          onToggleTheme={onToggleTheme}
+          accountLabel={accountLabel}
+          accountEmail={authState?.user.email}
+          accountInitials={accountInitials}
+          roleLabel={accountRole}
+        />
+      )}
+    >
+      <Outlet />
+    </StrideShell>
   )
 }
 
@@ -690,19 +479,6 @@ function getStoredReadNotificationIds() {
     return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : []
   } catch {
     return []
-  }
-}
-
-function formatNotificationType(type: AppNotification['type']) {
-  switch (type) {
-    case 'weekly-goal-reminder':
-      return 'Weekly reminder'
-    case 'inactivity-reminder':
-      return 'Inactivity'
-    case 'pr-opportunity':
-      return 'PR opportunity'
-    case 'goal-achievement':
-      return 'Achievement'
   }
 }
 
