@@ -72,6 +72,10 @@ const primaryNavItems: readonly NavItem[] = [
   { to: '/profile', label: 'Profile', icon: 'profile' },
 ] as const
 
+const adminNavItems: readonly NavItem[] = [
+  { to: '/admin', label: 'Admin', icon: 'admin' },
+] as const
+
 const routeMeta: Record<string, { title: string; eyebrow: string; description: string }> = {
   '/dashboard': {
     title: 'Command Center',
@@ -96,7 +100,7 @@ const routeMeta: Record<string, { title: string; eyebrow: string; description: s
   '/nutrition': {
     title: 'Nutrition Builder',
     eyebrow: 'Nutrition',
-    description: 'Search USDA foods, manage meals by day, and keep nutrition edits isolated from legacy calorie logs.',
+    description: 'Search USDA foods, manage meals by day, and sync meal-managed totals into the daily calorie workspace.',
   },
   '/exercise-library': {
     title: 'Exercise Library',
@@ -211,9 +215,8 @@ function AppLayout({
   const accountLabel = authState?.user.displayName || authState?.user.fullName || authState?.user.email
   const isAdmin = authState?.user.role === 'Admin'
   const [isCycleEnabled, setIsCycleEnabled] = useState(false)
-  const navItems = (isAdmin
-    ? [...primaryNavItems, { to: '/admin', label: 'Admin', icon: 'admin' as const }]
-    : primaryNavItems).filter((item) => item.to !== '/cycle' || isCycleEnabled)
+  const visiblePrimaryNavItems = primaryNavItems.filter((item) => item.to !== '/cycle' || isCycleEnabled)
+  const visibleAdminNavItems = isAdmin ? adminNavItems : []
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => getStoredReadNotificationIds())
@@ -226,6 +229,42 @@ function AppLayout({
   }
   const themeToggleLabel = `Switch to ${theme === 'light' ? 'dark' : 'light'} mode`
   const themeButtonLabel = theme === 'light' ? 'Dark mode' : 'Light mode'
+
+  async function loadNotifications() {
+    try {
+      const [workoutData, goalData] = await Promise.all([fetchWorkouts(), fetchGoals().catch(() => null)])
+      setNotifications(generateNotifications(workoutData, goalData))
+    } catch {
+      setNotifications([])
+    }
+  }
+
+  async function loadCycleVisibility() {
+    try {
+      const settings = await fetchCycleSettings()
+      setIsCycleEnabled(settings.isEnabled)
+    } catch {
+      setIsCycleEnabled(false)
+    }
+  }
+
+  function markNotificationAsRead(notificationId: string) {
+    setReadNotificationIds((current) => {
+      if (current.includes(notificationId)) {
+        return current
+      }
+
+      const next = [...current, notificationId]
+      window.localStorage.setItem(NOTIFICATION_READ_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  function markAllNotificationsAsRead() {
+    const allIds = notifications.map((notification) => notification.id)
+    setReadNotificationIds(allIds)
+    window.localStorage.setItem(NOTIFICATION_READ_STORAGE_KEY, JSON.stringify(allIds))
+  }
 
   useEffect(() => {
     setIsMobileNavOpen(false)
@@ -299,42 +338,6 @@ function AppLayout({
     [notifications, readNotificationIds],
   )
 
-  async function loadNotifications() {
-    try {
-      const [workoutData, goalData] = await Promise.all([fetchWorkouts(), fetchGoals().catch(() => null)])
-      setNotifications(generateNotifications(workoutData, goalData))
-    } catch {
-      setNotifications([])
-    }
-  }
-
-  async function loadCycleVisibility() {
-    try {
-      const settings = await fetchCycleSettings()
-      setIsCycleEnabled(settings.isEnabled)
-    } catch {
-      setIsCycleEnabled(false)
-    }
-  }
-
-  function markNotificationAsRead(notificationId: string) {
-    setReadNotificationIds((current) => {
-      if (current.includes(notificationId)) {
-        return current
-      }
-
-      const next = [...current, notificationId]
-      window.localStorage.setItem(NOTIFICATION_READ_STORAGE_KEY, JSON.stringify(next))
-      return next
-    })
-  }
-
-  function markAllNotificationsAsRead() {
-    const allIds = notifications.map((notification) => notification.id)
-    setReadNotificationIds(allIds)
-    window.localStorage.setItem(NOTIFICATION_READ_STORAGE_KEY, JSON.stringify(allIds))
-  }
-
   return (
     <div className="forge-shell">
       <div className={isMobileNavOpen ? 'shell-backdrop shell-backdrop-visible' : 'shell-backdrop'} onClick={() => setIsMobileNavOpen(false)} aria-hidden="true" />
@@ -357,16 +360,17 @@ function AppLayout({
 
           <div className="sidebar-section">
             <div className="sidebar-section-header">
-              <span>Navigation</span>
-              <span className="sidebar-section-count">{navItems.length}</span>
+              <span>Main navigation</span>
+              <span className="sidebar-section-count">{visiblePrimaryNavItems.length}</span>
             </div>
-            <nav className="sidebar-nav" aria-label="Primary">
-              {navItems.map((item) => (
+            <nav className="sidebar-nav" aria-label="Main navigation">
+              {visiblePrimaryNavItems.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   title={item.label}
                   className={({ isActive }) => (isActive ? 'sidebar-link sidebar-link-active' : 'sidebar-link')}
+                  onClick={() => setIsMobileNavOpen(false)}
                 >
                   <span className="sidebar-link-icon" aria-hidden="true">
                     <AppIcon name={item.icon} />
@@ -379,6 +383,34 @@ function AppLayout({
               ))}
             </nav>
           </div>
+
+          {visibleAdminNavItems.length > 0 ? (
+            <div className="sidebar-section sidebar-section-admin">
+              <div className="sidebar-section-header">
+                <span>Admin</span>
+                <span className="sidebar-section-count">Restricted</span>
+              </div>
+              <nav className="sidebar-nav sidebar-nav-secondary" aria-label="Admin navigation">
+                {visibleAdminNavItems.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    title={item.label}
+                    className={({ isActive }) => (isActive ? 'sidebar-link sidebar-link-active' : 'sidebar-link')}
+                    onClick={() => setIsMobileNavOpen(false)}
+                  >
+                    <span className="sidebar-link-icon" aria-hidden="true">
+                      <AppIcon name={item.icon} />
+                    </span>
+                    <span className="sidebar-link-copy">
+                      <span className="sidebar-link-label">{item.label}</span>
+                      <span className="sidebar-link-meta">Protected controls</span>
+                    </span>
+                  </NavLink>
+                ))}
+              </nav>
+            </div>
+          ) : null}
 
           <div className="sidebar-section sidebar-section-secondary">
             <div className="sidebar-section-header">
@@ -429,6 +461,7 @@ function AppLayout({
             <button
               type="button"
               className="topbar-icon-button mobile-nav-toggle"
+              aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={isMobileNavOpen}
               aria-controls="primary-navigation"
               onClick={() => setIsMobileNavOpen((current) => !current)}
@@ -453,26 +486,28 @@ function AppLayout({
           </div>
 
           <div className="tb-right">
-            <NotificationCenter
-              containerRef={notificationCenterRef}
-              notifications={notifications}
-              unreadCount={unreadCount}
-              isOpen={isNotificationsOpen}
-              onToggle={() => setIsNotificationsOpen((current) => !current)}
-              onMarkRead={markNotificationAsRead}
-              onMarkAllRead={markAllNotificationsAsRead}
-              readNotificationIds={readNotificationIds}
-            />
+            <div className="topbar-actions-cluster">
+              <NotificationCenter
+                containerRef={notificationCenterRef}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                isOpen={isNotificationsOpen}
+                onToggle={() => setIsNotificationsOpen((current) => !current)}
+                onMarkRead={markNotificationAsRead}
+                onMarkAllRead={markAllNotificationsAsRead}
+                readNotificationIds={readNotificationIds}
+              />
 
-            <button
-              type="button"
-              className="topbar-icon-button"
-              onClick={onToggleTheme}
-              aria-label={themeToggleLabel}
-              title={themeToggleLabel}
-            >
-              <ThemeIcon theme={theme} />
-            </button>
+              <button
+                type="button"
+                className="topbar-icon-button"
+                onClick={onToggleTheme}
+                aria-label={themeToggleLabel}
+                title={themeToggleLabel}
+              >
+                <ThemeIcon theme={theme} />
+              </button>
+            </div>
 
             <div className="topbar-user">
               <div className="avatar-ring" aria-hidden="true">
