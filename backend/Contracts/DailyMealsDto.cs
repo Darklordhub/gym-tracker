@@ -10,4 +10,8 @@ public class DailyMealsDto
     public decimal TotalFat { get; set; }
     public decimal? TotalFiber { get; set; }
     public decimal? TotalSugar { get; set; }
+    public bool CaloriesLinkedToDailyLog { get; set; }
+    public string? SourceMode { get; set; }
+    public string? ConflictMessage { get; set; }
+    public int? DailyLogCalories { get; set; }
 }

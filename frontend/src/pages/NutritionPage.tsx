@@ -8,12 +8,13 @@ import {
   getDailyMeals,
   getFoodDetail,
   searchFoods,
+  switchDayToMeals,
   updateMeal,
   updateMealItem,
 } from '../api/nutritionApi'
 import { StateCard } from '../components/StateCard'
 import { formatDate, getTodayDateValue } from '../lib/format'
-import { getRequestErrorMessage, isNotFoundError } from '../lib/http'
+import { getRequestErrorMessage, isConflictError, isNotFoundError } from '../lib/http'
 import type {
   DailyMeals,
   NutritionFoodDetail,
@@ -67,6 +68,7 @@ export function NutritionPage() {
   const [isRefreshingMeals, setIsRefreshingMeals] = useState(false)
   const [mealsErrorMessage, setMealsErrorMessage] = useState<string | null>(null)
   const [pageFeedback, setPageFeedback] = useState<PageFeedback>(null)
+  const [manualModeConflictMessage, setManualModeConflictMessage] = useState<string | null>(null)
   const [targetMealId, setTargetMealId] = useState<number | null>(null)
 
   const [createMealForm, setCreateMealForm] = useState<CreateMealFormState>(initialCreateMealFormState)
@@ -91,6 +93,7 @@ export function NutritionPage() {
   const [quantityInput, setQuantityInput] = useState('100')
   const [unit, setUnit] = useState(GRAM_UNIT)
   const [isAddingItem, setIsAddingItem] = useState(false)
+  const [isSwitchingToMeals, setIsSwitchingToMeals] = useState(false)
 
   const latestMealsRequestRef = useRef(0)
   const latestSearchRequestRef = useRef(0)
@@ -173,6 +176,10 @@ export function NutritionPage() {
   const mealCount = activeDailyMeals?.meals.length ?? 0
   const groupedMeals = buildMealGroups(activeDailyMeals?.meals ?? [])
   const targetMeal = activeDailyMeals?.meals.find((meal) => meal.id === targetMealId) ?? null
+  const selectedDaySourceMode = activeDailyMeals?.sourceMode ?? null
+  const isMealManagedDay = selectedDaySourceMode === 'meals'
+  const isManualCalorieDay = selectedDaySourceMode === 'manual'
+  const activeConflictMessage = manualModeConflictMessage ?? activeDailyMeals?.conflictMessage ?? null
   const quantityValue = parsePositiveNumber(quantityInput)
   const quantityError =
     quantityInput.trim().length === 0
@@ -190,6 +197,7 @@ export function NutritionPage() {
     quantityError,
     unit,
     foodDetailStatus,
+    manualModeConflictMessage: isManualCalorieDay ? activeConflictMessage : null,
   })
   const canAddFoodToMeal =
     Boolean(selectedFoodDetail)
@@ -199,8 +207,10 @@ export function NutritionPage() {
     && unit === GRAM_UNIT
     && !selectedFoodLoading
     && !selectedFoodError
+    && !(isManualCalorieDay && activeConflictMessage)
     && !isAddingItem
   const selectedFoodPreview = buildFoodPreview(selectedFoodDetail, quantityValue)
+  const canSwitchToMeals = Boolean(activeConflictMessage)
 
   async function loadDailyMeals(dateValue: string, preferredMealId?: number | null) {
     const requestId = ++latestMealsRequestRef.current
@@ -220,10 +230,7 @@ export function NutritionPage() {
         return
       }
 
-      setDailyMeals(nextDailyMeals)
-      setTargetMealId((currentTargetMealId) =>
-        resolveTargetMealId(nextDailyMeals.meals, preferredMealId ?? null, currentTargetMealId),
-      )
+      syncDailyMealsState(nextDailyMeals, preferredMealId ?? null)
     } catch (error) {
       if (requestId !== latestMealsRequestRef.current) {
         return
@@ -236,6 +243,29 @@ export function NutritionPage() {
         setIsRefreshingMeals(false)
       }
     }
+  }
+
+  function syncDailyMealsState(nextDailyMeals: DailyMeals, preferredMealId?: number | null) {
+    setDailyMeals(nextDailyMeals)
+    setManualModeConflictMessage(nextDailyMeals.conflictMessage ?? null)
+    setTargetMealId((currentTargetMealId) =>
+      resolveTargetMealId(nextDailyMeals.meals, preferredMealId ?? null, currentTargetMealId),
+    )
+  }
+
+  function captureMealModeConflict(error: unknown) {
+    if (!isConflictError(error)) {
+      return false
+    }
+
+    const conflictMessage = getRequestErrorMessage(
+      error,
+      'This day already has a manual calorie entry. Switch to meal tracking to replace it.',
+    )
+
+    setManualModeConflictMessage(conflictMessage)
+    setPageFeedback({ tone: 'error', message: conflictMessage })
+    return true
   }
 
   async function resolveSearchResults(results: NutritionFoodSearchResult[], requestId: number) {
@@ -407,6 +437,10 @@ export function NutritionPage() {
       await loadDailyMeals(selectedDate, meal.id)
       setPageFeedback({ tone: 'success', message: `Meal created for ${formatMealType(meal.mealType)}.` })
     } catch (error) {
+      if (captureMealModeConflict(error)) {
+        return
+      }
+
       setPageFeedback({
         tone: 'error',
         message: getRequestErrorMessage(error, 'Unable to create a meal right now.'),
@@ -425,6 +459,10 @@ export function NutritionPage() {
       setPageFeedback({ tone: 'success', message: 'Meal updated.' })
       return true
     } catch (error) {
+      if (captureMealModeConflict(error)) {
+        return false
+      }
+
       setPageFeedback({
         tone: 'error',
         message: getRequestErrorMessage(error, 'Unable to update this meal.'),
@@ -479,8 +517,17 @@ export function NutritionPage() {
         unit,
       })
       await loadDailyMeals(selectedDate, targetMealId)
-      setPageFeedback({ tone: 'success', message: `${selectedFoodDetail.name} added to ${targetMealName}.` })
+      setPageFeedback({
+        tone: 'success',
+        message: isMealManagedDay
+          ? `${selectedFoodDetail.name} added to ${targetMealName}. Daily calories updated from meals.`
+          : `${selectedFoodDetail.name} added to ${targetMealName}.`,
+      })
     } catch (error) {
+      if (captureMealModeConflict(error)) {
+        return
+      }
+
       setPageFeedback({
         tone: 'error',
         message: getRequestErrorMessage(error, 'Unable to add this food to the selected meal.'),
@@ -499,6 +546,10 @@ export function NutritionPage() {
       setPageFeedback({ tone: 'success', message: 'Meal item updated.' })
       return true
     } catch (error) {
+      if (captureMealModeConflict(error)) {
+        return false
+      }
+
       setPageFeedback({
         tone: 'error',
         message: getRequestErrorMessage(error, 'Unable to update this meal item.'),
@@ -531,6 +582,26 @@ export function NutritionPage() {
     }
   }
 
+  async function handleSwitchToMealTracking() {
+    try {
+      setIsSwitchingToMeals(true)
+      setPageFeedback(null)
+      const nextDailyMeals = await switchDayToMeals(selectedDate)
+      syncDailyMealsState(nextDailyMeals, targetMealId)
+      setPageFeedback({
+        tone: 'success',
+        message: 'Meal tracking now controls the daily calorie total for this date.',
+      })
+    } catch (error) {
+      setPageFeedback({
+        tone: 'error',
+        message: getRequestErrorMessage(error, 'Unable to switch this day to meal tracking.'),
+      })
+    } finally {
+      setIsSwitchingToMeals(false)
+    }
+  }
+
   return (
     <main className="page-shell nutrition-shell">
       <section className="panel nutrition-toolbar-panel">
@@ -538,7 +609,7 @@ export function NutritionPage() {
           <span className="eyebrow">FORGE / Nutrition</span>
           <h1>Nutrition</h1>
           <p>
-            Search USDA foods, load reliable detail before adding anything, and manage daily meals without changing the existing calorie log.
+            Search USDA foods, build saved meals, and sync daily calorie totals when the selected day is in meal-managed mode.
           </p>
         </div>
 
@@ -572,7 +643,9 @@ export function NutritionPage() {
             <div className="panel-header">
               <div>
                 <h2>Daily summary</h2>
-                <p>These totals come from saved meals only. Existing calorie tracking remains untouched until a later phase.</p>
+                <p>
+                  These totals come from saved meals. When a day is meal-managed, the same totals also update the existing daily calorie log.
+                </p>
               </div>
               {isRefreshingMeals ? <span className="record-hint">Refreshing day…</span> : null}
             </div>
@@ -585,6 +658,50 @@ export function NutritionPage() {
               <NutritionStatCard label="Fiber" value={activeDailyMeals?.totalFiber ?? 0} unit="g" />
               <NutritionStatCard label="Sugar" value={activeDailyMeals?.totalSugar ?? 0} unit="g" />
             </div>
+          </section>
+
+          <section className={isMealManagedDay ? 'panel nutrition-mode-panel nutrition-mode-panel-meals' : 'panel nutrition-mode-panel'}>
+            <div className="nutrition-mode-panel-header">
+              <div>
+                <span className="eyebrow">Daily log mode</span>
+                <h2>{isMealManagedDay ? 'Meal-managed mode' : isManualCalorieDay ? 'Manual calorie mode' : 'No daily calorie entry yet'}</h2>
+                <p>
+                  {isMealManagedDay
+                    ? 'Saved meal changes automatically update the existing daily calorie total and macros for this date.'
+                    : isManualCalorieDay
+                      ? 'A manual calorie entry already exists for this date. Switch to meal tracking before using saved meals as the daily calorie source.'
+                      : 'Create meals normally. The daily calorie log will be created automatically once this date is managed by meals.'}
+                </p>
+              </div>
+
+              {canSwitchToMeals ? (
+                <button
+                  type="button"
+                  className="primary-button compact-button"
+                  onClick={() => void handleSwitchToMealTracking()}
+                  disabled={isSwitchingToMeals}
+                >
+                  {isSwitchingToMeals ? 'Switching...' : 'Switch to meal tracking'}
+                </button>
+              ) : null}
+            </div>
+
+            <div className="nutrition-toolbar-pills">
+              <span className="info-pill">
+                {activeDailyMeals?.dailyLogCalories !== null && activeDailyMeals?.dailyLogCalories !== undefined
+                  ? `Daily log: ${activeDailyMeals.dailyLogCalories} kcal`
+                  : 'Daily log: none yet'}
+              </span>
+              <span className="info-pill">
+                {activeDailyMeals?.caloriesLinkedToDailyLog ? 'Meals linked to daily log' : 'Meals not linked to daily log'}
+              </span>
+            </div>
+
+            {activeConflictMessage ? (
+              <div className="feedback error nutrition-mode-conflict">
+                {activeConflictMessage}
+              </div>
+            ) : null}
           </section>
 
           <section className="panel nutrition-create-meal-panel">
@@ -1330,6 +1447,7 @@ function getAddFoodValidationMessage({
   selectedFoodDetail,
   selectedFoodError,
   selectedFoodLoading,
+  manualModeConflictMessage,
   targetMealId,
   quantityError,
   unit,
@@ -1339,6 +1457,7 @@ function getAddFoodValidationMessage({
   selectedFoodDetail: NutritionFoodDetail | null
   selectedFoodError: string | null
   selectedFoodLoading: boolean
+  manualModeConflictMessage: string | null
   targetMealId: number | null
   quantityError: string | null
   unit: string
@@ -1362,6 +1481,10 @@ function getAddFoodValidationMessage({
 
   if (foodDetailStatus.message) {
     return foodDetailStatus.message
+  }
+
+  if (manualModeConflictMessage) {
+    return manualModeConflictMessage
   }
 
   if (!targetMealId) {

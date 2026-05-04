@@ -2,6 +2,7 @@ using backend.Contracts;
 using backend.Data;
 using backend.Extensions;
 using backend.Models;
+using backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -75,6 +76,11 @@ public class CaloriesController : ControllerBase
                 UserId = userId,
                 Date = request.Date,
                 CaloriesConsumed = request.CaloriesConsumed,
+                SourceMode = CalorieLogSourceModes.Manual,
+                TotalProtein = null,
+                TotalCarbs = null,
+                TotalFat = null,
+                LastRolledUpAt = null,
                 Notes = NormalizeOptionalText(request.Notes),
                 CreatedAt = now,
                 UpdatedAt = now,
@@ -86,7 +92,20 @@ public class CaloriesController : ControllerBase
             return CreatedAtAction(nameof(GetLatest), MapLog(createdLog));
         }
 
+        if (existingLog.SourceMode == CalorieLogSourceModes.Meals)
+        {
+            return Conflict(new
+            {
+                message = "This day is currently managed by meals. Meal totals control the daily calorie entry.",
+            });
+        }
+
         existingLog.CaloriesConsumed = request.CaloriesConsumed;
+        existingLog.SourceMode = CalorieLogSourceModes.Manual;
+        existingLog.TotalProtein = null;
+        existingLog.TotalCarbs = null;
+        existingLog.TotalFat = null;
+        existingLog.LastRolledUpAt = null;
         existingLog.Notes = NormalizeOptionalText(request.Notes);
         existingLog.UpdatedAt = now;
 
@@ -102,6 +121,11 @@ public class CaloriesController : ControllerBase
             Id = log.Id,
             Date = log.Date,
             CaloriesConsumed = log.CaloriesConsumed,
+            SourceMode = log.SourceMode,
+            TotalProtein = log.TotalProtein,
+            TotalCarbs = log.TotalCarbs,
+            TotalFat = log.TotalFat,
+            LastRolledUpAt = log.LastRolledUpAt,
             Notes = log.Notes,
             CreatedAt = log.CreatedAt,
             UpdatedAt = log.UpdatedAt,

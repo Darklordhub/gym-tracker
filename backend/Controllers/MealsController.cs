@@ -64,6 +64,11 @@ public class MealsController : ControllerBase
             var meal = await _mealService.CreateMealAsync(userId, date, request, cancellationToken);
             return CreatedAtAction(nameof(GetMealById), new { mealId = meal.Id }, meal);
         }
+        catch (NutritionModeConflictException exception)
+        {
+            _logger.LogInformation(exception, "Meal creation conflicted with manual calorie mode for date {Date}.", date);
+            return Conflict(new { message = exception.Message });
+        }
         catch (ArgumentException exception)
         {
             _logger.LogWarning(exception, "Meal creation request was rejected.");
@@ -83,6 +88,33 @@ public class MealsController : ControllerBase
             return Problem(
                 title: "Unable to create meal.",
                 detail: "An unexpected server error occurred while creating the meal.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    [HttpPost("days/{date}/switch-to-meals")]
+    public async Task<ActionResult<DailyMealsDto>> SwitchDayToMeals(DateOnly date, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var userId = User.GetRequiredUserId();
+            var result = await _mealService.SwitchDayToMealsAsync(userId, date, cancellationToken);
+            return Ok(result);
+        }
+        catch (InvalidOperationException exception)
+        {
+            _logger.LogWarning(exception, "Switch to meals failed because the authenticated user context was invalid.");
+            return Problem(
+                title: "Unable to switch to meal tracking.",
+                detail: "The current user context could not be resolved for this request.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Unexpected error while switching date {Date} to meal tracking.", date);
+            return Problem(
+                title: "Unable to switch to meal tracking.",
+                detail: "An unexpected server error occurred while switching the day to meal tracking.",
                 statusCode: StatusCodes.Status500InternalServerError);
         }
     }
@@ -130,6 +162,11 @@ public class MealsController : ControllerBase
             var userId = User.GetRequiredUserId();
             var meal = await _mealService.UpdateMealAsync(userId, mealId, request, cancellationToken);
             return meal is null ? NotFound() : Ok(meal);
+        }
+        catch (NutritionModeConflictException exception)
+        {
+            _logger.LogInformation(exception, "Meal update conflicted with manual calorie mode for meal {MealId}.", mealId);
+            return Conflict(new { message = exception.Message });
         }
         catch (ArgumentException exception)
         {
@@ -200,6 +237,11 @@ public class MealsController : ControllerBase
                 ? NotFound()
                 : CreatedAtAction(nameof(GetMealById), new { mealId }, item);
         }
+        catch (NutritionModeConflictException exception)
+        {
+            _logger.LogInformation(exception, "Meal item creation conflicted with manual calorie mode for meal {MealId}.", mealId);
+            return Conflict(new { message = exception.Message });
+        }
         catch (ArgumentException exception)
         {
             _logger.LogWarning(exception, "Meal item creation request was rejected.");
@@ -247,6 +289,11 @@ public class MealsController : ControllerBase
             var userId = User.GetRequiredUserId();
             var item = await _mealService.UpdateMealItemAsync(userId, mealItemId, request, cancellationToken);
             return item is null ? NotFound() : Ok(item);
+        }
+        catch (NutritionModeConflictException exception)
+        {
+            _logger.LogInformation(exception, "Meal item update conflicted with manual calorie mode for item {MealItemId}.", mealItemId);
+            return Conflict(new { message = exception.Message });
         }
         catch (ArgumentException exception)
         {

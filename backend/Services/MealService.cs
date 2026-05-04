@@ -9,11 +9,16 @@ public class MealService : IMealService
 {
     private readonly AppDbContext _dbContext;
     private readonly INutritionService _nutritionService;
+    private readonly INutritionRollupService _nutritionRollupService;
 
-    public MealService(AppDbContext dbContext, INutritionService nutritionService)
+    public MealService(
+        AppDbContext dbContext,
+        INutritionService nutritionService,
+        INutritionRollupService nutritionRollupService)
     {
         _dbContext = dbContext;
         _nutritionService = nutritionService;
+        _nutritionRollupService = nutritionRollupService;
     }
 
     public async Task<DailyMealsDto> GetMealsForDateAsync(int userId, DateOnly date, CancellationToken cancellationToken)
@@ -25,6 +30,10 @@ public class MealService : IMealService
             .OrderBy(meal => meal.MealType)
             .ThenBy(meal => meal.Id)
             .ToListAsync(cancellationToken);
+        var dailyLog = await _dbContext.UserCalorieLogs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(log => log.UserId == userId && log.Date == date, cancellationToken);
+        var hasManualConflict = dailyLog?.SourceMode == CalorieLogSourceModes.Manual && meals.Count > 0;
 
         return new DailyMealsDto
         {
@@ -36,7 +45,22 @@ public class MealService : IMealService
             TotalFat = Round(meals.Sum(meal => meal.TotalFat)),
             TotalFiber = SumNullable(meals.Select(meal => meal.TotalFiber)),
             TotalSugar = SumNullable(meals.Select(meal => meal.TotalSugar)),
+            CaloriesLinkedToDailyLog = dailyLog?.SourceMode == CalorieLogSourceModes.Meals,
+            SourceMode = dailyLog?.SourceMode,
+            ConflictMessage = hasManualConflict ? NutritionModeConflictException.ManualCalorieEntryMessage : null,
+            DailyLogCalories = dailyLog?.CaloriesConsumed,
         };
+    }
+
+    public async Task<DailyMealsDto> SwitchDayToMealsAsync(int userId, DateOnly date, CancellationToken cancellationToken)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        await _nutritionRollupService.SwitchDayToMealsAsync(userId, date, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return await GetMealsForDateAsync(userId, date, cancellationToken);
     }
 
     public async Task<UserMealDto?> GetMealByIdAsync(int userId, int mealId, CancellationToken cancellationToken)
@@ -53,6 +77,7 @@ public class MealService : IMealService
     public async Task<UserMealDto> CreateMealAsync(int userId, DateOnly date, CreateMealRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var now = DateTime.UtcNow;
         var meal = new UserMeal
@@ -74,6 +99,9 @@ public class MealService : IMealService
 
         _dbContext.UserMeals.Add(meal);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _nutritionRollupService.RollupDayAsync(userId, date, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return await GetMealByIdAsync(userId, meal.Id, cancellationToken)
             ?? throw new InvalidOperationException($"Created meal '{meal.Id}' could not be reloaded.");
@@ -82,6 +110,7 @@ public class MealService : IMealService
     public async Task<UserMealDto?> UpdateMealAsync(int userId, int mealId, UpdateMealRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var meal = await _dbContext.UserMeals
             .Include(currentMeal => currentMeal.Items)
@@ -92,6 +121,7 @@ public class MealService : IMealService
             return null;
         }
 
+        var originalDate = meal.Date;
         meal.Date = request.Date;
         meal.MealType = NormalizeMealType(request.MealType);
         meal.Title = NormalizeOptionalText(request.Title);
@@ -99,12 +129,23 @@ public class MealService : IMealService
         meal.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _nutritionRollupService.RollupDayAsync(userId, request.Date, cancellationToken);
+
+        if (originalDate != request.Date)
+        {
+            await _nutritionRollupService.RollupDayAsync(userId, originalDate, cancellationToken);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return MapMeal(meal);
     }
 
     public async Task<bool> DeleteMealAsync(int userId, int mealId, CancellationToken cancellationToken)
     {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
         var meal = await _dbContext.UserMeals
             .FirstOrDefaultAsync(currentMeal => currentMeal.Id == mealId && currentMeal.UserId == userId, cancellationToken);
 
@@ -113,14 +154,19 @@ public class MealService : IMealService
             return false;
         }
 
+        var mealDate = meal.Date;
         _dbContext.UserMeals.Remove(meal);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _nutritionRollupService.RollupDayAsync(userId, mealDate, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
 
     public async Task<UserMealItemDto?> AddMealItemAsync(int userId, int mealId, AddMealItemRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var meal = await _dbContext.UserMeals
             .Include(currentMeal => currentMeal.Items)
@@ -184,6 +230,9 @@ public class MealService : IMealService
         meal.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _nutritionRollupService.RollupDayAsync(userId, meal.Date, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return MapMealItem(mealItem);
     }
@@ -191,6 +240,7 @@ public class MealService : IMealService
     public async Task<UserMealItemDto?> UpdateMealItemAsync(int userId, int mealItemId, UpdateMealItemRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var mealItem = await _dbContext.UserMealItems
             .Include(item => item.UserMeal)
@@ -229,12 +279,17 @@ public class MealService : IMealService
         mealItem.UserMeal.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _nutritionRollupService.RollupDayAsync(userId, mealItem.UserMeal.Date, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return MapMealItem(mealItem);
     }
 
     public async Task<bool> DeleteMealItemAsync(int userId, int mealItemId, CancellationToken cancellationToken)
     {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
         var mealItem = await _dbContext.UserMealItems
             .Include(item => item.UserMeal)
             .ThenInclude(meal => meal!.Items)
@@ -256,6 +311,9 @@ public class MealService : IMealService
         meal.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _nutritionRollupService.RollupDayAsync(userId, meal.Date, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
 

@@ -8826,6 +8826,39 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.nutrition-mode-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.nutrition-mode-panel-meals {
+  border-color: rgba(45, 217, 184, 0.28);
+  background:
+    linear-gradient(160deg, rgba(45, 217, 184, 0.04), transparent 55%),
+    var(--surface-overlay);
+}
+
+.nutrition-mode-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+
+.nutrition-mode-panel-header h2 {
+  margin: 8px 0 0;
+}
+
+.nutrition-mode-panel-header p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  max-width: 52rem;
+}
+
+.nutrition-mode-conflict {
+  margin: 0;
+}
+
 .nutrition-stat-card {
   display: grid;
   gap: 6px;
@@ -9189,7 +9222,8 @@ body {
   .nutrition-search-result-header,
   .nutrition-search-result-footer,
   .nutrition-preview-heading,
-  .nutrition-item-actions {
+  .nutrition-item-actions,
+  .nutrition-mode-panel-header {
     flex-direction: column;
   }
 

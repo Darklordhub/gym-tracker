@@ -89,6 +89,11 @@ public class AppDbContext : DbContext
             .HasMaxLength(500);
 
         modelBuilder.Entity<UserCalorieLog>()
+            .Property(log => log.SourceMode)
+            .HasMaxLength(20)
+            .HasDefaultValue(CalorieLogSourceModes.Manual);
+
+        modelBuilder.Entity<UserCalorieLog>()
             .Property(log => log.Notes)
             .HasMaxLength(500);
 

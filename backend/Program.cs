@@ -59,6 +59,7 @@ builder.Services.AddScoped<ExerciseCatalogService>();
 builder.Services.AddScoped<ExerciseCatalogSeedService>();
 builder.Services.AddScoped<IAiWorkoutGeneratorService, AiWorkoutGeneratorService>();
 builder.Services.AddScoped<INutritionService, NutritionService>();
+builder.Services.AddScoped<INutritionRollupService, NutritionRollupService>();
 builder.Services.AddScoped<IMealService, MealService>();
 builder.Services.AddScoped<ExerciseCatalogMediaEnrichmentService>();
 builder.Services.AddHttpClient<UsdaNutritionProvider>(httpClient =>

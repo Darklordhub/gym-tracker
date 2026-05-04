@@ -6,6 +6,8 @@ public interface IMealService
 {
     Task<DailyMealsDto> GetMealsForDateAsync(int userId, DateOnly date, CancellationToken cancellationToken);
 
+    Task<DailyMealsDto> SwitchDayToMealsAsync(int userId, DateOnly date, CancellationToken cancellationToken);
+
     Task<UserMealDto?> GetMealByIdAsync(int userId, int mealId, CancellationToken cancellationToken);
 
     Task<UserMealDto> CreateMealAsync(int userId, DateOnly date, CreateMealRequest request, CancellationToken cancellationToken);

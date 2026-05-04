@@ -85,6 +85,10 @@ export type DailyMeals = {
   totalFat: number
   totalFiber: number | null
   totalSugar: number | null
+  caloriesLinkedToDailyLog: boolean
+  sourceMode: string | null
+  conflictMessage: string | null
+  dailyLogCalories: number | null
 }
 
 export type CreateMealRequest = {

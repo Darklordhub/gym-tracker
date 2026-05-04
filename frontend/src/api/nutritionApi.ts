@@ -35,6 +35,11 @@ export async function getDailyMeals(date: string) {
   return response.data
 }
 
+export async function switchDayToMeals(date: string) {
+  const response = await apiClient.post<DailyMeals>(`/nutrition/days/${encodeURIComponent(date)}/switch-to-meals`)
+  return response.data
+}
+
 export async function createMeal(date: string, payload: CreateMealRequest) {
   const response = await apiClient.post<UserMeal>(`/nutrition/days/${encodeURIComponent(date)}/meals`, payload)
   return response.data
