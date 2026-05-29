@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var enableHttpsRedirection = builder.Configuration.GetValue("Http:UseHttpsRedirection", false);
+var appOptions = builder.Configuration.GetSection(AppOptions.SectionName).Get<AppOptions>() ?? new AppOptions();
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 var wgerOptions = builder.Configuration.GetSection(WgerOptions.SectionName).Get<WgerOptions>() ?? new WgerOptions();
 var nutritionOptions = builder.Configuration.GetSection(NutritionOptions.SectionName).Get<NutritionOptions>() ?? new NutritionOptions();
@@ -40,6 +41,7 @@ if (string.IsNullOrWhiteSpace(jwtOptions.SigningKey) || jwtOptions.SigningKey.Le
 }
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.Configure<AppOptions>(builder.Configuration.GetSection(AppOptions.SectionName));
 builder.Services.Configure<WgerOptions>(builder.Configuration.GetSection(WgerOptions.SectionName));
 builder.Services.Configure<NutritionOptions>(builder.Configuration.GetSection(NutritionOptions.SectionName));
 builder.Services.Configure<ExerciseMediaEnrichmentOptions>(builder.Configuration.GetSection(ExerciseMediaEnrichmentOptions.SectionName));
@@ -50,6 +52,7 @@ builder.Services.AddMemoryCache();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
+builder.Services.AddSingleton<ApplicationInitializationState>();
 builder.Services.AddSingleton<PasswordHasher<AppUser>>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<LegacyDataMigrationService>();
@@ -178,6 +181,7 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var legacyDataMigrationService = scope.ServiceProvider.GetRequiredService<LegacyDataMigrationService>();
     var exerciseCatalogSeedService = scope.ServiceProvider.GetRequiredService<ExerciseCatalogSeedService>();
+    var initializationState = app.Services.GetRequiredService<ApplicationInitializationState>();
 
     const int maxMigrationAttempts = 10;
     var initializationSucceeded = false;
@@ -190,6 +194,7 @@ using (var scope = app.Services.CreateScope())
             await legacyDataMigrationService.MigrateAsync();
             await exerciseCatalogSeedService.SeedAsync();
             initializationSucceeded = true;
+            initializationState.MarkSucceeded();
             logger.LogInformation(
                 "Database migrations and startup data initialization completed successfully on attempt {Attempt}.",
                 attempt);
@@ -207,19 +212,20 @@ using (var scope = app.Services.CreateScope())
         }
         catch (Exception exception)
         {
+            initializationState.MarkFailed("Database startup initialization failed.");
             logger.LogError(
                 exception,
                 "Database migration and startup data initialization failed on final attempt {Attempt} of {MaxAttempts}.",
                 attempt,
                 maxMigrationAttempts);
 
-            if (!app.Environment.IsProduction())
+            if (!appOptions.AllowStartupWithMigrationFailure)
             {
                 throw;
             }
 
             logger.LogWarning(
-                "Application startup will continue without applying database migrations because the environment is Production.");
+                "Application startup will continue without successful database initialization because App__AllowStartupWithMigrationFailure=true. Readiness will report unhealthy until initialization succeeds.");
         }
     }
 
@@ -254,6 +260,41 @@ app.MapGet("/healthz", async (AppDbContext dbContext) =>
     return canConnect
         ? Results.Ok(new { status = "ok" })
         : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+});
+app.MapGet("/readyz", async (AppDbContext dbContext, ApplicationInitializationState initializationState) =>
+{
+    var canConnect = await dbContext.Database.CanConnectAsync();
+    if (!canConnect)
+    {
+        return Results.Json(
+            new
+            {
+                status = "unhealthy",
+                database = "unavailable",
+                initialization = initializationState.Status.ToString().ToLowerInvariant(),
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    if (!initializationState.IsReady)
+    {
+        return Results.Json(
+            new
+            {
+                status = "unhealthy",
+                database = "ok",
+                initialization = initializationState.Status.ToString().ToLowerInvariant(),
+                message = initializationState.FailureMessage ?? "Database startup initialization has not completed successfully.",
+            },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    return Results.Ok(new
+    {
+        status = "ok",
+        database = "ok",
+        initialization = initializationState.Status.ToString().ToLowerInvariant(),
+    });
 });
 
 app.Run();
