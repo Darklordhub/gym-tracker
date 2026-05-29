@@ -1,5 +1,6 @@
 import { buildDailyCalorieBalance, type DailyCalorieBalance } from './calorieBalance'
 import { countWorkoutsInWeek } from './workoutMetrics'
+import { formatLocalDateOnly, normalizeDateOnlyValue, parseDateOnlyToLocalDate } from './dateOnly'
 import type { CalorieLog } from '../types/calories'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings } from '../types/goals'
@@ -41,8 +42,8 @@ export function buildDailyTrainingScore(params: {
     params.date,
     params.referenceWeightKg,
   )
-  const dayWorkouts = params.workouts.filter((workout) => workout.date.slice(0, 10) === params.date)
-  const workoutsUpToDate = params.workouts.filter((workout) => workout.date.slice(0, 10) <= params.date)
+  const dayWorkouts = params.workouts.filter((workout) => normalizeDateOnlyValue(workout.date) === params.date)
+  const workoutsUpToDate = params.workouts.filter((workout) => normalizeDateOnlyValue(workout.date) <= params.date)
   const readinessLog = params.readinessLog?.date === params.date ? params.readinessLog : null
   const activity = scoreActivity(dayWorkouts, readinessLog, params.cycleGuidance)
   const recovery = scoreRecovery(dayWorkouts, readinessLog, params.cycleGuidance)
@@ -91,7 +92,7 @@ export function buildWeeklyTrainingScoreSummary(params: {
     const date = new Date(now)
     date.setHours(0, 0, 0, 0)
     date.setDate(date.getDate() - offset)
-    const dateKey = date.toISOString().slice(0, 10)
+    const dateKey = formatLocalDateOnly(date)
     const readinessLog = params.readinessLogs.find((log) => log.date === dateKey) ?? null
     const calorieLog = params.calorieLogs.find((log) => log.date === dateKey) ?? null
 
@@ -241,7 +242,7 @@ function scoreAlignment(
     return 12
   }
 
-  const workoutsThisWeek = countWorkoutsInWeek(workoutsUpToDate, new Date(date))
+  const workoutsThisWeek = countWorkoutsInWeek(workoutsUpToDate, parseDateOnlyToLocalDate(date))
   const progress = workoutsThisWeek / goals.weeklyWorkoutTarget
 
   if (progress >= 1) {

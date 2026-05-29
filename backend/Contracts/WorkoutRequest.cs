@@ -4,7 +4,7 @@ namespace backend.Contracts;
 
 public class WorkoutRequest : IValidatableObject
 {
-    public DateTime Date { get; set; }
+    public DateOnly Date { get; set; }
     public string? WorkoutType { get; set; }
 
     [StringLength(500)]

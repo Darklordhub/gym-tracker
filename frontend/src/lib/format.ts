@@ -1,4 +1,10 @@
+import { formatDateOnlyForDisplay, isDateOnlyValue, todayLocalDateOnly } from './dateOnly'
+
 export function formatDate(date: string) {
+  if (isDateOnlyValue(date)) {
+    return formatDateOnlyForDisplay(date)
+  }
+
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
     day: 'numeric',
@@ -7,10 +13,5 @@ export function formatDate(date: string) {
 }
 
 export function getTodayDateValue() {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-
-  return `${year}-${month}-${day}`
+  return todayLocalDateOnly()
 }

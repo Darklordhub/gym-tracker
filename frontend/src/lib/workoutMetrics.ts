@@ -1,4 +1,5 @@
 import type { Workout } from '../types/workout'
+import { addDaysToDateOnly, compareDateOnlyValues, startOfWeekDateOnly, todayLocalDateOnly } from './dateOnly'
 
 export function startOfWeek(date: Date) {
   const result = new Date(date)
@@ -16,12 +17,11 @@ export function addDays(date: Date, days: number) {
 }
 
 export function countWorkoutsInWeek(workouts: Workout[], now = new Date()) {
-  const weekStart = startOfWeek(now)
-  const weekEnd = addDays(weekStart, 7)
+  const weekStart = startOfWeekDateOnly(now)
+  const weekEnd = addDaysToDateOnly(weekStart, 7)
 
   return workouts.filter((workout) => {
-    const workoutDate = new Date(workout.date)
-    return workoutDate >= weekStart && workoutDate < weekEnd
+    return compareDateOnlyValues(workout.date, weekStart) >= 0 && compareDateOnlyValues(workout.date, weekEnd) < 0
   }).length
 }
 
@@ -31,15 +31,15 @@ export function getWorkoutWeekStreak(workouts: Workout[], now = new Date()) {
   }
 
   const uniqueWorkoutWeeks = new Set(
-    workouts.map((workout) => startOfWeek(new Date(workout.date)).toISOString().slice(0, 10)),
+    workouts.map((workout) => startOfWeekDateOnly(workout.date)),
   )
 
   let streak = 0
-  let cursor = startOfWeek(now)
+  let cursor = startOfWeekDateOnly(todayLocalDateOnly(now))
 
-  while (uniqueWorkoutWeeks.has(cursor.toISOString().slice(0, 10))) {
+  while (uniqueWorkoutWeeks.has(cursor)) {
     streak += 1
-    cursor = addDays(cursor, -7)
+    cursor = addDaysToDateOnly(cursor, -7)
   }
 
   return streak

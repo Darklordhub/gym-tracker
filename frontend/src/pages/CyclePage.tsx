@@ -14,6 +14,7 @@ import {
   updateCycleSymptomLog,
 } from '../api/cycle'
 import { StateCard } from '../components/StateCard'
+import { differenceInDateOnlyDays, todayLocalDateOnly } from '../lib/dateOnly'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type {
@@ -67,8 +68,8 @@ const emptyCycleEntryForm: CycleEntryFormState = {
   notes: '',
 }
 
-const emptySymptomForm: SymptomFormState = {
-  date: new Date().toISOString().slice(0, 10),
+const createEmptySymptomForm = (): SymptomFormState => ({
+  date: todayLocalDateOnly(),
   fatigueLevel: '3',
   crampsLevel: '1',
   mood: 'steady',
@@ -76,7 +77,7 @@ const emptySymptomForm: SymptomFormState = {
   sleepQuality: '3',
   recoveryFeeling: '3',
   notes: '',
-}
+})
 
 export function CyclePage() {
   const navigate = useNavigate()
@@ -86,7 +87,7 @@ export function CyclePage() {
   const [cycleHistory, setCycleHistory] = useState<CycleEntry[]>([])
   const [cycleSymptoms, setCycleSymptoms] = useState<CycleSymptomLog[]>([])
   const [cycleEntryForm, setCycleEntryForm] = useState<CycleEntryFormState>(emptyCycleEntryForm)
-  const [symptomForm, setSymptomForm] = useState<SymptomFormState>(emptySymptomForm)
+  const [symptomForm, setSymptomForm] = useState<SymptomFormState>(createEmptySymptomForm)
   const [editingCycleEntryId, setEditingCycleEntryId] = useState<number | null>(null)
   const [editingSymptomLogId, setEditingSymptomLogId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -261,7 +262,7 @@ export function CyclePage() {
       }
 
       setEditingSymptomLogId(null)
-      setSymptomForm(emptySymptomForm)
+      setSymptomForm(createEmptySymptomForm())
       await refreshCyclePage()
     } catch (error) {
       setSymptomError(getRequestErrorMessage(error, 'Unable to save this symptom log.'))
@@ -297,7 +298,7 @@ export function CyclePage() {
       await deleteCycleSymptomLog(logId)
       if (editingSymptomLogId === logId) {
         setEditingSymptomLogId(null)
-        setSymptomForm(emptySymptomForm)
+        setSymptomForm(createEmptySymptomForm())
       }
       await refreshCyclePage()
       setSymptomMessage('Symptom log removed.')
@@ -495,7 +496,7 @@ export function CyclePage() {
                 <input
                   type="date"
                   value={cycleSettingsForm.lastPeriodStartDate}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={todayLocalDateOnly()}
                   onChange={(event) => setCycleSettingsForm((current) => ({ ...current, lastPeriodStartDate: event.target.value }))}
                 />
               </label>
@@ -594,7 +595,7 @@ export function CyclePage() {
                 <input
                   type="date"
                   value={cycleEntryForm.periodStartDate}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={todayLocalDateOnly()}
                   onChange={(event) => setCycleEntryForm((current) => ({ ...current, periodStartDate: event.target.value }))}
                 />
               </label>
@@ -604,7 +605,7 @@ export function CyclePage() {
                 <input
                   type="date"
                   value={cycleEntryForm.periodEndDate}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={todayLocalDateOnly()}
                   onChange={(event) => setCycleEntryForm((current) => ({ ...current, periodEndDate: event.target.value }))}
                 />
               </label>
@@ -708,7 +709,7 @@ export function CyclePage() {
                 <input
                   type="date"
                   value={symptomForm.date}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={todayLocalDateOnly()}
                   onChange={(event) => setSymptomForm((current) => ({ ...current, date: event.target.value }))}
                 />
               </label>
@@ -750,7 +751,7 @@ export function CyclePage() {
                   className="ghost-button"
                   onClick={() => {
                     setEditingSymptomLogId(null)
-                    setSymptomForm(emptySymptomForm)
+                    setSymptomForm(createEmptySymptomForm())
                   }}
                 >
                   Cancel edit
@@ -899,7 +900,7 @@ function validateCycleSettingsForm(form: CycleSettingsFormState) {
     }
   }
 
-  if (form.lastPeriodStartDate && form.lastPeriodStartDate > new Date().toISOString().slice(0, 10)) {
+  if (form.lastPeriodStartDate && form.lastPeriodStartDate > todayLocalDateOnly()) {
     return 'Last period start date cannot be in the future.'
   }
 
@@ -915,7 +916,7 @@ function validateCycleEntryForm(form: CycleEntryFormState) {
     return 'Period end date must be on or after the start date.'
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayLocalDateOnly()
   if (form.periodStartDate > today || form.periodEndDate > today) {
     return 'Period history cannot be saved in the future.'
   }
@@ -928,7 +929,7 @@ function validateSymptomForm(form: SymptomFormState) {
     return 'Date is required.'
   }
 
-  if (form.date > new Date().toISOString().slice(0, 10)) {
+  if (form.date > todayLocalDateOnly()) {
     return 'Symptom logs cannot be saved in the future.'
   }
 
@@ -974,7 +975,5 @@ function mapTriStateToBoolean(value: 'yes' | 'no' | 'unknown') {
 }
 
 function getDaySpan(startDate: string, endDate: string) {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1)
+  return Math.max(1, differenceInDateOnlyDays(startDate, endDate) + 1)
 }

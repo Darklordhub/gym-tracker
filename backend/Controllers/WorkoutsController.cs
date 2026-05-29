@@ -155,9 +155,9 @@ public class WorkoutsController : ControllerBase
         };
     }
 
-    private static DateTime NormalizeDate(DateTime date)
+    private static DateTime NormalizeDate(DateOnly date)
     {
-        return DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
+        return DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
     }
 
     private async Task<IReadOnlyDictionary<string, decimal>> GetPersonalRecordLookupAsync(int userId)

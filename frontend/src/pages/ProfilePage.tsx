@@ -4,6 +4,7 @@ import { changePassword, fetchProfile, updateProfile } from '../api/profile'
 import { fetchCycleGuidance, fetchCycleSettings, updateCycleSettings } from '../api/cycle'
 import { useAuth } from '../auth/useAuth'
 import { StateCard } from '../components/StateCard'
+import { todayLocalDateOnly } from '../lib/dateOnly'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { CycleGuidance, CycleSettings } from '../types/cycle'
@@ -418,7 +419,7 @@ export function ProfilePage() {
                   <input
                     type="date"
                     value={profileForm.dateOfBirth}
-                    max={new Date().toISOString().slice(0, 10)}
+                    max={todayLocalDateOnly()}
                     onChange={(event) => setProfileForm((current) => ({ ...current, dateOfBirth: event.target.value }))}
                   />
                 </label>
@@ -645,7 +646,7 @@ function validateProfileForm(form: ProfileFormState) {
     }
   }
 
-  if (form.dateOfBirth && form.dateOfBirth > new Date().toISOString().slice(0, 10)) {
+  if (form.dateOfBirth && form.dateOfBirth > todayLocalDateOnly()) {
     return 'Date of birth cannot be in the future.'
   }
 

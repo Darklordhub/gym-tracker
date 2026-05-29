@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchProgressiveOverloadRecommendation } from '../api/progressiveOverload'
 import { fetchWorkouts } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
+import { compareDateOnlyValues, parseDateOnlyToLocalDate } from '../lib/dateOnly'
 import { getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { formatDate } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
@@ -146,7 +147,7 @@ export function ExerciseProgressPage() {
       )
       .sort(
         (left, right) =>
-          new Date(left.date).getTime() - new Date(right.date).getTime() ||
+          compareDateOnlyValues(left.date, right.date) ||
           left.exerciseId - right.exerciseId ||
           left.setOrder - right.setOrder,
       )
@@ -173,7 +174,7 @@ export function ExerciseProgressPage() {
       }))
       .sort(
         (left, right) =>
-          new Date(left.date).getTime() - new Date(right.date).getTime() || left.workoutId - right.workoutId,
+          compareDateOnlyValues(left.date, right.date) || left.workoutId - right.workoutId,
       )
   }, [selectedItem, selectedMode, workouts])
 
@@ -701,7 +702,7 @@ export function ExerciseProgressPage() {
                 {[...filteredStrengthHistory]
                   .sort(
                     (left, right) =>
-                      new Date(right.date).getTime() - new Date(left.date).getTime() ||
+                      compareDateOnlyValues(right.date, left.date) ||
                       right.exerciseId - left.exerciseId ||
                       right.setOrder - left.setOrder,
                   )
@@ -759,7 +760,7 @@ export function ExerciseProgressPage() {
               {[...filteredCardioHistory]
                 .sort(
                   (left, right) =>
-                    new Date(right.date).getTime() - new Date(left.date).getTime() || right.workoutId - left.workoutId,
+                    compareDateOnlyValues(right.date, left.date) || right.workoutId - left.workoutId,
                 )
                 .map((entry) => (
                   <article key={`${entry.workoutId}-${entry.date}`} className="exercise-history-card" role="listitem">
@@ -911,7 +912,7 @@ function ProgressChart({
       shortDate: new Intl.DateTimeFormat(undefined, {
         month: 'short',
         day: 'numeric',
-      }).format(new Date(entry.date)),
+      }).format(parseDateOnlyToLocalDate(entry.date)),
     }
   })
 
@@ -990,7 +991,7 @@ function ProgressChart({
 
 function filterHistoryByDate<T extends { date: string }>(entries: T[], dateFrom: string, dateTo: string) {
   return entries.filter((entry) => {
-    const entryDate = entry.date.slice(0, 10)
+    const entryDate = entry.date
     const matchesDateFrom = !dateFrom || entryDate >= dateFrom
     const matchesDateTo = !dateTo || entryDate <= dateTo
 

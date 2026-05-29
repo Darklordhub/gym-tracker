@@ -6,6 +6,13 @@ import {
   updateWeightEntry,
 } from '../api/weightEntries'
 import { StateCard } from '../components/StateCard'
+import {
+  addDaysToDateOnly,
+  compareDateOnlyValues,
+  formatDateOnlyForDisplay,
+  parseDateOnlyToLocalDate,
+  startOfWeekDateOnly,
+} from '../lib/dateOnly'
 import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import type { WeightEntry } from '../types/weight'
@@ -94,13 +101,13 @@ export function WeightPage() {
 
   const chartData = useMemo(() => {
     return [...entries]
-      .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
+      .sort((left, right) => compareDateOnlyValues(left.date, right.date))
       .map((entry) => ({
         ...entry,
         shortDate: new Intl.DateTimeFormat(undefined, {
           month: 'short',
           day: 'numeric',
-        }).format(new Date(entry.date)),
+        }).format(parseDateOnlyToLocalDate(entry.date)),
       }))
   }, [entries])
 
@@ -128,7 +135,7 @@ export function WeightPage() {
     setErrors({})
     setFeedback(null)
     setForm({
-      date: entry.date.slice(0, 10),
+      date: entry.date,
       weightKg: entry.weightKg.toString(),
     })
   }
@@ -457,15 +464,14 @@ function WeightSignalCard({
 }
 
 function compareEntries(left: WeightEntry, right: WeightEntry) {
-  return new Date(right.date).getTime() - new Date(left.date).getTime() || right.id - left.id
+  return compareDateOnlyValues(right.date, left.date) || right.id - left.id
 }
 
 function buildWeeklyAverages(entries: WeightEntry[]) {
   const groupedEntries = new Map<string, WeightEntry[]>()
 
   for (const entry of entries) {
-    const weekStart = getWeekStart(entry.date)
-    const weekKey = weekStart.toISOString().slice(0, 10)
+    const weekKey = getWeekStart(entry.date)
     const currentWeek = groupedEntries.get(weekKey) ?? []
     currentWeek.push(entry)
     groupedEntries.set(weekKey, currentWeek)
@@ -487,24 +493,16 @@ function buildWeeklyAverages(entries: WeightEntry[]) {
         entryCount: weekEntries.length,
       }
     })
-    .sort((left, right) => new Date(right.weekKey).getTime() - new Date(left.weekKey).getTime())
+    .sort((left, right) => compareDateOnlyValues(right.weekKey, left.weekKey))
 }
 
 function getWeekStart(date: string) {
-  const result = new Date(date)
-  const day = result.getDay()
-  const diff = (day + 6) % 7
-  result.setHours(0, 0, 0, 0)
-  result.setDate(result.getDate() - diff)
-  return result
+  return startOfWeekDateOnly(date, 'monday')
 }
 
 function formatWeekLabel(weekKey: string) {
-  const start = new Date(weekKey)
-  const end = new Date(start)
-  end.setDate(end.getDate() + 6)
-
-  return `${formatDate(start.toISOString())} to ${formatDate(end.toISOString())}`
+  const end = addDaysToDateOnly(weekKey, 6)
+  return `${formatDateOnlyForDisplay(weekKey)} to ${formatDateOnlyForDisplay(end)}`
 }
 
 function getTrendClassName(change: number | null) {

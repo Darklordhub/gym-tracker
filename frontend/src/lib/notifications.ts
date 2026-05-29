@@ -1,5 +1,6 @@
 import { getWorkoutAssistantInsight } from './exerciseSuggestions'
-import { countWorkoutsInWeek, startOfWeek } from './workoutMetrics'
+import { countWorkoutsInWeek } from './workoutMetrics'
+import { compareDateOnlyValues, differenceInDateOnlyDays, startOfWeekDateOnly, todayLocalDateOnly } from './dateOnly'
 import type { GoalSettings } from '../types/goals'
 import type { Workout } from '../types/workout'
 
@@ -18,11 +19,10 @@ export function generateNotifications(
 ) {
   const notifications: Array<AppNotification & { priority: number }> = []
   const sortedWorkouts = [...workouts].sort(
-    (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime() || right.id - left.id,
+    (left, right) => compareDateOnlyValues(right.date, left.date) || right.id - left.id,
   )
   const latestWorkout = sortedWorkouts[0] ?? null
-  const weekStart = startOfWeek(now)
-  const weekStartKey = weekStart.toISOString().slice(0, 10)
+  const weekStartKey = startOfWeekDateOnly(now)
   const workoutsThisWeek = countWorkoutsInWeek(sortedWorkouts, now)
   const assistantInsight = getWorkoutAssistantInsight(sortedWorkouts, goals, undefined, undefined, undefined, undefined, now)
 
@@ -87,9 +87,5 @@ export function generateNotifications(
 }
 
 function getDaysSince(date: string, now: Date) {
-  const target = new Date(date)
-  target.setHours(0, 0, 0, 0)
-  const current = new Date(now)
-  current.setHours(0, 0, 0, 0)
-  return Math.max(0, Math.round((current.getTime() - target.getTime()) / 86400000))
+  return Math.max(0, differenceInDateOnlyDays(date, todayLocalDateOnly(now)))
 }

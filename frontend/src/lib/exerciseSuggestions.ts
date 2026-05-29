@@ -5,6 +5,12 @@ import type { ReadinessLog } from '../types/readiness'
 import type { DailyCalorieBalance } from './calorieBalance'
 import type { DailyTrainingScore } from './trainingScore'
 import { countWorkoutsInWeek } from './workoutMetrics'
+import {
+  addDaysToDateOnly,
+  compareDateOnlyValues,
+  differenceInDateOnlyDays,
+  todayLocalDateOnly,
+} from './dateOnly'
 
 export type ExerciseSuggestion = {
   suggestedWeightKg: number
@@ -60,7 +66,7 @@ export function getExerciseHistory(workouts: Workout[], exerciseName: string) {
           })),
         ),
     )
-    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+    .sort((left, right) => compareDateOnlyValues(right.date, left.date))
 }
 
 export function getSuggestedNextWeight(
@@ -193,11 +199,8 @@ export function getDailyTrainingSuggestion(
   trainingScore?: DailyTrainingScore | null,
   now = new Date(),
 ) {
-  const recentWindowStart = new Date(now)
-  recentWindowStart.setHours(0, 0, 0, 0)
-  recentWindowStart.setDate(recentWindowStart.getDate() - 6)
-
-  const recentWorkouts = workouts.filter((workout) => new Date(workout.date) >= recentWindowStart)
+  const recentWindowStart = addDaysToDateOnly(todayLocalDateOnly(now), -6)
+  const recentWorkouts = workouts.filter((workout) => compareDateOnlyValues(workout.date, recentWindowStart) >= 0)
   const recentStrengthSessions = recentWorkouts.filter((workout) => workout.workoutType !== 'cardio')
   const recentCardioSessions = recentWorkouts.filter((workout) => workout.workoutType === 'cardio')
   const recentSetCount = recentStrengthSessions.reduce(
@@ -395,7 +398,7 @@ function getCurrentReadinessSignal(readinessLog: ReadinessLog | null | undefined
     return null
   }
 
-  const today = now.toISOString().slice(0, 10)
+  const today = todayLocalDateOnly(now)
   if (readinessLog.date !== today) {
     return null
   }
@@ -477,7 +480,7 @@ function buildExerciseStats(workouts: Workout[]) {
         continue
       }
 
-      const isNewer = new Date(workoutDate).getTime() > new Date(current.lastSessionDate).getTime()
+      const isNewer = compareDateOnlyValues(workoutDate, current.lastSessionDate) > 0
 
       stats.set(key, {
         exerciseName: current.exerciseName,
@@ -493,9 +496,5 @@ function buildExerciseStats(workouts: Workout[]) {
 }
 
 function getDaysSince(date: string, now: Date) {
-  const target = new Date(date)
-  target.setHours(0, 0, 0, 0)
-  const current = new Date(now)
-  current.setHours(0, 0, 0, 0)
-  return Math.max(0, Math.round((current.getTime() - target.getTime()) / 86400000))
+  return Math.max(0, differenceInDateOnlyDays(date, todayLocalDateOnly(now)))
 }

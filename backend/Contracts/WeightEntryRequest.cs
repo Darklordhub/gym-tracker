@@ -4,7 +4,7 @@ namespace backend.Contracts;
 
 public class WeightEntryRequest : IValidatableObject
 {
-    public DateTime Date { get; set; }
+    public DateOnly Date { get; set; }
 
     [Range(20, 500)]
     public decimal WeightKg { get; set; }

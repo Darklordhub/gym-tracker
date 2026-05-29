@@ -20,6 +20,7 @@ import {
 } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
 import { VideoModal } from '../components/VideoModal'
+import { compareDateOnlyValues, toLocalDateOnlyFromDateTime } from '../lib/dateOnly'
 import { getWorkoutAssistantInsight, getSuggestedNextWeight } from '../lib/exerciseSuggestions'
 import { buildDailyCalorieBalance } from '../lib/calorieBalance'
 import { formatDate, getTodayDateValue } from '../lib/format'
@@ -223,7 +224,7 @@ function normalizeExerciseName(exerciseName: string) {
 
 function mapSessionToForm(session: ActiveWorkoutSession): WorkoutFormState {
   return {
-    date: session.startedAtUtc.slice(0, 10),
+    date: toLocalDateOnlyFromDateTime(session.startedAtUtc),
     notes: session.notes,
     exerciseEntries: session.exerciseEntries.map((exercise) => ({
       exerciseName: exercise.exerciseName,
@@ -338,7 +339,7 @@ export function WorkoutsPage() {
     const normalizedSearch = workoutSearch.trim().toUpperCase()
 
     return workouts.filter((workout) => {
-      const workoutDate = workout.date.slice(0, 10)
+      const workoutDate = workout.date
       const matchesDateFrom = !workoutDateFrom || workoutDate >= workoutDateFrom
       const matchesDateTo = !workoutDateTo || workoutDate <= workoutDateTo
       const matchesSearch =
@@ -1722,7 +1723,7 @@ function hasCardioErrors(errors: CardioFormErrors) {
 }
 
 function compareWorkouts(left: Workout, right: Workout) {
-  return new Date(right.date).getTime() - new Date(left.date).getTime() || right.id - left.id
+  return compareDateOnlyValues(right.date, left.date) || right.id - left.id
 }
 
 function describeSets(

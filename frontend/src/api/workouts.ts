@@ -1,4 +1,5 @@
 import { apiClient, isNotFoundError } from '../lib/http'
+import { normalizeDateOnlyValue } from '../lib/dateOnly'
 import type {
   ActiveWorkoutSession,
   ActiveWorkoutSessionPayload,
@@ -10,12 +11,12 @@ import type {
 
 export async function fetchWorkouts() {
   const response = await apiClient.get<Workout[]>('/Workouts')
-  return response.data
+  return response.data.map(normalizeWorkout)
 }
 
 export async function createWorkout(payload: WorkoutPayload) {
   const response = await apiClient.post<Workout>('/Workouts', payload)
-  return response.data
+  return normalizeWorkout(response.data)
 }
 
 export async function deleteWorkout(id: number) {
@@ -61,5 +62,12 @@ export async function updateActiveWorkoutSession(payload: ActiveWorkoutSessionPa
 
 export async function completeActiveWorkoutSession() {
   const response = await apiClient.post<Workout>('/ActiveWorkoutSession/complete')
-  return response.data
+  return normalizeWorkout(response.data)
+}
+
+function normalizeWorkout(workout: Workout): Workout {
+  return {
+    ...workout,
+    date: normalizeDateOnlyValue(workout.date),
+  }
 }

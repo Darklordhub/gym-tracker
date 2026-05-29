@@ -8,11 +8,12 @@ import { fetchWeightEntries } from '../api/weightEntries'
 import { fetchWorkouts } from '../api/workouts'
 import { StateCard } from '../components/StateCard'
 import { buildDailyCalorieBalance } from '../lib/calorieBalance'
+import { addDaysToDateOnly, compareDateOnlyValues, startOfWeekDateOnly, todayLocalDateOnly } from '../lib/dateOnly'
 import { getWorkoutAssistantInsight } from '../lib/exerciseSuggestions'
 import { formatDate, getTodayDateValue } from '../lib/format'
 import { getRequestErrorMessage } from '../lib/http'
 import { buildDailyTrainingScore, buildWeeklyTrainingScoreSummary } from '../lib/trainingScore'
-import { addDays, countWorkoutsInWeek, getWorkoutWeekStreak, startOfWeek } from '../lib/workoutMetrics'
+import { countWorkoutsInWeek, getWorkoutWeekStreak } from '../lib/workoutMetrics'
 import type { CalorieLog } from '../types/calories'
 import type { CycleGuidance } from '../types/cycle'
 import type { GoalSettings, GoalSettingsPayload } from '../types/goals'
@@ -160,17 +161,15 @@ export function DashboardPage() {
 
   const metrics = useMemo(() => {
     const now = new Date()
-    const weekStart = startOfWeek(now)
-    const weekEnd = addDays(weekStart, 7)
+    const weekStart = startOfWeekDateOnly(now)
+    const weekEnd = addDaysToDateOnly(weekStart, 7)
 
     const workoutsThisWeek = workouts.filter((workout) => {
-      const workoutDate = new Date(workout.date)
-      return workoutDate >= weekStart && workoutDate < weekEnd
+      return compareDateOnlyValues(workout.date, weekStart) >= 0 && compareDateOnlyValues(workout.date, weekEnd) < 0
     })
 
     const weighInsThisWeek = weightEntries.filter((entry) => {
-      const entryDate = new Date(entry.date)
-      return entryDate >= weekStart && entryDate < weekEnd
+      return compareDateOnlyValues(entry.date, weekStart) >= 0 && compareDateOnlyValues(entry.date, weekEnd) < 0
     })
 
     const averageBodyWeight =
@@ -225,8 +224,9 @@ export function DashboardPage() {
     }
   }, [goals, weightEntries, workouts])
 
-  const hasTodayReadinessLog = readinessLog?.date === getTodayDateValue()
-  const hasTodayCalorieLog = calorieLog?.date === getTodayDateValue()
+  const today = todayLocalDateOnly()
+  const hasTodayReadinessLog = readinessLog?.date === today
+  const hasTodayCalorieLog = calorieLog?.date === today
   const readinessAverage =
     (readinessForm.energyLevel +
       readinessForm.sorenessLevel +

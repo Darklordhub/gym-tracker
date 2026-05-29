@@ -1,6 +1,7 @@
 import type { CalorieLog } from '../types/calories'
 import type { GoalSettings } from '../types/goals'
 import type { Workout } from '../types/workout'
+import { normalizeDateOnlyValue } from './dateOnly'
 
 export type DailyCalorieBalance = {
   date: string
@@ -63,7 +64,7 @@ export function buildDailyCalorieBalance(
   date: string,
   referenceWeightKg?: number | null,
 ): DailyCalorieBalance {
-  const dayWorkouts = workouts.filter((workout) => workout.date.slice(0, 10) === date)
+  const dayWorkouts = workouts.filter((workout) => normalizeDateOnlyValue(workout.date) === date)
   const caloriesBurned = dayWorkouts.reduce((total, workout) => total + estimateWorkoutCaloriesBurned(workout), 0)
   const target = resolveDailyCalorieTarget(goals, referenceWeightKg)
   const caloriesConsumed = calorieLog?.date === date ? calorieLog.caloriesConsumed : null
