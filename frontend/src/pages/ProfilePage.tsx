@@ -53,14 +53,17 @@ const emptyCycleSettings: CycleSettings = {
 
 export function ProfilePage() {
   const { authState, setCurrentUser } = useAuth()
-  const [profile, setProfile] = useState<UserProfile | null>(authState?.user ?? null)
+  const authUser = authState?.user ?? null
+  const authUserId = authUser?.id ?? null
+  const [profile, setProfile] = useState<UserProfile | null>(authUser)
   const [profileForm, setProfileForm] = useState<ProfileFormState>(() =>
-    authState?.user ? mapProfileToForm(authState.user) : emptyProfileForm,
+    authUser ? mapProfileToForm(authUser) : emptyProfileForm,
   )
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>(emptyPasswordForm)
   const [cycleSettings, setCycleSettings] = useState<CycleSettings>(emptyCycleSettings)
   const [cycleGuidance, setCycleGuidance] = useState<CycleGuidance | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isInitialLoading, setIsInitialLoading] = useState(() => authUser === null)
+  const [isRefreshingProfile, setIsRefreshingProfile] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [isSavingCycleToggle, setIsSavingCycleToggle] = useState(false)
@@ -73,12 +76,18 @@ export function ProfilePage() {
   const [cycleMessage, setCycleMessage] = useState<string | null>(null)
   const loadRequestIdRef = useRef(0)
 
-  const loadProfile = useCallback(async () => {
+  const loadProfile = useCallback(async (options?: { blocking?: boolean }) => {
     const requestId = loadRequestIdRef.current + 1
     loadRequestIdRef.current = requestId
+    const shouldBlock = options?.blocking ?? false
 
     try {
-      setIsLoading(true)
+      if (shouldBlock) {
+        setIsInitialLoading(true)
+      } else {
+        setIsRefreshingProfile(true)
+      }
+
       setLoadError(null)
 
       const [profileResult, cycleSettingsResult, cycleGuidanceResult] = await Promise.allSettled([
@@ -116,20 +125,48 @@ export function ProfilePage() {
       }
     } finally {
       if (requestId === loadRequestIdRef.current) {
-        setIsLoading(false)
+        setIsInitialLoading(false)
+        setIsRefreshingProfile(false)
       }
     }
   }, [setCurrentUser])
 
   useEffect(() => {
-    void loadProfile()
-  }, [loadProfile])
+    if (authUserId === null) {
+      return
+    }
+
+    void loadProfile({ blocking: false })
+  }, [authUserId, loadProfile])
 
   useEffect(() => () => {
     loadRequestIdRef.current += 1
   }, [])
 
-  const hasRenderableProfile = profile !== null
+  useEffect(() => {
+    if (!authUser) {
+      return
+    }
+
+    setProfile((currentProfile) => {
+      if (currentProfile?.id === authUser.id) {
+        return currentProfile
+      }
+
+      return authUser
+    })
+
+    setProfileForm((currentForm) => {
+      if (profile?.id === authUser.id) {
+        return currentForm
+      }
+
+      return mapProfileToForm(authUser)
+    })
+  }, [authUser, profile?.id])
+
+  const renderProfile = profile ?? authUser
+  const hasRenderableProfile = renderProfile !== null
 
   async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -258,8 +295,8 @@ export function ProfilePage() {
                 : 'Cycle-specific guidance and navigation stay hidden until you opt in.'}
             </p>
             <div className="forge-focus-pills">
-              <span className="info-pill">{profile?.displayName || profile?.fullName || 'No display name'}</span>
-              <span className="info-pill info-pill-strength">{profile ? formatDate(profile.createdAt) : 'Loading...'}</span>
+              <span className="info-pill">{renderProfile?.displayName || renderProfile?.fullName || 'No display name'}</span>
+              <span className="info-pill info-pill-strength">{renderProfile ? formatDate(renderProfile.createdAt) : 'Loading...'}</span>
             </div>
           </article>
         </div>
@@ -269,19 +306,19 @@ export function ProfilePage() {
         <article className="forge-stat-card forge-stat-card-blue">
           <div className="forge-stat-glow" aria-hidden="true" />
           <span className="stat-label">Account email</span>
-          <strong>{profile?.email ?? authState?.user.email ?? 'Loading...'}</strong>
+          <strong>{renderProfile?.email ?? 'Loading...'}</strong>
           <p>Your sign-in identifier stays read-only here.</p>
         </article>
         <article className="forge-stat-card forge-stat-card-teal">
           <div className="forge-stat-glow" aria-hidden="true" />
           <span className="stat-label">Member since</span>
-          <strong>{profile ? formatDate(profile.createdAt) : 'Loading...'}</strong>
+          <strong>{renderProfile ? formatDate(renderProfile.createdAt) : 'Loading...'}</strong>
           <p>Created automatically when your account was registered.</p>
         </article>
         <article className="forge-stat-card forge-stat-card-violet">
           <div className="forge-stat-glow" aria-hidden="true" />
           <span className="stat-label">Display name</span>
-          <strong>{profile?.displayName || profile?.fullName || 'Not set'}</strong>
+          <strong>{renderProfile?.displayName || renderProfile?.fullName || 'Not set'}</strong>
           <p>Used as your preferred label inside the app.</p>
         </article>
         <article className="forge-stat-card forge-stat-card-lime">
@@ -296,7 +333,7 @@ export function ProfilePage() {
         </article>
       </section>
 
-      {isLoading && !hasRenderableProfile ? (
+      {isInitialLoading && !hasRenderableProfile ? (
         <section className="profile-main-grid">
           <div className="panel panel-span-2">
             <StateCard title="Loading profile" description="Fetching your account details." loading />
@@ -318,11 +355,17 @@ export function ProfilePage() {
                   You&apos;re viewing the account details already available on this device.
                 </p>
                 <div className="action-row">
-                  <button type="button" className="ghost-button" onClick={() => void loadProfile()}>
+                  <button type="button" className="ghost-button" onClick={() => void loadProfile({ blocking: false })}>
                     Retry profile load
                   </button>
                 </div>
               </div>
+            </div>
+          ) : null}
+
+          {isRefreshingProfile ? (
+            <div className="panel panel-span-2">
+              <p className="section-note">Refreshing profile details...</p>
             </div>
           ) : null}
 
@@ -342,7 +385,7 @@ export function ProfilePage() {
               <div className="form-grid">
                 <label className="field field-span-2">
                   <span>Email</span>
-                  <input type="email" value={profile?.email ?? ''} readOnly disabled />
+                  <input type="email" value={renderProfile?.email ?? ''} readOnly disabled />
                   <small>Sign-in email is managed separately and cannot be edited here.</small>
                 </label>
 
@@ -431,11 +474,11 @@ export function ProfilePage() {
             <div className="profile-meta-grid">
               <div>
                 <span className="stat-label">Created At</span>
-                <strong>{profile ? formatDate(profile.createdAt) : 'Unknown'}</strong>
+                <strong>{renderProfile ? formatDate(renderProfile.createdAt) : 'Unknown'}</strong>
               </div>
               <div>
                 <span className="stat-label">Preferred Name</span>
-                <strong>{profile?.displayName || profile?.fullName || 'Not set'}</strong>
+                <strong>{renderProfile?.displayName || renderProfile?.fullName || 'Not set'}</strong>
               </div>
             </div>
 
