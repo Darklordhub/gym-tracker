@@ -377,6 +377,10 @@ body {
   padding: 16px 8px 32px;
 }
 
+.profile-shell {
+  padding-top: 20px;
+}
+
 .hero-panel,
 .panel {
   border: 1px solid var(--border-strong);

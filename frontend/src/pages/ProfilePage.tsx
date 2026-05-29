@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { changePassword, fetchProfile, updateProfile } from '../api/profile'
 import { fetchCycleGuidance, fetchCycleSettings, updateCycleSettings } from '../api/cycle'
@@ -71,33 +71,65 @@ export function ProfilePage() {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
   const [cycleError, setCycleError] = useState<string | null>(null)
   const [cycleMessage, setCycleMessage] = useState<string | null>(null)
+  const loadRequestIdRef = useRef(0)
 
   const loadProfile = useCallback(async () => {
+    const requestId = loadRequestIdRef.current + 1
+    loadRequestIdRef.current = requestId
+
     try {
       setIsLoading(true)
       setLoadError(null)
 
-      const [currentProfile, currentCycleSettings, currentCycleGuidance] = await Promise.all([
+      const [profileResult, cycleSettingsResult, cycleGuidanceResult] = await Promise.allSettled([
         fetchProfile(),
-        fetchCycleSettings().catch(() => emptyCycleSettings),
-        fetchCycleGuidance().catch(() => null),
+        fetchCycleSettings(),
+        fetchCycleGuidance(),
       ])
 
-      setProfile(currentProfile)
-      setProfileForm(mapProfileToForm(currentProfile))
-      setCurrentUser(currentProfile)
-      setCycleSettings(currentCycleSettings)
-      setCycleGuidance(currentCycleGuidance)
+      if (requestId !== loadRequestIdRef.current) {
+        return
+      }
+
+      if (profileResult.status === 'fulfilled') {
+        setProfile(profileResult.value)
+        setProfileForm(mapProfileToForm(profileResult.value))
+        setCurrentUser(profileResult.value)
+      } else {
+        setLoadError(getRequestErrorMessage(profileResult.reason, 'Unable to load your profile.'))
+      }
+
+      if (cycleSettingsResult.status === 'fulfilled') {
+        setCycleSettings(cycleSettingsResult.value)
+      } else {
+        setCycleSettings(emptyCycleSettings)
+      }
+
+      if (cycleGuidanceResult.status === 'fulfilled') {
+        setCycleGuidance(cycleGuidanceResult.value)
+      } else {
+        setCycleGuidance(null)
+      }
     } catch (error) {
-      setLoadError(getRequestErrorMessage(error, 'Unable to load your profile.'))
+      if (requestId === loadRequestIdRef.current) {
+        setLoadError(getRequestErrorMessage(error, 'Unable to load your profile.'))
+      }
     } finally {
-      setIsLoading(false)
+      if (requestId === loadRequestIdRef.current) {
+        setIsLoading(false)
+      }
     }
   }, [setCurrentUser])
 
   useEffect(() => {
     void loadProfile()
   }, [loadProfile])
+
+  useEffect(() => () => {
+    loadRequestIdRef.current += 1
+  }, [])
+
+  const hasRenderableProfile = profile !== null
 
   async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -206,7 +238,7 @@ export function ProfilePage() {
   }
 
   return (
-    <main className="page-shell">
+    <main className="page-shell profile-shell">
       <section className="profile-hero-forge">
         <div className="profile-hero-main">
           <span className="eyebrow">FORGE / Account</span>
@@ -264,13 +296,13 @@ export function ProfilePage() {
         </article>
       </section>
 
-      {isLoading ? (
+      {isLoading && !hasRenderableProfile ? (
         <section className="profile-main-grid">
           <div className="panel panel-span-2">
             <StateCard title="Loading profile" description="Fetching your account details." loading />
           </div>
         </section>
-      ) : loadError ? (
+      ) : loadError && !hasRenderableProfile ? (
         <section className="profile-main-grid">
           <div className="panel panel-span-2">
             <StateCard title="Profile unavailable" description={loadError} tone="error" />
@@ -278,6 +310,22 @@ export function ProfilePage() {
         </section>
       ) : (
         <section className="profile-main-grid">
+          {loadError ? (
+            <div className="panel panel-span-2">
+              <div className="feedback-stack">
+                <p className="feedback error">{loadError}</p>
+                <p className="section-note">
+                  You&apos;re viewing the account details already available on this device.
+                </p>
+                <div className="action-row">
+                  <button type="button" className="ghost-button" onClick={() => void loadProfile()}>
+                    Retry profile load
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="panel">
             <div className="panel-header">
               <div>

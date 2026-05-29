@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -61,6 +62,19 @@ function normalizeAuthUser(user: AuthUser): AuthUser {
     role: user.role ?? 'User',
     isActive: user.isActive ?? true,
   }
+}
+
+function areAuthUsersEqual(left: AuthUser, right: AuthUser) {
+  return left.id === right.id
+    && left.email === right.email
+    && left.fullName === right.fullName
+    && left.displayName === right.displayName
+    && left.dateOfBirth === right.dateOfBirth
+    && left.heightCm === right.heightCm
+    && left.gender === right.gender
+    && left.role === right.role
+    && left.isActive === right.isActive
+    && left.createdAt === right.createdAt
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -129,49 +143,58 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
-  async function handleAuthResponse(request: Promise<AuthResponse>) {
+  const handleAuthResponse = useCallback(async (request: Promise<AuthResponse>) => {
     const response = await request
     const nextAuthState = toStoredAuthState(response)
     setAuthState(nextAuthState)
     persistAuthState(nextAuthState)
-  }
+  }, [])
 
-  function logout() {
+  const login = useCallback(async (payload: Parameters<typeof loginRequest>[0]) => {
+    await handleAuthResponse(loginRequest(payload))
+  }, [handleAuthResponse])
+
+  const register = useCallback(async (payload: Parameters<typeof registerRequest>[0]) => {
+    await handleAuthResponse(registerRequest(payload))
+  }, [handleAuthResponse])
+
+  const logout = useCallback(() => {
     setAuthState(null)
     persistAuthState(null)
-  }
+  }, [])
 
-  function setCurrentUser(user: AuthUser) {
+  const setCurrentUser = useCallback((user: AuthUser) => {
     setAuthState((current) => {
       if (!current) {
         return current
       }
 
+      const normalizedUser = normalizeAuthUser(user)
+      if (areAuthUsersEqual(current.user, normalizedUser)) {
+        return current
+      }
+
       const nextAuthState: StoredAuthState = {
         ...current,
-        user: normalizeAuthUser(user),
+        user: normalizedUser,
       }
 
       persistAuthState(nextAuthState)
       return nextAuthState
     })
-  }
+  }, [])
 
   const value = useMemo<AuthContextValue>(
     () => ({
       authState,
       isAuthenticated: authState !== null,
       isInitializing,
-      login: async (payload) => {
-        await handleAuthResponse(loginRequest(payload))
-      },
-      register: async (payload) => {
-        await handleAuthResponse(registerRequest(payload))
-      },
+      login,
+      register,
       setCurrentUser,
       logout,
     }),
-    [authState, isInitializing],
+    [authState, isInitializing, login, logout, register, setCurrentUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
