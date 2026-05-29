@@ -75,6 +75,10 @@ builder.Services.AddScoped<INutritionProvider>(serviceProvider => serviceProvide
 builder.Services.AddHttpClient<ExerciseMediaUrlValidationService>(httpClient =>
 {
     httpClient.Timeout = TimeSpan.FromSeconds(Math.Clamp(exerciseMediaEnrichmentOptions.UrlValidationTimeoutSeconds, 3, 60));
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AllowAutoRedirect = false,
 });
 builder.Services.AddHttpClient<IWgerExerciseCatalogSyncService, WgerExerciseCatalogSyncService>(httpClient =>
 {
