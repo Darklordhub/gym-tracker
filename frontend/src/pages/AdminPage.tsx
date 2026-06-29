@@ -289,9 +289,9 @@ export function AdminPage() {
   }
 
   return (
-    <main className="page-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
+    <main className="page-shell admin-shell">
+      <section className="hero-panel admin-hero-panel">
+        <div className="hero-copy admin-hero-copy">
           <span className="eyebrow">Admin</span>
           <h1>Operations & Catalog Management</h1>
           <p className="hero-text">

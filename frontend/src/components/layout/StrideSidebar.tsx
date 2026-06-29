@@ -58,12 +58,12 @@ export function StrideSidebar({
           </div>
         </div>
 
-        <div className="sidebar-section">
+        <div className="sidebar-section sidebar-section-primary">
           <div className="sidebar-section-header">
             <span>Main navigation</span>
             <span className="sidebar-section-count">{primaryNavItems.length}</span>
           </div>
-          <nav className="sidebar-nav" aria-label="Main navigation">
+          <nav className="sidebar-nav sidebar-nav-primary" aria-label="Main navigation">
             {primaryNavItems.map((item) => (
               <NavLink
                 key={item.to}

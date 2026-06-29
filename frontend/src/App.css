@@ -9754,3 +9754,628 @@ body {
     padding-inline: 12px;
   }
 }
+
+/* STRIDE laptop density system */
+
+@media (min-width: 901px) {
+  :root {
+    --stride-sidebar-width: clamp(224px, 18vw, 244px);
+    --stride-sidebar-rail: 78px;
+    --stride-topbar-height: clamp(84px, 11.25vh, 104px);
+    --stride-topbar-padding-block: clamp(12px, 1.35vh, 16px);
+    --stride-topbar-padding-inline: clamp(16px, 1.6vw, 22px);
+    --stride-page-padding-x: clamp(16px, 1.7vw, 22px);
+    --stride-page-padding-y: clamp(16px, 1.8vh, 24px);
+    --stride-section-gap: clamp(16px, 1.6vh, 20px);
+    --stride-stack-gap: clamp(10px, 1vh, 14px);
+    --stride-panel-padding: clamp(16px, 1.25vw, 22px);
+    --stride-card-padding: clamp(14px, 1vw, 18px);
+    --stride-hero-padding: clamp(20px, 1.8vw, 28px);
+    --stride-hero-title-size: clamp(2.05rem, 3.3vw, 3.25rem);
+    --stride-admin-hero-title-size: clamp(1.95rem, 3vw, 3rem);
+    --stride-dashboard-hero-title-size: clamp(2.35rem, 5vw, 4.6rem);
+    --stride-section-title-size: clamp(1.18rem, 1.2vw, 1.5rem);
+    --stride-nav-item-height: clamp(40px, 4.35vh, 46px);
+    --stride-nav-font-size: clamp(0.84rem, 0.2vw + 0.8rem, 0.92rem);
+    --stride-nav-meta-size: clamp(0.68rem, 0.12vw + 0.66rem, 0.73rem);
+    --section-gap: var(--stride-section-gap);
+    --stack-gap: var(--stride-stack-gap);
+    --panel-padding: var(--stride-panel-padding);
+    --card-padding: var(--stride-card-padding);
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1440px), (min-width: 1025px) and (max-height: 820px) {
+  :root {
+    --stride-sidebar-width: clamp(212px, 16vw, 228px);
+    --stride-topbar-height: clamp(72px, 10vh, 82px);
+    --stride-topbar-padding-block: clamp(10px, 1vh, 12px);
+    --stride-topbar-padding-inline: clamp(14px, 1.25vw, 18px);
+    --stride-page-padding-x: clamp(12px, 1.15vw, 18px);
+    --stride-page-padding-y: clamp(12px, 1.4vh, 18px);
+    --stride-section-gap: clamp(12px, 1.15vh, 16px);
+    --stride-stack-gap: clamp(8px, 0.8vh, 12px);
+    --stride-panel-padding: clamp(14px, 1vw, 18px);
+    --stride-card-padding: clamp(12px, 0.85vw, 16px);
+    --stride-hero-padding: clamp(16px, 1.25vw, 22px);
+    --stride-hero-title-size: clamp(1.8rem, 2.6vw, 2.6rem);
+    --stride-admin-hero-title-size: clamp(1.7rem, 2.4vw, 2.35rem);
+    --stride-dashboard-hero-title-size: clamp(2.05rem, 4vw, 3.75rem);
+    --stride-section-title-size: clamp(1.08rem, 1vw, 1.32rem);
+    --stride-nav-item-height: clamp(38px, 3.9vh, 42px);
+    --stride-nav-font-size: clamp(0.82rem, 0.14vw + 0.78rem, 0.88rem);
+    --stride-nav-meta-size: clamp(0.66rem, 0.08vw + 0.64rem, 0.71rem);
+  }
+
+  .workouts-panel-strength,
+  .workouts-panel-history,
+  .workouts-panel-templates,
+  .workouts-panel-cardio {
+    grid-column: span 6;
+  }
+
+  .exercise-library-list {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+@media (min-width: 901px) {
+  .forge-shell {
+    --shell-sidebar-width: var(--stride-sidebar-width);
+    --shell-sidebar-rail: var(--stride-sidebar-rail);
+  }
+
+  .app-sidebar {
+    padding: 8px 6px 8px 8px;
+  }
+
+  .sidebar-inner {
+    gap: clamp(10px, 1vh, 14px);
+    padding: clamp(10px, 1.2vh, 14px) clamp(8px, 0.85vw, 10px) clamp(10px, 1.05vh, 12px);
+  }
+
+  .sidebar-brand {
+    flex-shrink: 0;
+    min-height: 0;
+    gap: clamp(8px, 0.7vh, 12px);
+    padding: 0 clamp(4px, 0.45vw, 8px) clamp(10px, 1vh, 14px);
+    align-items: start;
+  }
+
+  .sidebar-brand .brand-mark {
+    width: clamp(34px, 2.45vw, 38px);
+    height: clamp(34px, 2.45vw, 38px);
+    border-radius: 11px;
+  }
+
+  .sidebar-brand .brand-kicker {
+    font-size: clamp(0.58rem, 0.5vw, 0.62rem);
+    letter-spacing: 0.18em;
+  }
+
+  .sidebar-brand .brand-name {
+    font-size: clamp(0.96rem, 0.9vw, 1.05rem);
+  }
+
+  .sidebar-brand .brand-subtitle {
+    display: block;
+    max-width: 18rem;
+    font-size: clamp(0.72rem, 0.6vw, 0.76rem);
+    line-height: 1.35;
+  }
+
+  .sidebar-section-primary {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .sidebar-section-admin {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .sidebar-section {
+    gap: clamp(8px, 0.7vh, 10px);
+  }
+
+  .sidebar-section-header {
+    padding-inline: clamp(6px, 0.5vw, 8px);
+    font-size: clamp(0.68rem, 0.55vw, 0.72rem);
+  }
+
+  .sidebar-section-count,
+  .sidebar-section-admin .sidebar-section-count,
+  .sidebar-section-secondary .status-pill {
+    min-height: 20px;
+    padding: 0 8px;
+    font-size: 0.66rem;
+  }
+
+  .sidebar-section-secondary {
+    padding-top: clamp(10px, 1vh, 12px);
+  }
+
+  .sidebar-nav {
+    gap: clamp(5px, 0.45vh, 6px);
+  }
+
+  .sidebar-nav-primary {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .sidebar-nav-secondary {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .sidebar-link {
+    min-height: var(--stride-nav-item-height);
+    gap: 10px;
+    padding: clamp(6px, 0.55vh, 8px) clamp(8px, 0.75vw, 10px);
+  }
+
+  .sidebar-link::before {
+    top: 6px;
+    bottom: 6px;
+  }
+
+  .sidebar-link-icon {
+    width: clamp(28px, 2vw, 32px);
+    height: clamp(28px, 2vw, 32px);
+    border-radius: 10px;
+  }
+
+  .sidebar-link-label {
+    font-size: var(--stride-nav-font-size);
+    line-height: 1.1;
+  }
+
+  .sidebar-link-meta {
+    font-size: var(--stride-nav-meta-size);
+    line-height: 1.18;
+  }
+
+  .sidebar-section-secondary .account-panel {
+    gap: clamp(10px, 0.8vh, 12px);
+    padding: clamp(10px, 0.9vh, 12px);
+    border-radius: 16px;
+  }
+
+  .sidebar-section-secondary .user-pill {
+    gap: 9px;
+    padding: 8px 9px;
+    border-radius: 12px;
+  }
+
+  .sidebar-section-secondary .avatar-ring {
+    width: 34px;
+    height: 34px;
+  }
+
+  .sidebar-section-secondary .user-copy strong {
+    font-size: 0.84rem;
+  }
+
+  .sidebar-section-secondary .user-copy span {
+    font-size: 0.73rem;
+  }
+
+  .sidebar-actions {
+    gap: 7px;
+  }
+
+  .sidebar-action-button {
+    min-height: 36px;
+    padding: 7px 8px;
+    font-size: 0.76rem;
+  }
+
+  .app-topbar {
+    min-height: var(--stride-topbar-height);
+    gap: clamp(12px, 1vw, 16px);
+    padding:
+      var(--stride-topbar-padding-block)
+      var(--stride-topbar-padding-inline)
+      calc(var(--stride-topbar-padding-block) - 1px);
+  }
+
+  .topbar-left {
+    gap: clamp(8px, 0.75vh, 12px);
+  }
+
+  .topbar-breadcrumb {
+    gap: 6px;
+    padding: 6px 9px;
+    font-size: clamp(0.64rem, 0.5vw, 0.69rem);
+  }
+
+  .topbar-title-block {
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .topbar-kicker {
+    font-size: clamp(0.68rem, 0.52vw, 0.72rem);
+    letter-spacing: 0.16em;
+  }
+
+  .topbar-title-block strong {
+    font-size: clamp(1.18rem, 1.45vw, 1.8rem);
+    line-height: 1;
+  }
+
+  .topbar-title-block p {
+    max-width: min(100%, 38rem);
+    font-size: clamp(0.82rem, 0.3vw + 0.75rem, 0.9rem);
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .tb-right {
+    gap: 8px;
+  }
+
+  .topbar-actions-cluster {
+    gap: 6px;
+    padding: 3px;
+    border-radius: 14px;
+  }
+
+  .topbar-icon-button,
+  .notification-toggle {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .topbar-user {
+    max-width: min(100%, 17rem);
+    gap: 8px;
+    padding: 6px 9px 6px 6px;
+    border-radius: 16px;
+  }
+
+  .topbar-user .avatar-ring {
+    width: 34px;
+    height: 34px;
+  }
+
+  .topbar-user .avatar-inner {
+    font-size: 0.68rem;
+  }
+
+  .topbar-user-copy {
+    gap: 1px;
+  }
+
+  .topbar-user-copy strong {
+    font-size: 0.84rem;
+  }
+
+  .topbar-user-copy span {
+    font-size: 0.72rem;
+  }
+
+  .notification-panel {
+    width: min(340px, calc(100vw - 32px));
+    gap: 12px;
+  }
+
+  .notification-card {
+    padding: clamp(12px, 0.85vw, 16px);
+  }
+
+  .content-container {
+    width: min(1320px, 100%);
+    padding:
+      var(--stride-page-padding-y)
+      var(--stride-page-padding-x)
+      calc(var(--stride-page-padding-y) + 6px);
+  }
+
+  .hero-panel,
+  .dashboard-hero-forge,
+  .workouts-hero-forge,
+  .weight-hero-forge,
+  .profile-hero-forge,
+  .progress-hero-forge,
+  .cycle-hero-forge,
+  .exercise-library-hero {
+    padding: var(--stride-hero-padding);
+    gap: clamp(14px, 1.15vh, 18px);
+    border-radius: clamp(24px, 1.9vw, 30px);
+  }
+
+  .nutrition-toolbar-panel {
+    padding: var(--stride-hero-padding);
+    gap: clamp(14px, 1.15vh, 18px);
+    border-radius: clamp(24px, 1.9vw, 30px);
+  }
+
+  .panel-header {
+    margin-bottom: clamp(12px, 1vh, 16px);
+  }
+
+  .panel-header h2,
+  .nutrition-mode-panel-header h2 {
+    font-size: var(--stride-section-title-size);
+  }
+
+  .panel-header p,
+  .hero-text,
+  .nutrition-toolbar-copy p,
+  .exercise-library-hero-copy p {
+    font-size: clamp(0.9rem, 0.32vw + 0.82rem, 1rem);
+    line-height: 1.5;
+  }
+
+  .hero-panel .hero-copy,
+  .weight-hero-main,
+  .profile-hero-main,
+  .progress-hero-main,
+  .cycle-hero-main,
+  .dashboard-hero-main,
+  .workouts-hero-main,
+  .exercise-library-hero-copy,
+  .nutrition-toolbar-copy {
+    display: grid;
+    gap: clamp(8px, 0.75vh, 12px);
+    min-width: 0;
+  }
+
+  .hero-panel h1,
+  .weight-hero-main h1,
+  .profile-hero-main h1,
+  .progress-hero-main h1,
+  .cycle-hero-main h1,
+  .exercise-library-hero-copy h1,
+  .nutrition-toolbar-copy h1 {
+    font-size: var(--stride-hero-title-size);
+    line-height: 0.96;
+  }
+
+  .dashboard-os .dashboard-hero-main h1,
+  .workouts-hero-main h1 {
+    font-size: var(--stride-dashboard-hero-title-size);
+    line-height: 0.93;
+  }
+
+  .admin-hero-copy {
+    display: grid;
+    gap: clamp(8px, 0.75vh, 10px);
+  }
+
+  .admin-hero-panel h1 {
+    max-width: 13ch;
+    font-size: var(--stride-admin-hero-title-size);
+    line-height: 0.97;
+  }
+
+  .stats-grid {
+    gap: clamp(10px, 0.95vh, 16px);
+    grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  }
+
+  .admin-hero-panel .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  }
+
+  .stat-card {
+    min-height: clamp(118px, 15.5vh, 140px);
+  }
+
+  .forge-stat-strip-dashboard {
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  }
+
+  .forge-stat-strip-workouts,
+  .forge-stat-strip-profile {
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  }
+
+  .forge-stat-card {
+    min-height: clamp(124px, 17vh, 156px);
+    padding: clamp(14px, 0.95vw, 18px);
+    gap: 7px;
+  }
+
+  .forge-stat-card strong {
+    font-size: clamp(1.45rem, 2.6vw, 2.05rem);
+  }
+
+  .hero-inline-stat,
+  .forge-focus-card {
+    padding: clamp(14px, 0.95vw, 18px);
+    gap: 6px;
+  }
+
+  .hero-inline-stat strong,
+  .forge-focus-card strong {
+    font-size: clamp(1.28rem, 2vw, 1.8rem);
+  }
+
+  .dashboard-os {
+    gap: clamp(12px, 1vh, 15px);
+    padding: clamp(10px, 0.95vw, 15px);
+    border-radius: 20px;
+  }
+
+  .dashboard-os .dashboard-hero-forge,
+  .dashboard-os .panel {
+    border-radius: 18px;
+  }
+
+  .dashboard-os .panel {
+    padding: clamp(14px, 1vw, 16px);
+  }
+
+  .dashboard-os .dashboard-hero-forge {
+    padding: clamp(18px, 1.2vw, 20px);
+    gap: clamp(12px, 0.9vh, 14px);
+  }
+
+  .dashboard-os .panel-header {
+    margin-bottom: clamp(10px, 0.8vh, 12px);
+  }
+
+  .dashboard-os .dashboard-hero-actions,
+  .dashboard-os .forge-stat-strip-dashboard,
+  .dashboard-os .dashboard-forge-grid,
+  .dashboard-os .dashboard-goals-layout {
+    gap: clamp(10px, 0.9vh, 12px);
+  }
+
+  .dashboard-os .dashboard-goal-progress-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  }
+
+  .dashboard-os .dashboard-weekly-grid,
+  .dashboard-os .dashboard-overview-grid,
+  .dashboard-os .dashboard-panel-energy .dashboard-metric-list,
+  .dashboard-os .dashboard-panel-training-score .dashboard-metric-list {
+    gap: 12px;
+  }
+
+  .dashboard-os .dashboard-readiness-summary {
+    gap: 12px;
+    padding: clamp(14px, 0.95vw, 18px);
+  }
+
+  .dashboard-os .dashboard-readiness-score strong {
+    font-size: clamp(2rem, 3.2vw, 2.35rem);
+  }
+
+  .dashboard-os .dashboard-panel-energy .dashboard-metric-card,
+  .dashboard-os .dashboard-panel-training-score .dashboard-metric-card,
+  .dashboard-os .dashboard-panel-overview .dashboard-metric-card,
+  .dashboard-os .dashboard-panel-weekly .dashboard-metric-card,
+  .dashboard-weekly-card,
+  .dashboard-overview-card {
+    min-height: clamp(110px, 14vh, 132px);
+  }
+
+  .dashboard-os .assistant-grid.dashboard-assistant-grid,
+  .workouts-assistant-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  }
+
+  .workouts-main-grid {
+    gap: clamp(12px, 1vh, 16px);
+  }
+
+  .workouts-panel-strength .exercise-builder,
+  .workouts-panel-full .exercise-builder,
+  .workouts-panel-history .filter-toolbar {
+    padding: clamp(14px, 0.95vw, 18px);
+  }
+
+  .workouts-panel-templates .template-list,
+  .workouts-panel-history .workout-list,
+  .exercise-list,
+  .template-list {
+    gap: clamp(10px, 0.9vh, 14px);
+  }
+
+  .workout-list-scroll {
+    max-height: min(64vh, 860px);
+  }
+
+  .profile-main-grid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  }
+
+  .profile-meta-grid > div,
+  .progress-analytics-grid > div {
+    padding: clamp(14px, 0.95vw, 16px) clamp(14px, 1vw, 18px);
+  }
+
+  .exercise-library-list {
+    gap: clamp(10px, 0.95vh, 14px);
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+
+  .exercise-library-card {
+    padding: clamp(12px, 0.95vw, 15px);
+  }
+
+  .exercise-library-card-media {
+    min-height: clamp(148px, 20vh, 172px);
+  }
+
+  .nutrition-shell {
+    gap: var(--section-gap);
+    padding-bottom: 40px;
+  }
+
+  .nutrition-toolbar-panel,
+  .nutrition-stat-card,
+  .nutrition-meal-card,
+  .nutrition-preview-card,
+  .nutrition-calculation-preview,
+  .nutrition-item-card,
+  .nutrition-search-result {
+    padding: clamp(14px, 0.95vw, 18px);
+  }
+
+  .nutrition-summary-grid {
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  }
+
+  .nutrition-search-input-shell {
+    min-height: 46px;
+    padding: 0 12px;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 12px 12px;
+  }
+
+  .admin-actions {
+    gap: 8px;
+  }
+
+  .admin-table-shell.panel-scroll-region {
+    max-height: min(66vh, 720px);
+  }
+}
+
+@media (min-width: 981px) {
+  .nutrition-create-meal-form {
+    grid-template-columns: minmax(160px, 0.85fr) minmax(200px, 1fr) minmax(0, 1.25fr);
+  }
+}
+
+@media (min-width: 1025px) {
+  .dashboard-os .dashboard-goals-layout {
+    grid-template-columns: minmax(248px, 0.86fr) minmax(0, 1.14fr);
+  }
+}
+
+@media (min-width: 1181px) {
+  .nutrition-toolbar-panel {
+    grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.95fr);
+  }
+
+  .nutrition-toolbar-date-field {
+    width: min(100%, 220px);
+    max-width: 220px;
+  }
+
+  .nutrition-workspace {
+    grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.96fr);
+    gap: clamp(16px, 1.35vw, 22px);
+  }
+}
+
+@media (min-width: 1181px) and (max-width: 1440px), (min-width: 1181px) and (max-height: 820px) {
+  .nutrition-workspace {
+    grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.88fr);
+  }
+}
