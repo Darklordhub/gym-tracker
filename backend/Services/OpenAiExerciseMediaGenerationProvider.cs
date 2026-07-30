@@ -13,6 +13,11 @@ public class OpenAiExerciseMediaGenerationProvider : IExerciseMediaGenerationPro
     public const string Name = "OpenAI";
 
     private static readonly HashSet<int> AllowedVideoSeconds = [4, 8, 12];
+    private static readonly HashSet<string> AllowedVideoModels = new(StringComparer.Ordinal)
+    {
+        "sora-2",
+        "sora-2-pro",
+    };
     private static readonly HashSet<string> AllowedVideoSizes = new(StringComparer.Ordinal)
     {
         "720x1280",
@@ -234,7 +239,7 @@ public class OpenAiExerciseMediaGenerationProvider : IExerciseMediaGenerationPro
         return timeoutSource;
     }
 
-    private void ValidateConfiguration()
+    public void ValidateConfiguration()
     {
         if (!_generationOptions.Enabled)
         {
@@ -252,11 +257,9 @@ public class OpenAiExerciseMediaGenerationProvider : IExerciseMediaGenerationPro
         }
 
         var model = _openAiOptions.VideoModel?.Trim();
-        if (string.IsNullOrWhiteSpace(model) ||
-            model.Length > 100 ||
-            model.Any(character => !char.IsLetterOrDigit(character) && character is not '-' and not '_' and not '.'))
+        if (string.IsNullOrWhiteSpace(model) || !AllowedVideoModels.Contains(model))
         {
-            throw new ExerciseMediaGenerationException("The configured OpenAI video model is invalid.");
+            throw new ExerciseMediaGenerationException("OpenAI video model must be sora-2 or sora-2-pro.");
         }
 
         if (!AllowedVideoSeconds.Contains(_openAiOptions.VideoSeconds))

@@ -259,6 +259,10 @@ public class AppDbContext : DbContext
             .Property(draft => draft.ErrorMessage)
             .HasMaxLength(4000);
 
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.UpdatedAt)
+            .IsConcurrencyToken();
+
         modelBuilder.Entity<NutritionCatalogItem>()
             .Property(item => item.Source)
             .HasMaxLength(40);

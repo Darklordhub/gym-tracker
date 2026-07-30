@@ -35,6 +35,8 @@ public interface IExerciseMediaGenerationProvider
 {
     string ProviderName { get; }
 
+    void ValidateConfiguration();
+
     Task<ExerciseMediaGenerationStartResult> StartGenerationAsync(
         ExerciseMediaDraft draft,
         CancellationToken cancellationToken = default);

@@ -27,6 +27,18 @@ Optional backup/auth settings:
 - `LEGACY_USER_EMAIL` blank by default
 - `LEGACY_USER_PASSWORD` blank by default
 
+Optional Exercise Media Studio settings:
+
+- `EXERCISE_MEDIA_VOLUME_NAME` controls the persistent generated-media volume name.
+- `MEDIA_STORAGE_MAX_FILE_SIZE_MB` defaults to `100`.
+- `MEDIA_GENERATION_ENABLED` defaults to `false` and must be explicitly enabled.
+- `MEDIA_GENERATION_PROVIDER` defaults to `OpenAI`.
+- `OPENAI_API_KEY` must be set only when generation is enabled.
+- `OPENAI_VIDEO_MODEL` accepts `sora-2` or `sora-2-pro`.
+- `OPENAI_VIDEO_SECONDS` accepts `4`, `8`, or `12`.
+- `OPENAI_VIDEO_SIZE` accepts `720x1280`, `1280x720`, `1024x1792`, or `1792x1024`.
+- `OPENAI_TIMEOUT_SECONDS` defaults to `60`.
+
 Example values are provided in [`/.env.example`](./.env.example).
 
 ### Deploy in Portainer
@@ -130,4 +142,7 @@ If you manage the stack through Portainer, the same sequence applies: stop `gym-
 - The API and database stay on the internal Docker network and communicate by service name.
 - The backup container also stays on the internal Docker network and does not publish host ports.
 - `JWT_SIGNING_KEY` must be set to a long random secret before deployment. The API refuses to start with a missing or too-short signing key.
+- `POSTGRES_PASSWORD` is required by Compose and has no production fallback.
+- `APP_BASE_URL` must be the externally reachable origin without a trailing slash or path, for example `https://gym.example.com`.
+- Keep `MEDIA_GENERATION_ENABLED=false` until the media volume, public `/media` route, provider budget limits, and admin workflow have been verified in staging.
 - This layout is suitable for a personal Linux server and can sit behind a reverse proxy or Cloudflare Tunnel later without changing app behavior.

@@ -1261,6 +1261,8 @@ export function AdminPage() {
             </div>
 
             <div className="media-studio-modal-content">
+              {mediaStudioError ? <p className="feedback error">{mediaStudioError}</p> : null}
+
               <div className="media-studio-meta-grid">
                 <span className={getMediaStudioStatusClassName(promptDraft.status)}>{formatCatalogLabel(promptDraft.status)}</span>
                 <span className="info-pill">{promptDraft.exerciseSource}</span>

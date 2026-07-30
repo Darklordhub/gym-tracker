@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-gymtrackerdb}
       POSTGRES_USER: ${POSTGRES_USER:-gymuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set to a strong secret}
     volumes:
       - gym-tracker-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -26,7 +26,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-gymtrackerdb}
       POSTGRES_USER: ${POSTGRES_USER:-gymuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set to a strong secret}
       PGHOST: gym-tracker-db
       PGPORT: 5432
       BACKUP_DIR: /backups
@@ -47,7 +47,7 @@ services:
       ASPNETCORE_URLS: http://+:8080
       Http__UseHttpsRedirection: "false"
       App__AllowStartupWithMigrationFailure: ${APP_ALLOW_STARTUP_WITH_MIGRATION_FAILURE:-false}
-      ConnectionStrings__DefaultConnection: Host=gym-tracker-db;Port=5432;Database=${POSTGRES_DB:-gymtrackerdb};Username=${POSTGRES_USER:-gymuser};Password=${POSTGRES_PASSWORD:-change-me}
+      ConnectionStrings__DefaultConnection: Host=gym-tracker-db;Port=5432;Database=${POSTGRES_DB:-gymtrackerdb};Username=${POSTGRES_USER:-gymuser};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set to a strong secret}
       Cors__AllowedOrigins__0: ${APP_BASE_URL:-http://localhost:8080}
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY must be set to a random string at least 32 characters long}
       Jwt__Issuer: ${JWT_ISSUER:-gym-tracker-api}

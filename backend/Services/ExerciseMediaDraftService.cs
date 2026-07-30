@@ -160,7 +160,7 @@ public class ExerciseMediaDraftService
         };
 
         _dbContext.ExerciseMediaDrafts.Add(draft);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveDraftChangesAsync(cancellationToken);
 
         draft.ExerciseCatalogItem = exercise;
         return MapDraft(draft);
@@ -192,7 +192,7 @@ public class ExerciseMediaDraftService
         draft.ReviewedAt = now;
         draft.UpdatedAt = now;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveDraftChangesAsync(cancellationToken);
         return MapDraft(draft);
     }
 
@@ -221,7 +221,7 @@ public class ExerciseMediaDraftService
         draft.ReviewedAt = now;
         draft.UpdatedAt = now;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveDraftChangesAsync(cancellationToken);
         return MapDraft(draft);
     }
 
@@ -289,7 +289,7 @@ public class ExerciseMediaDraftService
         draft.PublishedAt = now;
         draft.UpdatedAt = now;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveDraftChangesAsync(cancellationToken);
         return MapDraft(draft);
     }
 
@@ -321,6 +321,40 @@ public class ExerciseMediaDraftService
         }
 
         var provider = GetGenerationProvider(_generationOptions.Provider);
+        try
+        {
+            provider.ValidateConfiguration();
+        }
+        catch (ExerciseMediaGenerationException exception)
+        {
+            throw new ExerciseMediaDraftWorkflowException(exception.Message);
+        }
+
+        var originalStatus = draft.Status;
+        var claimTime = DateTime.UtcNow;
+        var claimed = await _dbContext.ExerciseMediaDrafts
+            .Where(candidate =>
+                candidate.Id == draft.Id &&
+                (candidate.Status == ExerciseMediaDraftStatuses.Queued ||
+                 candidate.Status == ExerciseMediaDraftStatuses.NeedsReview ||
+                 candidate.Status == ExerciseMediaDraftStatuses.Failed ||
+                 candidate.Status == ExerciseMediaDraftStatuses.Rejected))
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(candidate => candidate.Status, ExerciseMediaDraftStatuses.Generating)
+                    .SetProperty(candidate => candidate.UpdatedAt, claimTime),
+                cancellationToken);
+
+        if (claimed != 1)
+        {
+            throw new ExerciseMediaDraftWorkflowException(
+                "Draft status changed before generation could start. Refresh and try again.");
+        }
+
+        draft.Status = ExerciseMediaDraftStatuses.Generating;
+        draft.UpdatedAt = claimTime;
+        _dbContext.Entry(draft).Property(candidate => candidate.UpdatedAt).OriginalValue = claimTime;
+
         ExerciseMediaGenerationStartResult result;
         try
         {
@@ -328,6 +362,10 @@ public class ExerciseMediaDraftService
         }
         catch (ExerciseMediaGenerationException exception)
         {
+            draft.Status = originalStatus;
+            draft.ErrorMessage = exception.Message;
+            draft.UpdatedAt = DateTime.UtcNow;
+            await SaveDraftChangesAsync(cancellationToken);
             throw new ExerciseMediaDraftWorkflowException(exception.Message);
         }
 
@@ -345,7 +383,7 @@ public class ExerciseMediaDraftService
         draft.ReviewedAt = null;
         draft.UpdatedAt = now;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveDraftChangesAsync(cancellationToken);
         return MapDraft(draft);
     }
 
@@ -416,7 +454,7 @@ public class ExerciseMediaDraftService
         }
 
         draft.UpdatedAt = now;
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveDraftChangesAsync(cancellationToken);
         return MapDraft(draft);
     }
 
@@ -454,6 +492,19 @@ public class ExerciseMediaDraftService
             string.Equals(status, ExerciseMediaDraftStatuses.NeedsReview, StringComparison.Ordinal) ||
             string.Equals(status, ExerciseMediaDraftStatuses.Failed, StringComparison.Ordinal) ||
             string.Equals(status, ExerciseMediaDraftStatuses.Rejected, StringComparison.Ordinal);
+    }
+
+    private async Task SaveDraftChangesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ExerciseMediaDraftWorkflowException(
+                "Draft status changed while this action was running. Refresh and try again.");
+        }
     }
 
     private static ExerciseMediaDraftResponse MapDraft(ExerciseMediaDraft draft)

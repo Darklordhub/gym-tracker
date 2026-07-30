@@ -80,7 +80,8 @@ builder.Services.AddHttpClient<OpenAiExerciseMediaGenerationProvider>(httpClient
 {
     httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
     httpClient.Timeout = Timeout.InfiniteTimeSpan;
-});
+})
+.RedactLoggedHeaders(static _ => true);
 builder.Services.AddScoped<IExerciseMediaGenerationProvider>(serviceProvider =>
     serviceProvider.GetRequiredService<OpenAiExerciseMediaGenerationProvider>());
 builder.Services.AddHttpClient<UsdaNutritionProvider>(httpClient =>
@@ -297,13 +298,20 @@ if (string.IsNullOrWhiteSpace(mediaStorageRequestPath) || mediaStorageRequestPat
     throw new InvalidOperationException("MediaStorage:PublicBaseUrl must include a request path.");
 }
 
-Directory.CreateDirectory(mediaStorageRootPath);
+var mediaExercisesRootPath = Path.Combine(mediaStorageRootPath, "exercises");
+var mediaExercisesRequestPath = $"{mediaStorageRequestPath}/exercises";
+Directory.CreateDirectory(mediaExercisesRootPath);
 var mediaContentTypeProvider = new FileExtensionContentTypeProvider();
+mediaContentTypeProvider.Mappings.Clear();
+mediaContentTypeProvider.Mappings[".mp4"] = "video/mp4";
+mediaContentTypeProvider.Mappings[".jpg"] = "image/jpeg";
+mediaContentTypeProvider.Mappings[".jpeg"] = "image/jpeg";
+mediaContentTypeProvider.Mappings[".png"] = "image/png";
 mediaContentTypeProvider.Mappings[".webp"] = "image/webp";
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(mediaStorageRootPath),
-    RequestPath = mediaStorageRequestPath,
+    FileProvider = new PhysicalFileProvider(mediaExercisesRootPath),
+    RequestPath = mediaExercisesRequestPath,
     ContentTypeProvider = mediaContentTypeProvider,
     OnPrepareResponse = context => context.Context.Response.Headers.Append("X-Content-Type-Options", "nosniff"),
 });
