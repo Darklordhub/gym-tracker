@@ -5,10 +5,12 @@ import {
   createExerciseMediaDraft,
   fetchAdminExerciseCatalog,
   fetchAdminUsers,
+  generateExerciseMediaDraft,
   getExerciseMediaDraft,
   getExerciseMediaDrafts,
   getExerciseMediaStudioExercise,
   publishExerciseMediaDraft,
+  refreshExerciseMediaDraftStatus,
   rejectExerciseMediaDraft,
   resetAdminExerciseCatalogItem,
   resetAdminUserPassword,
@@ -411,6 +413,55 @@ export function AdminPage() {
     }
   }
 
+  async function handleGenerateMediaDraft(draft: ExerciseMediaDraftResponse) {
+    const confirmed = window.confirm(
+      `Start AI video generation for ${draft.exerciseName}? This action may incur provider usage costs.`,
+    )
+    if (!confirmed) {
+      return
+    }
+
+    const actionKey = `media-studio:generate:${draft.id}`
+
+    try {
+      setPendingActions((current) => ({ ...current, [actionKey]: true }))
+      setErrorMessage(null)
+      setSuccessMessage(null)
+      setMediaStudioError(null)
+
+      const updatedDraft = await generateExerciseMediaDraft(draft.id)
+      await refreshMediaStudioAfterDraftAction(updatedDraft)
+      setSuccessMessage(`Started video generation for ${updatedDraft.exerciseName}.`)
+    } catch (error) {
+      setMediaStudioError(getRequestErrorMessage(error, 'Unable to start exercise media generation.'))
+    } finally {
+      setPendingActions((current) => ({ ...current, [actionKey]: false }))
+    }
+  }
+
+  async function handleRefreshMediaDraftStatus(draft: ExerciseMediaDraftResponse) {
+    const actionKey = `media-studio:refresh-status:${draft.id}`
+
+    try {
+      setPendingActions((current) => ({ ...current, [actionKey]: true }))
+      setErrorMessage(null)
+      setSuccessMessage(null)
+      setMediaStudioError(null)
+
+      const updatedDraft = await refreshExerciseMediaDraftStatus(draft.id)
+      await refreshMediaStudioAfterDraftAction(updatedDraft)
+      setSuccessMessage(
+        updatedDraft.generatedVideoUrl
+          ? `Generated video is ready for review for ${updatedDraft.exerciseName}.`
+          : `Generation status refreshed for ${updatedDraft.exerciseName}.`,
+      )
+    } catch (error) {
+      setMediaStudioError(getRequestErrorMessage(error, 'Unable to refresh exercise media generation status.'))
+    } finally {
+      setPendingActions((current) => ({ ...current, [actionKey]: false }))
+    }
+  }
+
   async function handleCatalogStatusToggle(item: AdminExerciseCatalogItem) {
     const actionKey = `catalog:status:${item.id}`
 
@@ -725,11 +776,14 @@ export function AdminPage() {
                           {formatDateTime(draft.createdAt)} · {draft.promptVersion ?? 'No version'}
                         </p>
                         <p className="media-studio-prompt-preview">{truncateText(draft.promptText, 180)}</p>
+                        <MediaStudioGenerationSummary draft={draft} />
                         <MediaStudioReviewSummary draft={draft} />
                         <MediaStudioDraftActions
                           draft={draft}
                           pendingActions={pendingActions}
                           onOpenPrompt={handleOpenPromptDraft}
+                          onGenerateDraft={handleGenerateMediaDraft}
+                          onRefreshStatus={handleRefreshMediaDraftStatus}
                           onApproveDraft={handleApproveMediaDraft}
                           onRejectDraft={handleRejectMediaDraft}
                           onPublishDraft={handlePublishMediaDraft}
@@ -786,7 +840,9 @@ export function AdminPage() {
                           <span className={getMediaStudioStatusClassName(draft.status)}>{formatCatalogLabel(draft.status)}</span>
                           <MediaStudioReviewSummary draft={draft} />
                         </td>
-                        <td>{formatGenerationLabel(draft)}</td>
+                        <td>
+                          <MediaStudioGenerationSummary draft={draft} />
+                        </td>
                         <td>
                           <p className="media-studio-prompt-preview">{truncateText(draft.promptText, 160)}</p>
                         </td>
@@ -819,6 +875,8 @@ export function AdminPage() {
                             pendingActions={pendingActions}
                             onOpenExercise={openDraftExercise}
                             onOpenPrompt={handleOpenPromptDraft}
+                            onGenerateDraft={handleGenerateMediaDraft}
+                            onRefreshStatus={handleRefreshMediaDraftStatus}
                             onApproveDraft={handleApproveMediaDraft}
                             onRejectDraft={handleRejectMediaDraft}
                             onPublishDraft={handlePublishMediaDraft}
@@ -1211,6 +1269,7 @@ export function AdminPage() {
               </div>
 
               <MediaStudioReviewSummary draft={promptDraft} />
+              <MediaStudioGenerationSummary draft={promptDraft} />
 
               <div className="media-studio-modal-actions">
                 <MediaStudioDraftActions
@@ -1218,6 +1277,8 @@ export function AdminPage() {
                   pendingActions={pendingActions}
                   onClose={closePromptDialog}
                   onCopyPrompt={handleCopyPrompt}
+                  onGenerateDraft={handleGenerateMediaDraft}
+                  onRefreshStatus={handleRefreshMediaDraftStatus}
                   onApproveDraft={handleApproveMediaDraft}
                   onRejectDraft={handleRejectMediaDraft}
                   onPublishDraft={handlePublishMediaDraft}
@@ -1329,6 +1390,17 @@ function canPublishMediaDraft(draft: ExerciseMediaDraftResponse) {
   return draft.status === 'Approved'
 }
 
+function canGenerateMediaDraft(draft: ExerciseMediaDraftResponse) {
+  return (
+    draft.mediaType === 'Video' &&
+    ['Queued', 'NeedsReview', 'Failed', 'Rejected'].includes(draft.status)
+  )
+}
+
+function canRefreshMediaDraftStatus(draft: ExerciseMediaDraftResponse) {
+  return draft.status === 'Generating' && Boolean(draft.providerJobId)
+}
+
 function hasGeneratedMedia(draft: ExerciseMediaDraftResponse) {
   return Boolean(draft.generatedVideoUrl || draft.generatedThumbnailUrl)
 }
@@ -1339,6 +1411,8 @@ type MediaStudioDraftActionsProps = {
   onOpenExercise?: (exerciseId: number) => void
   onOpenPrompt?: (draftId: number) => Promise<void> | void
   onCopyPrompt?: () => Promise<void> | void
+  onGenerateDraft?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
+  onRefreshStatus?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
   onApproveDraft?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
   onRejectDraft?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
   onPublishDraft?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
@@ -1351,6 +1425,8 @@ function MediaStudioDraftActions({
   onOpenExercise,
   onOpenPrompt,
   onCopyPrompt,
+  onGenerateDraft,
+  onRefreshStatus,
   onApproveDraft,
   onRejectDraft,
   onPublishDraft,
@@ -1360,11 +1436,20 @@ function MediaStudioDraftActions({
   const isApprovingDraft = pendingActions[`media-studio:approve:${draft.id}`] ?? false
   const isRejectingDraft = pendingActions[`media-studio:reject:${draft.id}`] ?? false
   const isPublishingDraft = pendingActions[`media-studio:publish:${draft.id}`] ?? false
+  const isGeneratingDraft = pendingActions[`media-studio:generate:${draft.id}`] ?? false
+  const isRefreshingStatus = pendingActions[`media-studio:refresh-status:${draft.id}`] ?? false
   const isCopyingPrompt = pendingActions[`media-studio:copy:${draft.id}`] ?? false
-  const isDraftActionPending = isApprovingDraft || isRejectingDraft || isPublishingDraft
+  const isDraftActionPending =
+    isApprovingDraft ||
+    isRejectingDraft ||
+    isPublishingDraft ||
+    isGeneratingDraft ||
+    isRefreshingStatus
   const showApprove = canApproveMediaDraft(draft)
   const showReject = canRejectMediaDraft(draft)
   const showPublish = canPublishMediaDraft(draft)
+  const canGenerate = canGenerateMediaDraft(draft)
+  const canRefreshStatus = canRefreshMediaDraftStatus(draft)
   const hasGeneratedDraftMedia = hasGeneratedMedia(draft)
 
   return (
@@ -1383,6 +1468,26 @@ function MediaStudioDraftActions({
             onClick={() => void onOpenPrompt(draft.id)}
           >
             {isViewingDraft ? 'Loading...' : 'View prompt'}
+          </button>
+        ) : null}
+        {onGenerateDraft ? (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={!canGenerate || isDraftActionPending || isCopyingPrompt}
+            onClick={() => void onGenerateDraft(draft)}
+          >
+            {isGeneratingDraft ? 'Starting...' : draft.status === 'Failed' || draft.status === 'Rejected' ? 'Regenerate' : 'Generate'}
+          </button>
+        ) : null}
+        {canRefreshStatus && onRefreshStatus ? (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={isDraftActionPending || isCopyingPrompt}
+            onClick={() => void onRefreshStatus(draft)}
+          >
+            {isRefreshingStatus ? 'Refreshing...' : 'Refresh status'}
           </button>
         ) : null}
         {showApprove && onApproveDraft ? (
@@ -1441,13 +1546,24 @@ function MediaStudioDraftActions({
 }
 
 function MediaStudioReviewSummary({ draft }: { draft: ExerciseMediaDraftResponse }) {
-  const message = draft.rejectionReason
+  const message = draft.errorMessage
+    ? `Generation: ${draft.errorMessage}`
+    : draft.rejectionReason
     ? `Rejected: ${draft.rejectionReason}`
     : draft.reviewNotes
       ? `Review: ${draft.reviewNotes}`
       : null
 
   return message ? <p className="media-studio-review-summary">{truncateText(message, 180)}</p> : null
+}
+
+function MediaStudioGenerationSummary({ draft }: { draft: ExerciseMediaDraftResponse }) {
+  return (
+    <div className="media-studio-generation-summary">
+      <span>{formatGenerationLabel(draft)}</span>
+      {draft.providerJobId ? <span className="record-hint">Job {draft.providerJobId}</span> : null}
+    </div>
+  )
 }
 
 type MediaStudioLinkProps = {

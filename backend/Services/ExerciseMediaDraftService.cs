@@ -1,8 +1,10 @@
 using System.Text.Json;
+using backend.Configuration;
 using backend.Contracts;
 using backend.Data;
 using backend.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace backend.Services;
 
@@ -12,13 +14,19 @@ public class ExerciseMediaDraftService
 
     private readonly AppDbContext _dbContext;
     private readonly ExerciseMediaPromptBuilderService _promptBuilder;
+    private readonly IReadOnlyList<IExerciseMediaGenerationProvider> _generationProviders;
+    private readonly MediaGenerationOptions _generationOptions;
 
     public ExerciseMediaDraftService(
         AppDbContext dbContext,
-        ExerciseMediaPromptBuilderService promptBuilder)
+        ExerciseMediaPromptBuilderService promptBuilder,
+        IEnumerable<IExerciseMediaGenerationProvider> generationProviders,
+        IOptions<MediaGenerationOptions> generationOptions)
     {
         _dbContext = dbContext;
         _promptBuilder = promptBuilder;
+        _generationProviders = generationProviders.ToList();
+        _generationOptions = generationOptions.Value;
     }
 
     public async Task<IReadOnlyList<ExerciseMediaDraftResponse>> ListDraftsAsync(
@@ -285,11 +293,167 @@ public class ExerciseMediaDraftService
         return MapDraft(draft);
     }
 
+    public async Task<ExerciseMediaDraftResponse?> StartGenerationAsync(
+        int draftId,
+        CancellationToken cancellationToken = default)
+    {
+        var draft = await GetDraftForUpdateAsync(draftId, cancellationToken);
+        if (draft is null)
+        {
+            return null;
+        }
+
+        if (!CanStartGeneration(draft.Status))
+        {
+            throw new ExerciseMediaDraftWorkflowException(
+                "Only queued, review, failed, or rejected drafts can start generation.");
+        }
+
+        if (!string.Equals(draft.MediaType, ExerciseMediaDraftMediaTypes.Video, StringComparison.Ordinal))
+        {
+            throw new ExerciseMediaDraftWorkflowException(
+                "Only video drafts can use the configured video generation provider.");
+        }
+
+        if (string.IsNullOrWhiteSpace(draft.PromptText))
+        {
+            throw new ExerciseMediaDraftWorkflowException("Draft prompt text is required for generation.");
+        }
+
+        var provider = GetGenerationProvider(_generationOptions.Provider);
+        ExerciseMediaGenerationStartResult result;
+        try
+        {
+            result = await provider.StartGenerationAsync(draft, cancellationToken);
+        }
+        catch (ExerciseMediaGenerationException exception)
+        {
+            throw new ExerciseMediaDraftWorkflowException(exception.Message);
+        }
+
+        var now = DateTime.UtcNow;
+        draft.Status = ExerciseMediaDraftStatuses.Generating;
+        draft.GenerationProvider = result.Provider;
+        draft.GenerationModel = result.Model;
+        draft.ProviderJobId = result.ProviderJobId;
+        draft.GeneratedVideoUrl = null;
+        draft.ErrorMessage = null;
+        draft.GeneratedAt = null;
+        draft.ReviewNotes = null;
+        draft.RejectionReason = null;
+        draft.ReviewedByUserId = null;
+        draft.ReviewedAt = null;
+        draft.UpdatedAt = now;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapDraft(draft);
+    }
+
+    public async Task<ExerciseMediaDraftResponse?> RefreshGenerationStatusAsync(
+        int draftId,
+        CancellationToken cancellationToken = default)
+    {
+        var draft = await GetDraftForUpdateAsync(draftId, cancellationToken);
+        if (draft is null)
+        {
+            return null;
+        }
+
+        if (!string.Equals(draft.Status, ExerciseMediaDraftStatuses.Generating, StringComparison.Ordinal))
+        {
+            throw new ExerciseMediaDraftWorkflowException(
+                "Only generating drafts can refresh provider status.");
+        }
+
+        if (string.IsNullOrWhiteSpace(draft.ProviderJobId))
+        {
+            throw new ExerciseMediaDraftWorkflowException(
+                "The draft does not have a provider job identifier.");
+        }
+
+        var provider = GetGenerationProvider(draft.GenerationProvider);
+        ExerciseMediaGenerationRefreshResult result;
+        try
+        {
+            result = await provider.RefreshGenerationStatusAsync(draft, cancellationToken);
+        }
+        catch (ExerciseMediaGenerationException exception)
+        {
+            throw new ExerciseMediaDraftWorkflowException(exception.Message);
+        }
+
+        var now = DateTime.UtcNow;
+        switch (result.State)
+        {
+            case ExerciseMediaGenerationState.Pending:
+                draft.Status = ExerciseMediaDraftStatuses.Generating;
+                break;
+
+            case ExerciseMediaGenerationState.Failed:
+                draft.Status = ExerciseMediaDraftStatuses.Failed;
+                draft.ErrorMessage = string.IsNullOrWhiteSpace(result.ErrorMessage)
+                    ? "Video generation failed."
+                    : result.ErrorMessage;
+                draft.GeneratedAt = null;
+                break;
+
+            case ExerciseMediaGenerationState.Completed:
+                if (string.IsNullOrWhiteSpace(result.GeneratedVideoUrl))
+                {
+                    throw new ExerciseMediaDraftWorkflowException(
+                        "The video provider completed without stored media.");
+                }
+
+                draft.GeneratedVideoUrl = result.GeneratedVideoUrl;
+                draft.Status = ExerciseMediaDraftStatuses.NeedsReview;
+                draft.ErrorMessage = null;
+                draft.GeneratedAt = now;
+                break;
+
+            default:
+                throw new ExerciseMediaDraftWorkflowException(
+                    "The video provider returned an unsupported generation state.");
+        }
+
+        draft.UpdatedAt = now;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapDraft(draft);
+    }
+
     private async Task<ExerciseMediaDraft?> GetDraftForUpdateAsync(int draftId, CancellationToken cancellationToken)
     {
         return await _dbContext.ExerciseMediaDrafts
             .Include(draft => draft.ExerciseCatalogItem)
             .FirstOrDefaultAsync(draft => draft.Id == draftId, cancellationToken);
+    }
+
+    private IExerciseMediaGenerationProvider GetGenerationProvider(string? providerName)
+    {
+        if (!_generationOptions.Enabled)
+        {
+            throw new ExerciseMediaDraftWorkflowException("Media generation is disabled.");
+        }
+
+        var normalizedProviderName = providerName?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedProviderName))
+        {
+            throw new ExerciseMediaDraftWorkflowException(
+                "A media generation provider is not configured for this draft.");
+        }
+
+        var provider = _generationProviders.FirstOrDefault(candidate =>
+            string.Equals(candidate.ProviderName, normalizedProviderName, StringComparison.OrdinalIgnoreCase));
+
+        return provider ?? throw new ExerciseMediaDraftWorkflowException(
+            "The configured media generation provider is not available.");
+    }
+
+    private static bool CanStartGeneration(string status)
+    {
+        return string.Equals(status, ExerciseMediaDraftStatuses.Queued, StringComparison.Ordinal) ||
+            string.Equals(status, ExerciseMediaDraftStatuses.NeedsReview, StringComparison.Ordinal) ||
+            string.Equals(status, ExerciseMediaDraftStatuses.Failed, StringComparison.Ordinal) ||
+            string.Equals(status, ExerciseMediaDraftStatuses.Rejected, StringComparison.Ordinal);
     }
 
     private static ExerciseMediaDraftResponse MapDraft(ExerciseMediaDraft draft)

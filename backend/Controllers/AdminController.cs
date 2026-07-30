@@ -374,6 +374,48 @@ public class AdminController : ControllerBase
         }
     }
 
+    [HttpPost("exercise-catalog/media-studio/{draftId:int}/generate")]
+    public async Task<ActionResult<ExerciseMediaDraftResponse>> GenerateExerciseMediaStudioDraft(
+        int draftId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var draft = await _exerciseMediaDraftService.StartGenerationAsync(
+                draftId,
+                cancellationToken);
+
+            return draft is null
+                ? NotFound(new { message = "Exercise media draft not found." })
+                : Ok(draft);
+        }
+        catch (ExerciseMediaDraftWorkflowException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("exercise-catalog/media-studio/{draftId:int}/refresh-status")]
+    public async Task<ActionResult<ExerciseMediaDraftResponse>> RefreshExerciseMediaStudioDraftStatus(
+        int draftId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var draft = await _exerciseMediaDraftService.RefreshGenerationStatusAsync(
+                draftId,
+                cancellationToken);
+
+            return draft is null
+                ? NotFound(new { message = "Exercise media draft not found." })
+                : Ok(draft);
+        }
+        catch (ExerciseMediaDraftWorkflowException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
     [HttpPut("exercise-catalog/{id:int}")]
     public async Task<ActionResult<AdminExerciseCatalogItemResponse>> UpdateExerciseCatalogItem(int id, UpdateExerciseCatalogItemRequest request)
     {

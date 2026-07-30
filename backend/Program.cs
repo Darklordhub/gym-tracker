@@ -51,6 +51,8 @@ builder.Services.Configure<WgerOptions>(builder.Configuration.GetSection(WgerOpt
 builder.Services.Configure<NutritionOptions>(builder.Configuration.GetSection(NutritionOptions.SectionName));
 builder.Services.Configure<ExerciseMediaEnrichmentOptions>(builder.Configuration.GetSection(ExerciseMediaEnrichmentOptions.SectionName));
 builder.Services.Configure<ExerciseMediaStorageOptions>(builder.Configuration.GetSection(ExerciseMediaStorageOptions.SectionName));
+builder.Services.Configure<MediaGenerationOptions>(builder.Configuration.GetSection(MediaGenerationOptions.SectionName));
+builder.Services.Configure<OpenAiVideoGenerationOptions>(builder.Configuration.GetSection(OpenAiVideoGenerationOptions.SectionName));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -74,6 +76,13 @@ builder.Services.AddScoped<ExerciseCatalogMediaEnrichmentService>();
 builder.Services.AddScoped<ExerciseMediaPromptBuilderService>();
 builder.Services.AddScoped<ExerciseMediaDraftService>();
 builder.Services.AddSingleton<ExerciseMediaStorageService>();
+builder.Services.AddHttpClient<OpenAiExerciseMediaGenerationProvider>(httpClient =>
+{
+    httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
+    httpClient.Timeout = Timeout.InfiniteTimeSpan;
+});
+builder.Services.AddScoped<IExerciseMediaGenerationProvider>(serviceProvider =>
+    serviceProvider.GetRequiredService<OpenAiExerciseMediaGenerationProvider>());
 builder.Services.AddHttpClient<UsdaNutritionProvider>(httpClient =>
 {
     httpClient.BaseAddress = new Uri(

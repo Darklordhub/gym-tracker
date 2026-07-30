@@ -59,6 +59,13 @@ services:
       MediaStorage__RootPath: /app/media
       MediaStorage__PublicBaseUrl: ${APP_BASE_URL:-http://localhost:8080}/media
       MediaStorage__MaxFileSizeMb: ${MEDIA_STORAGE_MAX_FILE_SIZE_MB:-100}
+      MediaGeneration__Enabled: ${MEDIA_GENERATION_ENABLED:-false}
+      MediaGeneration__Provider: ${MEDIA_GENERATION_PROVIDER:-OpenAI}
+      OpenAI__ApiKey: ${OPENAI_API_KEY:-}
+      OpenAI__VideoModel: ${OPENAI_VIDEO_MODEL:-sora-2}
+      OpenAI__VideoSeconds: ${OPENAI_VIDEO_SECONDS:-4}
+      OpenAI__VideoSize: ${OPENAI_VIDEO_SIZE:-1280x720}
+      OpenAI__TimeoutSeconds: ${OPENAI_TIMEOUT_SECONDS:-60}
     depends_on:
       - gym-tracker-db
     volumes:

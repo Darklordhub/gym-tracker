@@ -10547,6 +10547,12 @@ body {
   gap: 6px;
 }
 
+.media-studio-generation-summary {
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
 .media-studio-table-shell {
   max-height: min(36vh, 320px);
 }

@@ -104,3 +104,17 @@ export async function publishExerciseMediaDraft(draftId: number) {
   const response = await apiClient.post<ExerciseMediaDraftResponse>(`/admin/exercise-catalog/media-studio/${draftId}/publish`)
   return response.data
 }
+
+export async function generateExerciseMediaDraft(draftId: number) {
+  const response = await apiClient.post<ExerciseMediaDraftResponse>(
+    `/admin/exercise-catalog/media-studio/${draftId}/generate`,
+  )
+  return response.data
+}
+
+export async function refreshExerciseMediaDraftStatus(draftId: number) {
+  const response = await apiClient.post<ExerciseMediaDraftResponse>(
+    `/admin/exercise-catalog/media-studio/${draftId}/refresh-status`,
+  )
+  return response.data
+}
