@@ -61,6 +61,10 @@ services:
       MediaStorage__MaxFileSizeMb: ${MEDIA_STORAGE_MAX_FILE_SIZE_MB:-100}
       MediaGeneration__Enabled: ${MEDIA_GENERATION_ENABLED:-false}
       MediaGeneration__Provider: ${MEDIA_GENERATION_PROVIDER:-OpenAI}
+      MediaGeneration__MaxJobsPerDay: ${MEDIA_GENERATION_MAX_JOBS_PER_DAY:-10}
+      MediaGeneration__MaxJobsPerHour: ${MEDIA_GENERATION_MAX_JOBS_PER_HOUR:-3}
+      MediaGeneration__MaxJobsPerDraftPerDay: ${MEDIA_GENERATION_MAX_JOBS_PER_DRAFT_PER_DAY:-2}
+      MediaGeneration__CooldownSeconds: ${MEDIA_GENERATION_COOLDOWN_SECONDS:-120}
       OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       OpenAI__VideoModel: ${OPENAI_VIDEO_MODEL:-sora-2}
       OpenAI__VideoSeconds: ${OPENAI_VIDEO_SECONDS:-4}

@@ -30,6 +30,7 @@ public class AppDbContext : DbContext
     public DbSet<UserMealItem> UserMealItems => Set<UserMealItem>();
     public DbSet<ExerciseCatalogItem> ExerciseCatalogItems => Set<ExerciseCatalogItem>();
     public DbSet<ExerciseMediaDraft> ExerciseMediaDrafts => Set<ExerciseMediaDraft>();
+    public DbSet<ExerciseMediaGenerationAttempt> ExerciseMediaGenerationAttempts => Set<ExerciseMediaGenerationAttempt>();
     public DbSet<NutritionCatalogItem> NutritionCatalogItems => Set<NutritionCatalogItem>();
     public DbSet<NutritionCatalogPortion> NutritionCatalogPortions => Set<NutritionCatalogPortion>();
 
@@ -263,6 +264,26 @@ public class AppDbContext : DbContext
             .Property(draft => draft.UpdatedAt)
             .IsConcurrencyToken();
 
+        modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
+            .Property(attempt => attempt.Provider)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
+            .Property(attempt => attempt.Model)
+            .HasMaxLength(160);
+
+        modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
+            .Property(attempt => attempt.Status)
+            .HasMaxLength(20);
+
+        modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
+            .Property(attempt => attempt.ProviderJobId)
+            .HasMaxLength(240);
+
+        modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
+            .Property(attempt => attempt.ErrorMessage)
+            .HasMaxLength(4000);
+
         modelBuilder.Entity<NutritionCatalogItem>()
             .Property(item => item.Source)
             .HasMaxLength(40);
@@ -406,6 +427,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(draft => draft.ExerciseCatalogItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
+            .HasOne(attempt => attempt.ExerciseMediaDraft)
+            .WithMany(draft => draft.GenerationAttempts)
+            .HasForeignKey(attempt => attempt.ExerciseMediaDraftId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<GoalSettings>()
             .HasIndex(goalSettings => goalSettings.UserId)
             .IsUnique();
@@ -422,6 +449,15 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<ExerciseMediaDraft>()
             .HasIndex(draft => draft.UpdatedAt);
+
+        modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
+            .HasIndex(attempt => attempt.CreatedAt);
+
+        modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
+            .HasIndex(attempt => new { attempt.ExerciseMediaDraftId, attempt.CreatedAt });
+
+        modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
+            .HasIndex(attempt => new { attempt.ExerciseCatalogItemId, attempt.CreatedAt });
 
         modelBuilder.Entity<UserCycleEntry>()
             .HasIndex(entry => new { entry.UserId, entry.PeriodStartDate })

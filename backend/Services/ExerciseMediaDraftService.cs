@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Data;
+using System.Data.Common;
 using backend.Configuration;
 using backend.Contracts;
 using backend.Data;
@@ -354,6 +356,7 @@ public class ExerciseMediaDraftService
 
     public async Task<ExerciseMediaDraftResponse?> StartGenerationAsync(
         int draftId,
+        int? requestedByUserId = null,
         CancellationToken cancellationToken = default)
     {
         var draft = await GetDraftForUpdateAsync(draftId, cancellationToken);
@@ -390,29 +393,30 @@ public class ExerciseMediaDraftService
         }
 
         var originalStatus = draft.Status;
-        var claimTime = DateTime.UtcNow;
-        var claimed = await _dbContext.ExerciseMediaDrafts
-            .Where(candidate =>
-                candidate.Id == draft.Id &&
-                (candidate.Status == ExerciseMediaDraftStatuses.Queued ||
-                 candidate.Status == ExerciseMediaDraftStatuses.NeedsReview ||
-                 candidate.Status == ExerciseMediaDraftStatuses.Failed ||
-                 candidate.Status == ExerciseMediaDraftStatuses.Rejected))
-            .ExecuteUpdateAsync(
-                setters => setters
-                    .SetProperty(candidate => candidate.Status, ExerciseMediaDraftStatuses.Generating)
-                    .SetProperty(candidate => candidate.UpdatedAt, claimTime),
+        ExerciseMediaGenerationAttempt attempt;
+        try
+        {
+            attempt = await ReserveGenerationAttemptAsync(
+                draft,
+                provider.ProviderName,
+                requestedByUserId,
                 cancellationToken);
-
-        if (claimed != 1)
+        }
+        catch (ExerciseMediaDraftWorkflowException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is DbUpdateException or DbException or InvalidOperationException)
         {
             throw new ExerciseMediaDraftWorkflowException(
-                "Draft status changed before generation could start. Refresh and try again.");
+                "Generation could not be reserved. Try again later.");
         }
 
-        draft.Status = ExerciseMediaDraftStatuses.Generating;
-        draft.UpdatedAt = claimTime;
-        _dbContext.Entry(draft).Property(candidate => candidate.UpdatedAt).OriginalValue = claimTime;
+        _dbContext.ChangeTracker.Clear();
+        draft = await GetDraftForUpdateAsync(draftId, cancellationToken)
+            ?? throw new ExerciseMediaDraftWorkflowException("The draft is no longer available.");
+        attempt = await _dbContext.ExerciseMediaGenerationAttempts
+            .SingleAsync(candidate => candidate.Id == attempt.Id, cancellationToken);
 
         ExerciseMediaGenerationStartResult result;
         try
@@ -421,11 +425,14 @@ public class ExerciseMediaDraftService
         }
         catch (ExerciseMediaGenerationException exception)
         {
-            draft.Status = originalStatus;
-            draft.ErrorMessage = exception.Message;
-            draft.UpdatedAt = DateTime.UtcNow;
-            await SaveDraftChangesAsync(cancellationToken);
+            await MarkGenerationStartFailedAsync(draft, attempt, originalStatus, exception.Message, cancellationToken);
             throw new ExerciseMediaDraftWorkflowException(exception.Message);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            const string errorMessage = "Video generation could not be started.";
+            await MarkGenerationStartFailedAsync(draft, attempt, originalStatus, errorMessage, cancellationToken);
+            throw new ExerciseMediaDraftWorkflowException(errorMessage);
         }
 
         var now = DateTime.UtcNow;
@@ -441,6 +448,10 @@ public class ExerciseMediaDraftService
         draft.ReviewedByUserId = null;
         draft.ReviewedAt = null;
         draft.UpdatedAt = now;
+
+        attempt.Provider = result.Provider;
+        attempt.Model = result.Model;
+        attempt.ProviderJobId = result.ProviderJobId;
 
         await SaveDraftChangesAsync(cancellationToken);
         return MapDraft(draft);
@@ -469,6 +480,7 @@ public class ExerciseMediaDraftService
         }
 
         var provider = GetGenerationProvider(draft.GenerationProvider);
+        var attempt = await GetActiveGenerationAttemptAsync(draft, cancellationToken);
         ExerciseMediaGenerationRefreshResult result;
         try
         {
@@ -476,7 +488,8 @@ public class ExerciseMediaDraftService
         }
         catch (ExerciseMediaGenerationException exception)
         {
-            throw new ExerciseMediaDraftWorkflowException(exception.Message);
+            await MarkGenerationRefreshFailedAsync(draft, attempt, exception.Message, cancellationToken);
+            return MapDraft(draft);
         }
 
         var now = DateTime.UtcNow;
@@ -492,6 +505,7 @@ public class ExerciseMediaDraftService
                     ? "Video generation failed."
                     : result.ErrorMessage;
                 draft.GeneratedAt = null;
+                MarkAttemptFinished(attempt, ExerciseMediaGenerationAttemptStatuses.Failed, draft.ErrorMessage, now);
                 break;
 
             case ExerciseMediaGenerationState.Completed:
@@ -505,6 +519,7 @@ public class ExerciseMediaDraftService
                 draft.Status = ExerciseMediaDraftStatuses.NeedsReview;
                 draft.ErrorMessage = null;
                 draft.GeneratedAt = now;
+                MarkAttemptFinished(attempt, ExerciseMediaGenerationAttemptStatuses.Completed, null, now);
                 break;
 
             default:
@@ -522,6 +537,164 @@ public class ExerciseMediaDraftService
         return await _dbContext.ExerciseMediaDrafts
             .Include(draft => draft.ExerciseCatalogItem)
             .FirstOrDefaultAsync(draft => draft.Id == draftId, cancellationToken);
+    }
+
+    private async Task<ExerciseMediaGenerationAttempt> ReserveGenerationAttemptAsync(
+        ExerciseMediaDraft draft,
+        string providerName,
+        int? requestedByUserId,
+        CancellationToken cancellationToken)
+    {
+        EnsureGenerationLimitsAreValid();
+
+        var now = DateTime.UtcNow;
+        var dayWindowStart = now.AddDays(-1);
+        var hourWindowStart = now.AddHours(-1);
+        var cooldownWindowStart = now.AddSeconds(-_generationOptions.CooldownSeconds);
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
+
+        var paidAttempts = _dbContext.ExerciseMediaGenerationAttempts
+            .Where(attempt => attempt.Status != ExerciseMediaGenerationAttemptStatuses.Blocked);
+        var dailyCount = await paidAttempts
+            .CountAsync(attempt => attempt.CreatedAt >= dayWindowStart, cancellationToken);
+        var hourlyCount = await paidAttempts
+            .CountAsync(attempt => attempt.CreatedAt >= hourWindowStart, cancellationToken);
+        var draftDailyCount = await paidAttempts
+            .CountAsync(
+                attempt => attempt.ExerciseMediaDraftId == draft.Id && attempt.CreatedAt >= dayWindowStart,
+                cancellationToken);
+        var withinCooldown = await paidAttempts.AnyAsync(
+            attempt => attempt.ExerciseMediaDraftId == draft.Id && attempt.CreatedAt >= cooldownWindowStart,
+            cancellationToken);
+
+        if (dailyCount >= _generationOptions.MaxJobsPerDay ||
+            hourlyCount >= _generationOptions.MaxJobsPerHour ||
+            draftDailyCount >= _generationOptions.MaxJobsPerDraftPerDay ||
+            withinCooldown)
+        {
+            _dbContext.ExerciseMediaGenerationAttempts.Add(new ExerciseMediaGenerationAttempt
+            {
+                ExerciseMediaDraftId = draft.Id,
+                ExerciseCatalogItemId = draft.ExerciseCatalogItemId,
+                RequestedByUserId = requestedByUserId,
+                Provider = providerName,
+                Status = ExerciseMediaGenerationAttemptStatuses.Blocked,
+                ErrorMessage = "Generation limit reached. Try again later.",
+                CreatedAt = now,
+                CompletedAt = now,
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            throw new ExerciseMediaDraftWorkflowException("Generation limit reached. Try again later.");
+        }
+
+        var claimed = await _dbContext.ExerciseMediaDrafts
+            .Where(candidate =>
+                candidate.Id == draft.Id &&
+                (candidate.Status == ExerciseMediaDraftStatuses.Queued ||
+                 candidate.Status == ExerciseMediaDraftStatuses.NeedsReview ||
+                 candidate.Status == ExerciseMediaDraftStatuses.Failed ||
+                 candidate.Status == ExerciseMediaDraftStatuses.Rejected))
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(candidate => candidate.Status, ExerciseMediaDraftStatuses.Generating)
+                    .SetProperty(candidate => candidate.UpdatedAt, now),
+                cancellationToken);
+
+        if (claimed != 1)
+        {
+            throw new ExerciseMediaDraftWorkflowException(
+                "Draft status changed before generation could start. Refresh and try again.");
+        }
+
+        var attempt = new ExerciseMediaGenerationAttempt
+        {
+            ExerciseMediaDraftId = draft.Id,
+            ExerciseCatalogItemId = draft.ExerciseCatalogItemId,
+            RequestedByUserId = requestedByUserId,
+            Provider = providerName,
+            Status = ExerciseMediaGenerationAttemptStatuses.Started,
+            CreatedAt = now,
+        };
+        _dbContext.ExerciseMediaGenerationAttempts.Add(attempt);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return attempt;
+    }
+
+    private async Task<ExerciseMediaGenerationAttempt?> GetActiveGenerationAttemptAsync(
+        ExerciseMediaDraft draft,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.ExerciseMediaGenerationAttempts
+            .Where(attempt =>
+                attempt.ExerciseMediaDraftId == draft.Id &&
+                attempt.Status == ExerciseMediaGenerationAttemptStatuses.Started &&
+                attempt.ProviderJobId == draft.ProviderJobId)
+            .OrderByDescending(attempt => attempt.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task MarkGenerationStartFailedAsync(
+        ExerciseMediaDraft draft,
+        ExerciseMediaGenerationAttempt attempt,
+        string originalStatus,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        draft.Status = originalStatus;
+        draft.ErrorMessage = errorMessage;
+        draft.UpdatedAt = now;
+        MarkAttemptFinished(attempt, ExerciseMediaGenerationAttemptStatuses.Failed, errorMessage, now);
+        await SaveDraftChangesAsync(cancellationToken);
+    }
+
+    private async Task MarkGenerationRefreshFailedAsync(
+        ExerciseMediaDraft draft,
+        ExerciseMediaGenerationAttempt? attempt,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        draft.Status = ExerciseMediaDraftStatuses.Failed;
+        draft.ErrorMessage = errorMessage;
+        draft.GeneratedAt = null;
+        draft.UpdatedAt = now;
+        MarkAttemptFinished(attempt, ExerciseMediaGenerationAttemptStatuses.Failed, errorMessage, now);
+        await SaveDraftChangesAsync(cancellationToken);
+    }
+
+    private static void MarkAttemptFinished(
+        ExerciseMediaGenerationAttempt? attempt,
+        string status,
+        string? errorMessage,
+        DateTime completedAt)
+    {
+        if (attempt is null)
+        {
+            return;
+        }
+
+        attempt.Status = status;
+        attempt.ErrorMessage = errorMessage;
+        attempt.CompletedAt = completedAt;
+    }
+
+    private void EnsureGenerationLimitsAreValid()
+    {
+        if (_generationOptions.MaxJobsPerDay < 1 ||
+            _generationOptions.MaxJobsPerHour < 1 ||
+            _generationOptions.MaxJobsPerDraftPerDay < 1 ||
+            _generationOptions.CooldownSeconds < 0)
+        {
+            throw new ExerciseMediaDraftWorkflowException("Media generation limits are misconfigured.");
+        }
     }
 
     private IExerciseMediaGenerationProvider GetGenerationProvider(string? providerName)

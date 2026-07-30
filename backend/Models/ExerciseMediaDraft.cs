@@ -26,4 +26,5 @@ public class ExerciseMediaDraft
     public DateTime? GeneratedAt { get; set; }
     public DateTime? ReviewedAt { get; set; }
     public DateTime? PublishedAt { get; set; }
+    public List<ExerciseMediaGenerationAttempt> GenerationAttempts { get; set; } = new();
 }

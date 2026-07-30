@@ -405,6 +405,7 @@ public class AdminController : ControllerBase
         {
             var draft = await _exerciseMediaDraftService.StartGenerationAsync(
                 draftId,
+                User.GetRequiredUserId(),
                 cancellationToken);
 
             return draft is null

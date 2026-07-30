@@ -54,7 +54,11 @@ internal sealed class ExerciseMediaTestFactory : IDisposable
         AppDbContext context,
         IEnumerable<IExerciseMediaGenerationProvider>? providers = null,
         bool generationEnabled = false,
-        string providerName = "Fake")
+        string providerName = "Fake",
+        int maxJobsPerDay = 10,
+        int maxJobsPerHour = 3,
+        int maxJobsPerDraftPerDay = 2,
+        int cooldownSeconds = 120)
     {
         return new ExerciseMediaDraftService(
             context,
@@ -65,6 +69,10 @@ internal sealed class ExerciseMediaTestFactory : IDisposable
             {
                 Enabled = generationEnabled,
                 Provider = providerName,
+                MaxJobsPerDay = maxJobsPerDay,
+                MaxJobsPerHour = maxJobsPerHour,
+                MaxJobsPerDraftPerDay = maxJobsPerDraftPerDay,
+                CooldownSeconds = cooldownSeconds,
             }));
     }
 
@@ -126,6 +134,29 @@ internal sealed class ExerciseMediaTestFactory : IDisposable
         draft.UpdatedAt = DateTime.UtcNow;
         await context.SaveChangesAsync();
         return stored.PreviewUrl;
+    }
+
+    public async Task<ExerciseMediaGenerationAttempt> CreateGenerationAttemptAsync(
+        AppDbContext context,
+        ExerciseMediaDraft draft,
+        DateTime createdAt,
+        string status = ExerciseMediaGenerationAttemptStatuses.Completed)
+    {
+        var attempt = new ExerciseMediaGenerationAttempt
+        {
+            ExerciseMediaDraftId = draft.Id,
+            ExerciseCatalogItemId = draft.ExerciseCatalogItemId,
+            RequestedByUserId = 7,
+            Provider = "Fake",
+            Model = "test-model",
+            Status = status,
+            ProviderJobId = status == ExerciseMediaGenerationAttemptStatuses.Blocked ? null : $"job-{Guid.NewGuid():N}",
+            CreatedAt = createdAt,
+            CompletedAt = status is ExerciseMediaGenerationAttemptStatuses.Started ? null : createdAt,
+        };
+        context.ExerciseMediaGenerationAttempts.Add(attempt);
+        await context.SaveChangesAsync();
+        return attempt;
     }
 
     public void Dispose()
