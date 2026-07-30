@@ -21,19 +21,22 @@ public class AdminController : ControllerBase
     private readonly IWgerExerciseCatalogSyncService _wgerExerciseCatalogSyncService;
     private readonly ExerciseCatalogService _exerciseCatalogService;
     private readonly ExerciseCatalogMediaEnrichmentService _exerciseCatalogMediaEnrichmentService;
+    private readonly ExerciseMediaDraftService _exerciseMediaDraftService;
 
     public AdminController(
         AppDbContext dbContext,
         PasswordHasher<AppUser> passwordHasher,
         IWgerExerciseCatalogSyncService wgerExerciseCatalogSyncService,
         ExerciseCatalogService exerciseCatalogService,
-        ExerciseCatalogMediaEnrichmentService exerciseCatalogMediaEnrichmentService)
+        ExerciseCatalogMediaEnrichmentService exerciseCatalogMediaEnrichmentService,
+        ExerciseMediaDraftService exerciseMediaDraftService)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
         _wgerExerciseCatalogSyncService = wgerExerciseCatalogSyncService;
         _exerciseCatalogService = exerciseCatalogService;
         _exerciseCatalogMediaEnrichmentService = exerciseCatalogMediaEnrichmentService;
+        _exerciseMediaDraftService = exerciseMediaDraftService;
     }
 
     [HttpGet("users")]
@@ -225,6 +228,70 @@ public class AdminController : ControllerBase
     {
         var items = await _exerciseCatalogService.GetAdminItemsAsync(q);
         return Ok(items);
+    }
+
+    [HttpGet("exercise-catalog/media-studio")]
+    public async Task<ActionResult<IReadOnlyList<ExerciseMediaDraftResponse>>> GetExerciseMediaStudioDrafts(
+        CancellationToken cancellationToken)
+    {
+        var drafts = await _exerciseMediaDraftService.ListDraftsAsync(cancellationToken);
+        return Ok(drafts);
+    }
+
+    [HttpGet("exercise-catalog/media-studio/{draftId:int}")]
+    public async Task<ActionResult<ExerciseMediaDraftResponse>> GetExerciseMediaStudioDraft(
+        int draftId,
+        CancellationToken cancellationToken)
+    {
+        var draft = await _exerciseMediaDraftService.GetDraftByIdAsync(draftId, cancellationToken);
+        return draft is null ? NotFound(new { message = "Exercise media draft not found." }) : Ok(draft);
+    }
+
+    [HttpGet("exercise-catalog/{exerciseId:int}/media-studio")]
+    public async Task<ActionResult<ExerciseMediaStudioExerciseResponse>> GetExerciseMediaStudioExercise(
+        int exerciseId,
+        CancellationToken cancellationToken)
+    {
+        var studioExercise = await _exerciseMediaDraftService.GetStudioExerciseAsync(exerciseId, cancellationToken);
+        return studioExercise is null
+            ? NotFound(new { message = "Exercise catalog item not found." })
+            : Ok(studioExercise);
+    }
+
+    [HttpPost("exercise-catalog/{exerciseId:int}/media-studio/drafts")]
+    public async Task<ActionResult<ExerciseMediaDraftResponse>> CreateExerciseMediaStudioDraft(
+        int exerciseId,
+        CreateExerciseMediaDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        ExerciseMediaDraftResponse? draft;
+        try
+        {
+            draft = await _exerciseMediaDraftService.CreateDraftAsync(
+                exerciseId,
+                request,
+                User.GetRequiredUserId(),
+                cancellationToken);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+
+        if (draft is null)
+        {
+            return NotFound(new { message = "Exercise catalog item not found." });
+        }
+
+        return CreatedAtAction(
+            nameof(GetExerciseMediaStudioDraft),
+            new { draftId = draft.Id },
+            draft);
     }
 
     [HttpPut("exercise-catalog/{id:int}")]

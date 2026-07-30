@@ -65,6 +65,8 @@ builder.Services.AddScoped<INutritionService, NutritionService>();
 builder.Services.AddScoped<INutritionRollupService, NutritionRollupService>();
 builder.Services.AddScoped<IMealService, MealService>();
 builder.Services.AddScoped<ExerciseCatalogMediaEnrichmentService>();
+builder.Services.AddScoped<ExerciseMediaPromptBuilderService>();
+builder.Services.AddScoped<ExerciseMediaDraftService>();
 builder.Services.AddHttpClient<UsdaNutritionProvider>(httpClient =>
 {
     httpClient.BaseAddress = new Uri(
