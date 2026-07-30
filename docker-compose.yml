@@ -56,8 +56,13 @@ services:
       Nutrition__UsdaApiKey: ${Nutrition__UsdaApiKey:-}
       LegacyUser__Email: ${LEGACY_USER_EMAIL:-}
       LegacyUser__Password: ${LEGACY_USER_PASSWORD:-}
+      MediaStorage__RootPath: /app/media
+      MediaStorage__PublicBaseUrl: ${APP_BASE_URL:-http://localhost:8080}/media
+      MediaStorage__MaxFileSizeMb: ${MEDIA_STORAGE_MAX_FILE_SIZE_MB:-100}
     depends_on:
       - gym-tracker-db
+    volumes:
+      - gym-tracker-exercise-media:/app/media
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
       interval: 15s
@@ -88,6 +93,8 @@ volumes:
     name: ${POSTGRES_VOLUME_NAME:-gym-tracker_gym-tracker-postgres-data}
   gym-tracker-postgres-backups:
     name: ${POSTGRES_BACKUP_VOLUME_NAME:-gym-tracker_gym-tracker-postgres-backups}
+  gym-tracker-exercise-media:
+    name: ${EXERCISE_MEDIA_VOLUME_NAME:-gym-tracker_gym-tracker-exercise-media}
 
 networks:
   gym-tracker-net:

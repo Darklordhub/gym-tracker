@@ -6,7 +6,9 @@ using backend.Models;
 using backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +21,9 @@ var nutritionOptions = builder.Configuration.GetSection(NutritionOptions.Section
 var exerciseMediaEnrichmentOptions = builder.Configuration
     .GetSection(ExerciseMediaEnrichmentOptions.SectionName)
     .Get<ExerciseMediaEnrichmentOptions>() ?? new ExerciseMediaEnrichmentOptions();
+var exerciseMediaStorageOptions = builder.Configuration
+    .GetSection(ExerciseMediaStorageOptions.SectionName)
+    .Get<ExerciseMediaStorageOptions>() ?? new ExerciseMediaStorageOptions();
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()?
@@ -45,6 +50,7 @@ builder.Services.Configure<AppOptions>(builder.Configuration.GetSection(AppOptio
 builder.Services.Configure<WgerOptions>(builder.Configuration.GetSection(WgerOptions.SectionName));
 builder.Services.Configure<NutritionOptions>(builder.Configuration.GetSection(NutritionOptions.SectionName));
 builder.Services.Configure<ExerciseMediaEnrichmentOptions>(builder.Configuration.GetSection(ExerciseMediaEnrichmentOptions.SectionName));
+builder.Services.Configure<ExerciseMediaStorageOptions>(builder.Configuration.GetSection(ExerciseMediaStorageOptions.SectionName));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -67,6 +73,7 @@ builder.Services.AddScoped<IMealService, MealService>();
 builder.Services.AddScoped<ExerciseCatalogMediaEnrichmentService>();
 builder.Services.AddScoped<ExerciseMediaPromptBuilderService>();
 builder.Services.AddScoped<ExerciseMediaDraftService>();
+builder.Services.AddSingleton<ExerciseMediaStorageService>();
 builder.Services.AddHttpClient<UsdaNutritionProvider>(httpClient =>
 {
     httpClient.BaseAddress = new Uri(
@@ -252,6 +259,45 @@ if (enableHttpsRedirection)
 {
     app.UseHttpsRedirection();
 }
+
+if (string.IsNullOrWhiteSpace(exerciseMediaStorageOptions.RootPath))
+{
+    throw new InvalidOperationException("MediaStorage:RootPath must be configured.");
+}
+
+if (exerciseMediaStorageOptions.MaxFileSizeMb is < 1 or > 1024)
+{
+    throw new InvalidOperationException("MediaStorage:MaxFileSizeMb must be between 1 and 1024.");
+}
+
+if (!Uri.TryCreate(exerciseMediaStorageOptions.PublicBaseUrl, UriKind.Absolute, out var mediaStoragePublicUri) ||
+    (mediaStoragePublicUri.Scheme != Uri.UriSchemeHttp && mediaStoragePublicUri.Scheme != Uri.UriSchemeHttps) ||
+    mediaStoragePublicUri.Query.Length > 0 ||
+    mediaStoragePublicUri.Fragment.Length > 0)
+{
+    throw new InvalidOperationException(
+        "MediaStorage:PublicBaseUrl must be an absolute HTTP or HTTPS URL without a query or fragment.");
+}
+
+var mediaStorageRootPath = Path.GetFullPath(Path.IsPathRooted(exerciseMediaStorageOptions.RootPath)
+    ? exerciseMediaStorageOptions.RootPath
+    : Path.Combine(app.Environment.ContentRootPath, exerciseMediaStorageOptions.RootPath));
+var mediaStorageRequestPath = mediaStoragePublicUri.AbsolutePath.TrimEnd('/');
+if (string.IsNullOrWhiteSpace(mediaStorageRequestPath) || mediaStorageRequestPath == "/")
+{
+    throw new InvalidOperationException("MediaStorage:PublicBaseUrl must include a request path.");
+}
+
+Directory.CreateDirectory(mediaStorageRootPath);
+var mediaContentTypeProvider = new FileExtensionContentTypeProvider();
+mediaContentTypeProvider.Mappings[".webp"] = "image/webp";
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(mediaStorageRootPath),
+    RequestPath = mediaStorageRequestPath,
+    ContentTypeProvider = mediaContentTypeProvider,
+    OnPrepareResponse = context => context.Context.Response.Headers.Append("X-Content-Type-Options", "nosniff"),
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
