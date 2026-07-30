@@ -29,6 +29,7 @@ public class AppDbContext : DbContext
     public DbSet<UserMeal> UserMeals => Set<UserMeal>();
     public DbSet<UserMealItem> UserMealItems => Set<UserMealItem>();
     public DbSet<ExerciseCatalogItem> ExerciseCatalogItems => Set<ExerciseCatalogItem>();
+    public DbSet<ExerciseMediaDraft> ExerciseMediaDrafts => Set<ExerciseMediaDraft>();
     public DbSet<NutritionCatalogItem> NutritionCatalogItems => Set<NutritionCatalogItem>();
     public DbSet<NutritionCatalogPortion> NutritionCatalogPortions => Set<NutritionCatalogPortion>();
 
@@ -205,6 +206,59 @@ public class AppDbContext : DbContext
             .Property(item => item.IsManuallyEdited)
             .HasDefaultValue(false);
 
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.Status)
+            .HasMaxLength(30)
+            .HasDefaultValue(ExerciseMediaDraftStatuses.Queued);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.MediaType)
+            .HasMaxLength(20);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.PromptText)
+            .HasMaxLength(12000);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.PromptVersion)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.SourceSnapshotJson)
+            .HasColumnType("jsonb");
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.GeneratedThumbnailUrl)
+            .HasMaxLength(2000);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.GeneratedVideoUrl)
+            .HasMaxLength(2000);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.GenerationProvider)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.GenerationModel)
+            .HasMaxLength(160);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.ProviderJobId)
+            .HasMaxLength(240);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.ReviewNotes)
+            .HasMaxLength(4000);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.RejectionReason)
+            .HasMaxLength(2000);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .Property(draft => draft.ErrorMessage)
+            .HasMaxLength(4000);
+
         modelBuilder.Entity<NutritionCatalogItem>()
             .Property(item => item.Source)
             .HasMaxLength(40);
@@ -342,6 +396,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(portion => portion.NutritionCatalogItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .HasOne(draft => draft.ExerciseCatalogItem)
+            .WithMany(item => item.ExerciseMediaDrafts)
+            .HasForeignKey(draft => draft.ExerciseCatalogItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<GoalSettings>()
             .HasIndex(goalSettings => goalSettings.UserId)
             .IsUnique();
@@ -349,6 +409,15 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserCycleSettings>()
             .HasIndex(settings => settings.UserId)
             .IsUnique();
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .HasIndex(draft => draft.ExerciseCatalogItemId);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .HasIndex(draft => draft.Status);
+
+        modelBuilder.Entity<ExerciseMediaDraft>()
+            .HasIndex(draft => draft.UpdatedAt);
 
         modelBuilder.Entity<UserCycleEntry>()
             .HasIndex(entry => new { entry.UserId, entry.PeriodStartDate })

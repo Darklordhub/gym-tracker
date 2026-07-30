@@ -26,4 +26,5 @@ public class ExerciseCatalogItem
     public DateTime? LastEditedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public List<ExerciseMediaDraft> ExerciseMediaDrafts { get; set; } = new();
 }
