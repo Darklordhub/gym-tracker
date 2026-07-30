@@ -221,7 +221,7 @@ public class OpenAiExerciseMediaGenerationProvider : IExerciseMediaGenerationPro
         return new ExerciseMediaGenerationRefreshResult
         {
             State = ExerciseMediaGenerationState.Completed,
-            GeneratedVideoUrl = storedFile.PublicUrl,
+            GeneratedVideoUrl = storedFile.PreviewUrl,
         };
     }
 

@@ -10568,6 +10568,25 @@ body {
   gap: 16px;
 }
 
+.media-studio-private-preview {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-muted);
+}
+
+.media-studio-private-preview video,
+.media-studio-private-preview img {
+  display: block;
+  width: 100%;
+  max-height: min(42vh, 360px);
+  border-radius: 12px;
+  object-fit: contain;
+  background: #0b0d0f;
+}
+
 .media-studio-modal-actions {
   padding: 14px 16px;
   border: 1px solid var(--border);

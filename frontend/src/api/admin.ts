@@ -69,6 +69,22 @@ export async function getExerciseMediaDraft(draftId: number) {
   return response.data
 }
 
+export async function getExerciseMediaDraftVideo(draftId: number) {
+  const response = await apiClient.get<Blob>(
+    `/admin/exercise-catalog/media-studio/${draftId}/video`,
+    { responseType: 'blob' },
+  )
+  return response.data
+}
+
+export async function getExerciseMediaDraftThumbnail(draftId: number) {
+  const response = await apiClient.get<Blob>(
+    `/admin/exercise-catalog/media-studio/${draftId}/thumbnail`,
+    { responseType: 'blob' },
+  )
+  return response.data
+}
+
 export async function getExerciseMediaStudioExercise(exerciseId: number) {
   const response = await apiClient.get<ExerciseMediaStudioExerciseResponse>(
     `/admin/exercise-catalog/${exerciseId}/media-studio`,

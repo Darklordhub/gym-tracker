@@ -12,8 +12,124 @@ public enum ExerciseMediaStorageKind
 
 public sealed class ExerciseMediaStoredFile
 {
-    public string PublicUrl { get; init; } = string.Empty;
+    public string PreviewUrl { get; init; } = string.Empty;
     public string ContentType { get; init; } = string.Empty;
+}
+
+public sealed class ExerciseMediaReadFile : IDisposable
+{
+    public required FileStream Content { get; init; }
+    public required string ContentType { get; init; }
+    public required string FileName { get; init; }
+
+    public void Dispose()
+    {
+        Content.Dispose();
+    }
+}
+
+public sealed class ExerciseMediaPublication : IDisposable
+{
+    private readonly IReadOnlyList<ExerciseMediaPublicationFile> _files;
+    private readonly string _stagingDirectory;
+    private bool _completed;
+
+    internal ExerciseMediaPublication(
+        IReadOnlyList<ExerciseMediaPublicationFile> files,
+        string stagingDirectory,
+        string? videoPublicUrl,
+        string? thumbnailPublicUrl)
+    {
+        _files = files;
+        _stagingDirectory = stagingDirectory;
+        VideoPublicUrl = videoPublicUrl;
+        ThumbnailPublicUrl = thumbnailPublicUrl;
+    }
+
+    public string? VideoPublicUrl { get; }
+    public string? ThumbnailPublicUrl { get; }
+
+    public void CommitFiles()
+    {
+        try
+        {
+            foreach (var file in _files)
+            {
+                var destinationDirectory = Path.GetDirectoryName(file.PublicPath)
+                    ?? throw new ExerciseMediaStorageException("Published media path is invalid.");
+                Directory.CreateDirectory(destinationDirectory);
+                File.Move(file.StagingPath, file.PublicPath, overwrite: false);
+                file.WasMoved = true;
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            DeleteMovedFiles();
+            throw new ExerciseMediaStorageException("Generated media could not be published.");
+        }
+    }
+
+    public void Complete()
+    {
+        _completed = true;
+        TryDeleteDirectory(_stagingDirectory);
+    }
+
+    public void Dispose()
+    {
+        if (!_completed)
+        {
+            DeleteMovedFiles();
+        }
+
+        TryDeleteDirectory(_stagingDirectory);
+    }
+
+    private void DeleteMovedFiles()
+    {
+        foreach (var file in _files.Where(file => file.WasMoved))
+        {
+            TryDeleteFile(file.PublicPath);
+            file.WasMoved = false;
+        }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Cleanup failure must not mask the publish failure.
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Cleanup failure must not mask the workflow result.
+        }
+    }
+}
+
+internal sealed class ExerciseMediaPublicationFile
+{
+    public required string StagingPath { get; init; }
+    public required string PublicPath { get; init; }
+    public bool WasMoved { get; set; }
 }
 
 public sealed class ExerciseMediaStorageException : Exception
@@ -27,6 +143,7 @@ public sealed class ExerciseMediaStorageException : Exception
 public class ExerciseMediaStorageService
 {
     private const int CopyBufferSize = 81920;
+    private const string AdminPreviewBasePath = "/api/admin/exercise-catalog/media-studio";
 
     private static readonly IReadOnlyDictionary<string, string> ThumbnailContentTypes =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -36,8 +153,20 @@ public class ExerciseMediaStorageService
             ["image/webp"] = ".webp",
         };
 
+    private static readonly IReadOnlyDictionary<string, string> StoredContentTypes =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [".mp4"] = "video/mp4",
+            [".jpg"] = "image/jpeg",
+            [".png"] = "image/png",
+            [".webp"] = "image/webp",
+        };
+
     private readonly string _rootPath;
     private readonly string _rootPathPrefix;
+    private readonly string _privateRootPath;
+    private readonly string _publicRootPath;
+    private readonly string _legacyRootPath;
     private readonly string _publicBaseUrl;
     private readonly long _maxFileSizeBytes;
 
@@ -50,6 +179,9 @@ public class ExerciseMediaStorageService
         _rootPathPrefix = _rootPath.EndsWith(Path.DirectorySeparatorChar)
             ? _rootPath
             : _rootPath + Path.DirectorySeparatorChar;
+        _privateRootPath = GetSafePath(_rootPath, "private");
+        _publicRootPath = GetSafePath(_rootPath, "public");
+        _legacyRootPath = GetSafePath(_rootPath, "exercises");
         _publicBaseUrl = NormalizePublicBaseUrl(configuredOptions.PublicBaseUrl);
 
         if (configuredOptions.MaxFileSizeMb is < 1 or > 1024)
@@ -105,10 +237,7 @@ public class ExerciseMediaStorageService
         string? sourceFileName = null,
         CancellationToken cancellationToken = default)
     {
-        if (exerciseId <= 0 || draftId <= 0)
-        {
-            throw new ExerciseMediaStorageException("Exercise and draft identifiers must be positive.");
-        }
+        ValidateIdentifiers(exerciseId, draftId);
 
         if (content is null || !content.CanRead)
         {
@@ -119,61 +248,20 @@ public class ExerciseMediaStorageService
         var extension = GetAllowedExtension(mediaKind, normalizedContentType);
         ValidateSourceFileName(sourceFileName, normalizedContentType, extension);
 
-        var fileName = mediaKind == ExerciseMediaStorageKind.Video
-            ? "video.mp4"
-            : $"thumbnail{extension}";
-        var draftDirectory = GetDraftDirectoryPath(exerciseId, draftId);
+        var fileName = GetStoredFileName(mediaKind, extension);
+        var draftDirectory = GetPrivateDraftDirectoryPath(exerciseId, draftId);
         var targetPath = GetSafePath(draftDirectory, fileName);
         var temporaryPath = GetSafePath(draftDirectory, $".{fileName}.{Guid.NewGuid():N}.tmp");
 
         Directory.CreateDirectory(draftDirectory);
         try
         {
-            byte[] signatureBuffer = new byte[16];
-            var signatureLength = 0;
-            var bytesWritten = 0L;
-            var buffer = ArrayPool<byte>.Shared.Rent(CopyBufferSize);
-
-            try
-            {
-                await using var destination = new FileStream(
-                    temporaryPath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None,
-                    CopyBufferSize,
-                    useAsync: true);
-
-                while (true)
-                {
-                    var read = await content.ReadAsync(buffer.AsMemory(0, CopyBufferSize), cancellationToken);
-                    if (read == 0)
-                    {
-                        break;
-                    }
-
-                    if (bytesWritten > _maxFileSizeBytes - read)
-                    {
-                        throw new ExerciseMediaStorageException("Generated media exceeds the configured file size limit.");
-                    }
-
-                    var signatureBytesToCopy = Math.Min(signatureBuffer.Length - signatureLength, read);
-                    if (signatureBytesToCopy > 0)
-                    {
-                        buffer.AsSpan(0, signatureBytesToCopy).CopyTo(signatureBuffer.AsSpan(signatureLength));
-                        signatureLength += signatureBytesToCopy;
-                    }
-
-                    await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                    bytesWritten += read;
-                }
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
-
-            ValidateFileSignature(mediaKind, normalizedContentType, signatureBuffer.AsSpan(0, signatureLength));
+            await CopyAndValidateAsync(
+                content,
+                temporaryPath,
+                mediaKind,
+                normalizedContentType,
+                cancellationToken);
             File.Move(temporaryPath, targetPath, overwrite: true);
         }
         catch (ExerciseMediaStorageException)
@@ -186,12 +274,7 @@ public class ExerciseMediaStorageService
             TryDeleteTemporaryFile(temporaryPath);
             throw;
         }
-        catch (IOException)
-        {
-            TryDeleteTemporaryFile(temporaryPath);
-            throw new ExerciseMediaStorageException("Generated media could not be stored.");
-        }
-        catch (UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             TryDeleteTemporaryFile(temporaryPath);
             throw new ExerciseMediaStorageException("Generated media could not be stored.");
@@ -199,14 +282,290 @@ public class ExerciseMediaStorageService
 
         return new ExerciseMediaStoredFile
         {
-            PublicUrl = $"{_publicBaseUrl}/exercises/{exerciseId}/drafts/{draftId}/{fileName}",
+            PreviewUrl = $"{AdminPreviewBasePath}/{draftId}/{ToPreviewRouteSegment(mediaKind)}",
             ContentType = normalizedContentType,
         };
     }
 
-    private string GetDraftDirectoryPath(int exerciseId, int draftId)
+    public ExerciseMediaReadFile? OpenDraftMedia(
+        int exerciseId,
+        int draftId,
+        ExerciseMediaStorageKind mediaKind,
+        string? storedReference)
     {
-        return GetSafePath(_rootPath, "exercises", exerciseId.ToString(), "drafts", draftId.ToString());
+        ValidateIdentifiers(exerciseId, draftId);
+        var path = ResolveDraftMediaPath(exerciseId, draftId, mediaKind, storedReference);
+        return path is null ? null : OpenValidatedFile(path, mediaKind);
+    }
+
+    public ExerciseMediaReadFile? OpenLegacyDraftMedia(
+        int exerciseId,
+        int draftId,
+        string fileName)
+    {
+        ValidateIdentifiers(exerciseId, draftId);
+        if (!TryGetMediaKind(fileName, out var mediaKind))
+        {
+            return null;
+        }
+
+        var legacyDirectory = GetLegacyDraftDirectoryPath(exerciseId, draftId);
+        var path = GetSafePath(legacyDirectory, fileName);
+        return File.Exists(path) ? OpenValidatedFile(path, mediaKind) : null;
+    }
+
+    public async Task<ExerciseMediaPublication> PrepareDraftPublicationAsync(
+        int exerciseId,
+        int draftId,
+        string? videoReference,
+        string? thumbnailReference,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateIdentifiers(exerciseId, draftId);
+        if (string.IsNullOrWhiteSpace(videoReference) && string.IsNullOrWhiteSpace(thumbnailReference))
+        {
+            throw new ExerciseMediaStorageException("Draft has no generated media to publish.");
+        }
+
+        var publicationId = Guid.NewGuid().ToString("N");
+        var stagingDirectory = GetSafePath(_privateRootPath, "publication-staging", publicationId);
+        var publicDirectory = GetSafePath(
+            _publicRootPath,
+            "exercises",
+            exerciseId.ToString(),
+            "published",
+            draftId.ToString(),
+            publicationId);
+        var publicationFiles = new List<ExerciseMediaPublicationFile>();
+        string? videoPublicUrl = null;
+        string? thumbnailPublicUrl = null;
+
+        Directory.CreateDirectory(stagingDirectory);
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(videoReference))
+            {
+                var video = await PreparePublicationFileAsync(
+                    exerciseId,
+                    draftId,
+                    ExerciseMediaStorageKind.Video,
+                    videoReference,
+                    stagingDirectory,
+                    publicDirectory,
+                    cancellationToken);
+                publicationFiles.Add(video.File);
+                videoPublicUrl = BuildPublishedUrl(exerciseId, draftId, publicationId, video.FileName);
+            }
+
+            if (!string.IsNullOrWhiteSpace(thumbnailReference))
+            {
+                var thumbnail = await PreparePublicationFileAsync(
+                    exerciseId,
+                    draftId,
+                    ExerciseMediaStorageKind.Thumbnail,
+                    thumbnailReference,
+                    stagingDirectory,
+                    publicDirectory,
+                    cancellationToken);
+                publicationFiles.Add(thumbnail.File);
+                thumbnailPublicUrl = BuildPublishedUrl(exerciseId, draftId, publicationId, thumbnail.FileName);
+            }
+
+            return new ExerciseMediaPublication(
+                publicationFiles,
+                stagingDirectory,
+                videoPublicUrl,
+                thumbnailPublicUrl);
+        }
+        catch
+        {
+            TryDeleteDirectory(stagingDirectory);
+            throw;
+        }
+    }
+
+    private async Task<(ExerciseMediaPublicationFile File, string FileName)> PreparePublicationFileAsync(
+        int exerciseId,
+        int draftId,
+        ExerciseMediaStorageKind mediaKind,
+        string storedReference,
+        string stagingDirectory,
+        string publicDirectory,
+        CancellationToken cancellationToken)
+    {
+        var sourcePath = ResolveDraftMediaPath(exerciseId, draftId, mediaKind, storedReference);
+        if (sourcePath is null)
+        {
+            var mediaLabel = mediaKind == ExerciseMediaStorageKind.Video ? "video" : "thumbnail";
+            throw new ExerciseMediaStorageException(
+                $"Draft generated {mediaLabel} is unavailable from private storage.");
+        }
+
+        var fileName = Path.GetFileName(sourcePath);
+        var contentType = GetStoredContentType(fileName);
+        await using var source = OpenValidatedStream(sourcePath, mediaKind, contentType);
+        var stagingPath = GetSafePath(stagingDirectory, fileName);
+        await CopyAndValidateAsync(source, stagingPath, mediaKind, contentType, cancellationToken);
+
+        return (
+            new ExerciseMediaPublicationFile
+            {
+                StagingPath = stagingPath,
+                PublicPath = GetSafePath(publicDirectory, fileName),
+            },
+            fileName);
+    }
+
+    private async Task CopyAndValidateAsync(
+        Stream content,
+        string destinationPath,
+        ExerciseMediaStorageKind mediaKind,
+        string contentType,
+        CancellationToken cancellationToken)
+    {
+        byte[] signatureBuffer = new byte[16];
+        var signatureLength = 0;
+        var bytesWritten = 0L;
+        var buffer = ArrayPool<byte>.Shared.Rent(CopyBufferSize);
+
+        try
+        {
+            await using var destination = new FileStream(
+                destinationPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                CopyBufferSize,
+                useAsync: true);
+
+            while (true)
+            {
+                var read = await content.ReadAsync(buffer.AsMemory(0, CopyBufferSize), cancellationToken);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                if (bytesWritten > _maxFileSizeBytes - read)
+                {
+                    throw new ExerciseMediaStorageException("Generated media exceeds the configured file size limit.");
+                }
+
+                var signatureBytesToCopy = Math.Min(signatureBuffer.Length - signatureLength, read);
+                if (signatureBytesToCopy > 0)
+                {
+                    buffer.AsSpan(0, signatureBytesToCopy).CopyTo(signatureBuffer.AsSpan(signatureLength));
+                    signatureLength += signatureBytesToCopy;
+                }
+
+                await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                bytesWritten += read;
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+
+        ValidateFileSignature(mediaKind, contentType, signatureBuffer.AsSpan(0, signatureLength));
+    }
+
+    private ExerciseMediaReadFile OpenValidatedFile(string path, ExerciseMediaStorageKind mediaKind)
+    {
+        var contentType = GetStoredContentType(path);
+        var content = OpenValidatedStream(path, mediaKind, contentType);
+        return new ExerciseMediaReadFile
+        {
+            Content = content,
+            ContentType = contentType,
+            FileName = Path.GetFileName(path),
+        };
+    }
+
+    private FileStream OpenValidatedStream(
+        string path,
+        ExerciseMediaStorageKind mediaKind,
+        string contentType)
+    {
+        FileStream? content = null;
+        try
+        {
+            var attributes = File.GetAttributes(path);
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new ExerciseMediaStorageException("Stored media file is invalid.");
+            }
+
+            content = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                CopyBufferSize,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            if (content.Length <= 0 || content.Length > _maxFileSizeBytes)
+            {
+                throw new ExerciseMediaStorageException("Stored media file size is invalid.");
+            }
+
+            Span<byte> signature = stackalloc byte[16];
+            var signatureLength = content.Read(signature);
+            ValidateFileSignature(mediaKind, contentType, signature[..signatureLength]);
+            content.Position = 0;
+            return content;
+        }
+        catch (ExerciseMediaStorageException)
+        {
+            content?.Dispose();
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            content?.Dispose();
+            throw new ExerciseMediaStorageException("Stored media file is unavailable.");
+        }
+    }
+
+    private string? ResolveDraftMediaPath(
+        int exerciseId,
+        int draftId,
+        ExerciseMediaStorageKind mediaKind,
+        string? storedReference)
+    {
+        var candidateNames = GetCandidateFileNames(mediaKind, storedReference);
+        var candidateDirectories = new[]
+        {
+            GetPrivateDraftDirectoryPath(exerciseId, draftId),
+            GetLegacyDraftDirectoryPath(exerciseId, draftId),
+        };
+
+        return candidateDirectories
+            .SelectMany(directory => candidateNames.Select(fileName => GetSafePath(directory, fileName)))
+            .Where(File.Exists)
+            .Select(path => new FileInfo(path))
+            .Where(file => (file.Attributes & FileAttributes.ReparsePoint) == 0)
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .Select(file => file.FullName)
+            .FirstOrDefault();
+    }
+
+    private string GetPrivateDraftDirectoryPath(int exerciseId, int draftId)
+    {
+        return GetSafePath(
+            _privateRootPath,
+            "exercises",
+            exerciseId.ToString(),
+            "drafts",
+            draftId.ToString());
+    }
+
+    private string GetLegacyDraftDirectoryPath(int exerciseId, int draftId)
+    {
+        return GetSafePath(
+            _legacyRootPath,
+            exerciseId.ToString(),
+            "drafts",
+            draftId.ToString());
     }
 
     private string GetSafePath(params string[] pathSegments)
@@ -276,6 +635,105 @@ public class ExerciseMediaStorageService
         throw new ExerciseMediaStorageException("Generated media type is not supported.");
     }
 
+    private static string GetStoredContentType(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return StoredContentTypes.TryGetValue(extension, out var contentType)
+            ? contentType
+            : throw new ExerciseMediaStorageException("Stored media type is not supported.");
+    }
+
+    private static string GetStoredFileName(ExerciseMediaStorageKind mediaKind, string extension)
+    {
+        return mediaKind == ExerciseMediaStorageKind.Video
+            ? "video.mp4"
+            : $"thumbnail{extension}";
+    }
+
+    private static IReadOnlyList<string> GetCandidateFileNames(
+        ExerciseMediaStorageKind mediaKind,
+        string? storedReference)
+    {
+        if (mediaKind == ExerciseMediaStorageKind.Video)
+        {
+            return ["video.mp4"];
+        }
+
+        var candidates = new List<string>();
+        var referencedExtension = GetReferenceExtension(storedReference);
+        if (ThumbnailContentTypes.Values.Contains(referencedExtension, StringComparer.OrdinalIgnoreCase))
+        {
+            candidates.Add($"thumbnail{referencedExtension.ToLowerInvariant()}");
+        }
+
+        candidates.AddRange(["thumbnail.jpg", "thumbnail.png", "thumbnail.webp"]);
+        return candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static string GetReferenceExtension(string? storedReference)
+    {
+        if (string.IsNullOrWhiteSpace(storedReference))
+        {
+            return string.Empty;
+        }
+
+        if (Uri.TryCreate(storedReference.Trim(), UriKind.Absolute, out var absoluteUri))
+        {
+            return Path.GetExtension(absoluteUri.AbsolutePath);
+        }
+
+        return Path.GetExtension(storedReference.Trim());
+    }
+
+    private static bool TryGetMediaKind(string fileName, out ExerciseMediaStorageKind mediaKind)
+    {
+        if (string.Equals(fileName, "video.mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            mediaKind = ExerciseMediaStorageKind.Video;
+            return true;
+        }
+
+        if (string.Equals(fileName, "thumbnail.jpg", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(fileName, "thumbnail.png", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(fileName, "thumbnail.webp", StringComparison.OrdinalIgnoreCase))
+        {
+            mediaKind = ExerciseMediaStorageKind.Thumbnail;
+            return true;
+        }
+
+        mediaKind = default;
+        return false;
+    }
+
+    private static string ToPreviewRouteSegment(ExerciseMediaStorageKind mediaKind)
+    {
+        return mediaKind == ExerciseMediaStorageKind.Video ? "video" : "thumbnail";
+    }
+
+    private string BuildPublishedUrl(
+        int exerciseId,
+        int draftId,
+        string publicationId,
+        string fileName)
+    {
+        var publicUrl =
+            $"{_publicBaseUrl}/exercises/{exerciseId}/published/{draftId}/{publicationId}/{fileName}";
+        if (publicUrl.Length > 500)
+        {
+            throw new ExerciseMediaStorageException("Published media URL is too long.");
+        }
+
+        return publicUrl;
+    }
+
+    private static void ValidateIdentifiers(int exerciseId, int draftId)
+    {
+        if (exerciseId <= 0 || draftId <= 0)
+        {
+            throw new ExerciseMediaStorageException("Exercise and draft identifiers must be positive.");
+        }
+    }
+
     private static void ValidateSourceFileName(
         string? sourceFileName,
         string contentType,
@@ -341,11 +799,22 @@ public class ExerciseMediaStorageService
                 File.Delete(temporaryPath);
             }
         }
-        catch (IOException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             // A failed cleanup must not mask the safe storage error.
         }
-        catch (UnauthorizedAccessException)
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             // A failed cleanup must not mask the safe storage error.
         }

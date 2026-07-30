@@ -38,6 +38,8 @@ Optional Exercise Media Studio settings:
 - `OPENAI_VIDEO_SECONDS` accepts `4`, `8`, or `12`.
 - `OPENAI_VIDEO_SIZE` accepts `720x1280`, `1280x720`, `1024x1792`, or `1792x1024`.
 - `OPENAI_TIMEOUT_SECONDS` defaults to `60`.
+- Generated drafts remain in the private area of the media volume and are previewed through Admin-only API endpoints.
+- Publishing copies approved media into the public area of the same volume before updating catalog overrides.
 
 Example values are provided in [`/.env.example`](./.env.example).
 
@@ -144,5 +146,6 @@ If you manage the stack through Portainer, the same sequence applies: stop `gym-
 - `JWT_SIGNING_KEY` must be set to a long random secret before deployment. The API refuses to start with a missing or too-short signing key.
 - `POSTGRES_PASSWORD` is required by Compose and has no production fallback.
 - `APP_BASE_URL` must be the externally reachable origin without a trailing slash or path, for example `https://gym.example.com`.
+- Do not expose the media volume directly from Docker or a host web server; only the API-managed `/media` route should serve its public area.
 - Keep `MEDIA_GENERATION_ENABLED=false` until the media volume, public `/media` route, provider budget limits, and admin workflow have been verified in staging.
 - This layout is suitable for a personal Linux server and can sit behind a reverse proxy or Cloudflare Tunnel later without changing app behavior.

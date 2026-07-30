@@ -247,6 +247,28 @@ public class AdminController : ControllerBase
         return draft is null ? NotFound(new { message = "Exercise media draft not found." }) : Ok(draft);
     }
 
+    [HttpGet("exercise-catalog/media-studio/{draftId:int}/video")]
+    public Task<IActionResult> GetExerciseMediaStudioDraftVideo(
+        int draftId,
+        CancellationToken cancellationToken)
+    {
+        return GetExerciseMediaStudioDraftMedia(
+            draftId,
+            ExerciseMediaStorageKind.Video,
+            cancellationToken);
+    }
+
+    [HttpGet("exercise-catalog/media-studio/{draftId:int}/thumbnail")]
+    public Task<IActionResult> GetExerciseMediaStudioDraftThumbnail(
+        int draftId,
+        CancellationToken cancellationToken)
+    {
+        return GetExerciseMediaStudioDraftMedia(
+            draftId,
+            ExerciseMediaStorageKind.Thumbnail,
+            cancellationToken);
+    }
+
     [HttpGet("exercise-catalog/{exerciseId:int}/media-studio")]
     public async Task<ActionResult<ExerciseMediaStudioExerciseResponse>> GetExerciseMediaStudioExercise(
         int exerciseId,
@@ -414,6 +436,37 @@ public class AdminController : ControllerBase
         {
             return BadRequest(new { message = exception.Message });
         }
+    }
+
+    private async Task<IActionResult> GetExerciseMediaStudioDraftMedia(
+        int draftId,
+        ExerciseMediaStorageKind mediaKind,
+        CancellationToken cancellationToken)
+    {
+        ExerciseMediaReadFile? media;
+        try
+        {
+            media = await _exerciseMediaDraftService.OpenDraftMediaAsync(
+                draftId,
+                mediaKind,
+                cancellationToken);
+        }
+        catch (ExerciseMediaDraftWorkflowException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+
+        if (media is null)
+        {
+            return NotFound(new { message = "Exercise media draft file not found." });
+        }
+
+        Response.Headers.CacheControl = "private, no-store";
+        Response.Headers.Append("X-Content-Type-Options", "nosniff");
+        return File(
+            media.Content,
+            media.ContentType,
+            enableRangeProcessing: true);
     }
 
     [HttpPut("exercise-catalog/{id:int}")]

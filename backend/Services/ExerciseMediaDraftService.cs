@@ -14,17 +14,20 @@ public class ExerciseMediaDraftService
 
     private readonly AppDbContext _dbContext;
     private readonly ExerciseMediaPromptBuilderService _promptBuilder;
+    private readonly ExerciseMediaStorageService _storageService;
     private readonly IReadOnlyList<IExerciseMediaGenerationProvider> _generationProviders;
     private readonly MediaGenerationOptions _generationOptions;
 
     public ExerciseMediaDraftService(
         AppDbContext dbContext,
         ExerciseMediaPromptBuilderService promptBuilder,
+        ExerciseMediaStorageService storageService,
         IEnumerable<IExerciseMediaGenerationProvider> generationProviders,
         IOptions<MediaGenerationOptions> generationOptions)
     {
         _dbContext = dbContext;
         _promptBuilder = promptBuilder;
+        _storageService = storageService;
         _generationProviders = generationProviders.ToList();
         _generationOptions = generationOptions.Value;
     }
@@ -52,6 +55,41 @@ public class ExerciseMediaDraftService
             .FirstOrDefaultAsync(item => item.Id == draftId, cancellationToken);
 
         return draft is null ? null : MapDraft(draft);
+    }
+
+    public async Task<ExerciseMediaReadFile?> OpenDraftMediaAsync(
+        int draftId,
+        ExerciseMediaStorageKind mediaKind,
+        CancellationToken cancellationToken = default)
+    {
+        var draft = await _dbContext.ExerciseMediaDrafts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == draftId, cancellationToken);
+        if (draft is null)
+        {
+            return null;
+        }
+
+        var storedReference = mediaKind == ExerciseMediaStorageKind.Video
+            ? draft.GeneratedVideoUrl
+            : draft.GeneratedThumbnailUrl;
+        if (string.IsNullOrWhiteSpace(storedReference))
+        {
+            return null;
+        }
+
+        try
+        {
+            return _storageService.OpenDraftMedia(
+                draft.ExerciseCatalogItemId,
+                draft.Id,
+                mediaKind,
+                storedReference);
+        }
+        catch (ExerciseMediaStorageException exception)
+        {
+            throw new ExerciseMediaDraftWorkflowException(exception.Message);
+        }
     }
 
     public async Task<ExerciseMediaStudioExerciseResponse?> GetStudioExerciseAsync(
@@ -248,16 +286,6 @@ public class ExerciseMediaDraftService
             throw new ExerciseMediaDraftWorkflowException("Draft has no generated media to publish.");
         }
 
-        if (!IsPublishableMediaUrl(generatedVideoUrl) || !IsPublishableMediaUrl(generatedThumbnailUrl))
-        {
-            throw new ExerciseMediaDraftWorkflowException("Generated media URLs must be valid absolute HTTP or HTTPS URLs.");
-        }
-
-        if ((generatedVideoUrl?.Length ?? 0) > 500 || (generatedThumbnailUrl?.Length ?? 0) > 500)
-        {
-            throw new ExerciseMediaDraftWorkflowException("Generated media URLs are too long to publish.");
-        }
-
         var exercise = draft.ExerciseCatalogItem;
         if (exercise is null)
         {
@@ -269,27 +297,58 @@ public class ExerciseMediaDraftService
             throw new ExerciseMediaDraftWorkflowException("Draft source snapshot is stale. Create a new draft before publishing.");
         }
 
-        var now = DateTime.UtcNow;
-        if (generatedVideoUrl is not null)
+        ExerciseMediaPublication publication;
+        try
         {
-            exercise.LocalVideoUrlOverride = generatedVideoUrl;
+            publication = await _storageService.PrepareDraftPublicationAsync(
+                exercise.Id,
+                draft.Id,
+                generatedVideoUrl,
+                generatedThumbnailUrl,
+                cancellationToken);
+        }
+        catch (ExerciseMediaStorageException exception)
+        {
+            throw new ExerciseMediaDraftWorkflowException(exception.Message);
         }
 
-        if (generatedThumbnailUrl is not null)
+        using (publication)
+        await using (var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken))
         {
-            exercise.LocalThumbnailUrlOverride = generatedThumbnailUrl;
+            var now = DateTime.UtcNow;
+            if (publication.VideoPublicUrl is not null)
+            {
+                exercise.LocalVideoUrlOverride = publication.VideoPublicUrl;
+            }
+
+            if (publication.ThumbnailPublicUrl is not null)
+            {
+                exercise.LocalThumbnailUrlOverride = publication.ThumbnailPublicUrl;
+            }
+
+            exercise.IsManuallyEdited = HasManualOverrides(exercise);
+            exercise.LastEditedAt = exercise.IsManuallyEdited ? now : null;
+            exercise.UpdatedAt = now;
+
+            draft.Status = ExerciseMediaDraftStatuses.Published;
+            draft.PublishedByUserId = publishedByUserId;
+            draft.PublishedAt = now;
+            draft.UpdatedAt = now;
+
+            await SaveDraftChangesAsync(cancellationToken);
+            try
+            {
+                publication.CommitFiles();
+            }
+            catch (ExerciseMediaStorageException exception)
+            {
+                throw new ExerciseMediaDraftWorkflowException(exception.Message);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            publication.Complete();
         }
 
-        exercise.IsManuallyEdited = HasManualOverrides(exercise);
-        exercise.LastEditedAt = exercise.IsManuallyEdited ? now : null;
-        exercise.UpdatedAt = now;
-
-        draft.Status = ExerciseMediaDraftStatuses.Published;
-        draft.PublishedByUserId = publishedByUserId;
-        draft.PublishedAt = now;
-        draft.UpdatedAt = now;
-
-        await SaveDraftChangesAsync(cancellationToken);
         return MapDraft(draft);
     }
 
@@ -623,13 +682,6 @@ public class ExerciseMediaDraftService
 
         value = property.GetString();
         return true;
-    }
-
-    private static bool IsPublishableMediaUrl(string? value)
-    {
-        return value is null ||
-            (Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-             (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps));
     }
 
     private static bool HasManualOverrides(ExerciseCatalogItem item)

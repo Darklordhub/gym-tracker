@@ -298,9 +298,8 @@ if (string.IsNullOrWhiteSpace(mediaStorageRequestPath) || mediaStorageRequestPat
     throw new InvalidOperationException("MediaStorage:PublicBaseUrl must include a request path.");
 }
 
-var mediaExercisesRootPath = Path.Combine(mediaStorageRootPath, "exercises");
-var mediaExercisesRequestPath = $"{mediaStorageRequestPath}/exercises";
-Directory.CreateDirectory(mediaExercisesRootPath);
+var publicMediaRootPath = Path.Combine(mediaStorageRootPath, "public");
+Directory.CreateDirectory(publicMediaRootPath);
 var mediaContentTypeProvider = new FileExtensionContentTypeProvider();
 mediaContentTypeProvider.Mappings.Clear();
 mediaContentTypeProvider.Mappings[".mp4"] = "video/mp4";
@@ -310,8 +309,8 @@ mediaContentTypeProvider.Mappings[".png"] = "image/png";
 mediaContentTypeProvider.Mappings[".webp"] = "image/webp";
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(mediaExercisesRootPath),
-    RequestPath = mediaExercisesRequestPath,
+    FileProvider = new PhysicalFileProvider(publicMediaRootPath),
+    RequestPath = mediaStorageRequestPath,
     ContentTypeProvider = mediaContentTypeProvider,
     OnPrepareResponse = context => context.Context.Response.Headers.Append("X-Content-Type-Options", "nosniff"),
 });

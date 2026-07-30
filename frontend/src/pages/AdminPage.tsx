@@ -7,7 +7,9 @@ import {
   fetchAdminUsers,
   generateExerciseMediaDraft,
   getExerciseMediaDraft,
+  getExerciseMediaDraftThumbnail,
   getExerciseMediaDrafts,
+  getExerciseMediaDraftVideo,
   getExerciseMediaStudioExercise,
   publishExerciseMediaDraft,
   refreshExerciseMediaDraftStatus,
@@ -36,6 +38,13 @@ import type {
 } from '../types/admin'
 
 type PendingActionMap = Record<string, boolean>
+type DraftMediaPreviewKind = 'video' | 'thumbnail'
+
+type DraftMediaPreview = {
+  draftId: number
+  kind: DraftMediaPreviewKind
+  objectUrl: string
+}
 
 const mediaDraftTypeOptions: ExerciseMediaDraftMediaType[] = ['Video', 'Thumbnail', 'Image']
 
@@ -71,6 +80,7 @@ export function AdminPage() {
   const [selectedMediaType, setSelectedMediaType] = useState<ExerciseMediaDraftMediaType>('Video')
   const [selectedStudioExercise, setSelectedStudioExercise] = useState<ExerciseMediaStudioExerciseResponse | null>(null)
   const [promptDraft, setPromptDraft] = useState<ExerciseMediaDraftResponse | null>(null)
+  const [draftMediaPreview, setDraftMediaPreview] = useState<DraftMediaPreview | null>(null)
   const deferredCatalogSearch = useDeferredValue(catalogSearch)
 
   useEffect(() => {
@@ -96,6 +106,14 @@ export function AdminPage() {
 
     void loadStudioExercise(selectedMediaExerciseId)
   }, [selectedMediaExerciseId])
+
+  useEffect(() => {
+    return () => {
+      if (draftMediaPreview) {
+        URL.revokeObjectURL(draftMediaPreview.objectUrl)
+      }
+    }
+  }, [draftMediaPreview])
 
   async function loadUsers() {
     try {
@@ -295,6 +313,7 @@ export function AdminPage() {
       setPendingActions((current) => ({ ...current, [actionKey]: true }))
       setMediaStudioError(null)
       const draft = await getExerciseMediaDraft(draftId)
+      setDraftMediaPreview((current) => (current?.draftId === draft.id ? current : null))
       setPromptDraft(draft)
     } catch (error) {
       setMediaStudioError(getRequestErrorMessage(error, 'Unable to load the draft prompt.'))
@@ -327,6 +346,36 @@ export function AdminPage() {
     }
   }
 
+  async function handlePreviewDraftMedia(
+    draft: ExerciseMediaDraftResponse,
+    kind: DraftMediaPreviewKind,
+  ) {
+    const actionKey = `media-studio:preview-${kind}:${draft.id}`
+
+    try {
+      setPendingActions((current) => ({ ...current, [actionKey]: true }))
+      setMediaStudioError(null)
+      setPromptDraft(draft)
+
+      const blob = kind === 'video'
+        ? await getExerciseMediaDraftVideo(draft.id)
+        : await getExerciseMediaDraftThumbnail(draft.id)
+      if (blob.size === 0) {
+        throw new Error('Draft media response was empty.')
+      }
+
+      setDraftMediaPreview({
+        draftId: draft.id,
+        kind,
+        objectUrl: URL.createObjectURL(blob),
+      })
+    } catch (error) {
+      setMediaStudioError(getRequestErrorMessage(error, `Unable to load the private draft ${kind}.`))
+    } finally {
+      setPendingActions((current) => ({ ...current, [actionKey]: false }))
+    }
+  }
+
   async function refreshMediaStudioAfterDraftAction(draft: ExerciseMediaDraftResponse) {
     await loadMediaDrafts()
 
@@ -335,6 +384,16 @@ export function AdminPage() {
     }
 
     setPromptDraft((current) => (current?.id === draft.id ? draft : current))
+    setDraftMediaPreview((current) => {
+      if (current?.draftId !== draft.id) {
+        return current
+      }
+
+      const stillAvailable = current.kind === 'video'
+        ? Boolean(draft.generatedVideoUrl)
+        : Boolean(draft.generatedThumbnailUrl)
+      return stillAvailable ? current : null
+    })
   }
 
   async function handleApproveMediaDraft(draft: ExerciseMediaDraftResponse) {
@@ -574,6 +633,7 @@ export function AdminPage() {
 
   function closePromptDialog() {
     setPromptDraft(null)
+    setDraftMediaPreview(null)
   }
 
   function openDraftExercise(exerciseId: number) {
@@ -782,6 +842,8 @@ export function AdminPage() {
                           draft={draft}
                           pendingActions={pendingActions}
                           onOpenPrompt={handleOpenPromptDraft}
+                          onPreviewVideo={(draft) => handlePreviewDraftMedia(draft, 'video')}
+                          onPreviewThumbnail={(draft) => handlePreviewDraftMedia(draft, 'thumbnail')}
                           onGenerateDraft={handleGenerateMediaDraft}
                           onRefreshStatus={handleRefreshMediaDraftStatus}
                           onApproveDraft={handleApproveMediaDraft}
@@ -849,14 +911,10 @@ export function AdminPage() {
                         <td>
                           <div className="media-studio-url-stack">
                             {draft.generatedThumbnailUrl ? (
-                              <a href={draft.generatedThumbnailUrl} target="_blank" rel="noreferrer">
-                                Thumbnail
-                              </a>
+                              <span className="record-hint">Private thumbnail ready</span>
                             ) : null}
                             {draft.generatedVideoUrl ? (
-                              <a href={draft.generatedVideoUrl} target="_blank" rel="noreferrer">
-                                Video
-                              </a>
+                              <span className="record-hint">Private video ready</span>
                             ) : null}
                             {!draft.generatedThumbnailUrl && !draft.generatedVideoUrl ? (
                               <span className="record-hint">Not generated</span>
@@ -875,6 +933,8 @@ export function AdminPage() {
                             pendingActions={pendingActions}
                             onOpenExercise={openDraftExercise}
                             onOpenPrompt={handleOpenPromptDraft}
+                            onPreviewVideo={(draft) => handlePreviewDraftMedia(draft, 'video')}
+                            onPreviewThumbnail={(draft) => handlePreviewDraftMedia(draft, 'thumbnail')}
                             onGenerateDraft={handleGenerateMediaDraft}
                             onRefreshStatus={handleRefreshMediaDraftStatus}
                             onApproveDraft={handleApproveMediaDraft}
@@ -1273,12 +1333,25 @@ export function AdminPage() {
               <MediaStudioReviewSummary draft={promptDraft} />
               <MediaStudioGenerationSummary draft={promptDraft} />
 
+              {draftMediaPreview?.draftId === promptDraft.id ? (
+                <div className="media-studio-private-preview">
+                  <span className="admin-field-hint">Private admin preview</span>
+                  {draftMediaPreview.kind === 'video' ? (
+                    <video controls muted preload="metadata" src={draftMediaPreview.objectUrl} />
+                  ) : (
+                    <img src={draftMediaPreview.objectUrl} alt={`${promptDraft.exerciseName} generated draft thumbnail`} />
+                  )}
+                </div>
+              ) : null}
+
               <div className="media-studio-modal-actions">
                 <MediaStudioDraftActions
                   draft={promptDraft}
                   pendingActions={pendingActions}
                   onClose={closePromptDialog}
                   onCopyPrompt={handleCopyPrompt}
+                  onPreviewVideo={(draft) => handlePreviewDraftMedia(draft, 'video')}
+                  onPreviewThumbnail={(draft) => handlePreviewDraftMedia(draft, 'thumbnail')}
                   onGenerateDraft={handleGenerateMediaDraft}
                   onRefreshStatus={handleRefreshMediaDraftStatus}
                   onApproveDraft={handleApproveMediaDraft}
@@ -1413,6 +1486,8 @@ type MediaStudioDraftActionsProps = {
   onOpenExercise?: (exerciseId: number) => void
   onOpenPrompt?: (draftId: number) => Promise<void> | void
   onCopyPrompt?: () => Promise<void> | void
+  onPreviewVideo?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
+  onPreviewThumbnail?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
   onGenerateDraft?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
   onRefreshStatus?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
   onApproveDraft?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
@@ -1427,6 +1502,8 @@ function MediaStudioDraftActions({
   onOpenExercise,
   onOpenPrompt,
   onCopyPrompt,
+  onPreviewVideo,
+  onPreviewThumbnail,
   onGenerateDraft,
   onRefreshStatus,
   onApproveDraft,
@@ -1441,12 +1518,16 @@ function MediaStudioDraftActions({
   const isGeneratingDraft = pendingActions[`media-studio:generate:${draft.id}`] ?? false
   const isRefreshingStatus = pendingActions[`media-studio:refresh-status:${draft.id}`] ?? false
   const isCopyingPrompt = pendingActions[`media-studio:copy:${draft.id}`] ?? false
+  const isPreviewingVideo = pendingActions[`media-studio:preview-video:${draft.id}`] ?? false
+  const isPreviewingThumbnail = pendingActions[`media-studio:preview-thumbnail:${draft.id}`] ?? false
   const isDraftActionPending =
     isApprovingDraft ||
     isRejectingDraft ||
     isPublishingDraft ||
     isGeneratingDraft ||
-    isRefreshingStatus
+    isRefreshingStatus ||
+    isPreviewingVideo ||
+    isPreviewingThumbnail
   const showApprove = canApproveMediaDraft(draft)
   const showReject = canRejectMediaDraft(draft)
   const showPublish = canPublishMediaDraft(draft)
@@ -1470,6 +1551,26 @@ function MediaStudioDraftActions({
             onClick={() => void onOpenPrompt(draft.id)}
           >
             {isViewingDraft ? 'Loading...' : 'View prompt'}
+          </button>
+        ) : null}
+        {draft.generatedVideoUrl && onPreviewVideo ? (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={isDraftActionPending || isCopyingPrompt}
+            onClick={() => void onPreviewVideo(draft)}
+          >
+            {isPreviewingVideo ? 'Loading video...' : 'Preview video'}
+          </button>
+        ) : null}
+        {draft.generatedThumbnailUrl && onPreviewThumbnail ? (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={isDraftActionPending || isCopyingPrompt}
+            onClick={() => void onPreviewThumbnail(draft)}
+          >
+            {isPreviewingThumbnail ? 'Loading image...' : 'Preview thumbnail'}
           </button>
         ) : null}
         {onGenerateDraft ? (
