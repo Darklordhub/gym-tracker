@@ -6,7 +6,9 @@ import type {
   ExerciseCatalogSyncResult,
   ExerciseMediaDraftResponse,
   ExerciseMediaStudioExerciseResponse,
+  RejectExerciseMediaDraftRequest,
   ResetAdminUserPasswordPayload,
+  ReviewExerciseMediaDraftRequest,
   UpdateExerciseCatalogItemPayload,
   UpdateAdminUserRolePayload,
   UpdateAdminUserStatusPayload,
@@ -79,5 +81,26 @@ export async function createExerciseMediaDraft(exerciseId: number, payload: Crea
     `/admin/exercise-catalog/${exerciseId}/media-studio/drafts`,
     payload,
   )
+  return response.data
+}
+
+export async function approveExerciseMediaDraft(draftId: number, payload: ReviewExerciseMediaDraftRequest) {
+  const response = await apiClient.post<ExerciseMediaDraftResponse>(
+    `/admin/exercise-catalog/media-studio/${draftId}/approve`,
+    payload,
+  )
+  return response.data
+}
+
+export async function rejectExerciseMediaDraft(draftId: number, payload: RejectExerciseMediaDraftRequest) {
+  const response = await apiClient.post<ExerciseMediaDraftResponse>(
+    `/admin/exercise-catalog/media-studio/${draftId}/reject`,
+    payload,
+  )
+  return response.data
+}
+
+export async function publishExerciseMediaDraft(draftId: number) {
+  const response = await apiClient.post<ExerciseMediaDraftResponse>(`/admin/exercise-catalog/media-studio/${draftId}/publish`)
   return response.data
 }

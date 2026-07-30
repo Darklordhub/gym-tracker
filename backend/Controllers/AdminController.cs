@@ -294,6 +294,86 @@ public class AdminController : ControllerBase
             draft);
     }
 
+    [HttpPost("exercise-catalog/media-studio/{draftId:int}/approve")]
+    public async Task<ActionResult<ExerciseMediaDraftResponse>> ApproveExerciseMediaStudioDraft(
+        int draftId,
+        ReviewExerciseMediaDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        try
+        {
+            var draft = await _exerciseMediaDraftService.ApproveDraftAsync(
+                draftId,
+                request,
+                User.GetRequiredUserId(),
+                cancellationToken);
+
+            return draft is null
+                ? NotFound(new { message = "Exercise media draft not found." })
+                : Ok(draft);
+        }
+        catch (ExerciseMediaDraftWorkflowException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("exercise-catalog/media-studio/{draftId:int}/reject")]
+    public async Task<ActionResult<ExerciseMediaDraftResponse>> RejectExerciseMediaStudioDraft(
+        int draftId,
+        RejectExerciseMediaDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        try
+        {
+            var draft = await _exerciseMediaDraftService.RejectDraftAsync(
+                draftId,
+                request,
+                User.GetRequiredUserId(),
+                cancellationToken);
+
+            return draft is null
+                ? NotFound(new { message = "Exercise media draft not found." })
+                : Ok(draft);
+        }
+        catch (ExerciseMediaDraftWorkflowException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("exercise-catalog/media-studio/{draftId:int}/publish")]
+    public async Task<ActionResult<ExerciseMediaDraftResponse>> PublishExerciseMediaStudioDraft(
+        int draftId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var draft = await _exerciseMediaDraftService.PublishDraftAsync(
+                draftId,
+                User.GetRequiredUserId(),
+                cancellationToken);
+
+            return draft is null
+                ? NotFound(new { message = "Exercise media draft not found." })
+                : Ok(draft);
+        }
+        catch (ExerciseMediaDraftWorkflowException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
     [HttpPut("exercise-catalog/{id:int}")]
     public async Task<ActionResult<AdminExerciseCatalogItemResponse>> UpdateExerciseCatalogItem(int id, UpdateExerciseCatalogItemRequest request)
     {

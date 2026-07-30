@@ -158,6 +158,140 @@ public class ExerciseMediaDraftService
         return MapDraft(draft);
     }
 
+    public async Task<ExerciseMediaDraftResponse?> ApproveDraftAsync(
+        int draftId,
+        ReviewExerciseMediaDraftRequest request,
+        int reviewedByUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var draft = await GetDraftForUpdateAsync(draftId, cancellationToken);
+        if (draft is null)
+        {
+            return null;
+        }
+
+        if (!string.Equals(draft.Status, ExerciseMediaDraftStatuses.NeedsReview, StringComparison.Ordinal) &&
+            !string.Equals(draft.Status, ExerciseMediaDraftStatuses.Generated, StringComparison.Ordinal))
+        {
+            throw new ExerciseMediaDraftWorkflowException("Only drafts that need review or have been generated can be approved.");
+        }
+
+        var now = DateTime.UtcNow;
+        draft.Status = ExerciseMediaDraftStatuses.Approved;
+        draft.ReviewNotes = NormalizeOptionalText(request.ReviewNotes);
+        draft.RejectionReason = null;
+        draft.ReviewedByUserId = reviewedByUserId;
+        draft.ReviewedAt = now;
+        draft.UpdatedAt = now;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapDraft(draft);
+    }
+
+    public async Task<ExerciseMediaDraftResponse?> RejectDraftAsync(
+        int draftId,
+        RejectExerciseMediaDraftRequest request,
+        int reviewedByUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var draft = await GetDraftForUpdateAsync(draftId, cancellationToken);
+        if (draft is null)
+        {
+            return null;
+        }
+
+        if (string.Equals(draft.Status, ExerciseMediaDraftStatuses.Published, StringComparison.Ordinal))
+        {
+            throw new ExerciseMediaDraftWorkflowException("Published drafts cannot be rejected.");
+        }
+
+        var now = DateTime.UtcNow;
+        draft.Status = ExerciseMediaDraftStatuses.Rejected;
+        draft.ReviewNotes = NormalizeOptionalText(request.ReviewNotes);
+        draft.RejectionReason = NormalizeOptionalText(request.RejectionReason);
+        draft.ReviewedByUserId = reviewedByUserId;
+        draft.ReviewedAt = now;
+        draft.UpdatedAt = now;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapDraft(draft);
+    }
+
+    public async Task<ExerciseMediaDraftResponse?> PublishDraftAsync(
+        int draftId,
+        int publishedByUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var draft = await GetDraftForUpdateAsync(draftId, cancellationToken);
+        if (draft is null)
+        {
+            return null;
+        }
+
+        if (!string.Equals(draft.Status, ExerciseMediaDraftStatuses.Approved, StringComparison.Ordinal))
+        {
+            throw new ExerciseMediaDraftWorkflowException("Only approved drafts can be published.");
+        }
+
+        var generatedVideoUrl = NormalizeOptionalText(draft.GeneratedVideoUrl);
+        var generatedThumbnailUrl = NormalizeOptionalText(draft.GeneratedThumbnailUrl);
+        if (generatedVideoUrl is null && generatedThumbnailUrl is null)
+        {
+            throw new ExerciseMediaDraftWorkflowException("Draft has no generated media to publish.");
+        }
+
+        if (!IsPublishableMediaUrl(generatedVideoUrl) || !IsPublishableMediaUrl(generatedThumbnailUrl))
+        {
+            throw new ExerciseMediaDraftWorkflowException("Generated media URLs must be valid absolute HTTP or HTTPS URLs.");
+        }
+
+        if ((generatedVideoUrl?.Length ?? 0) > 500 || (generatedThumbnailUrl?.Length ?? 0) > 500)
+        {
+            throw new ExerciseMediaDraftWorkflowException("Generated media URLs are too long to publish.");
+        }
+
+        var exercise = draft.ExerciseCatalogItem;
+        if (exercise is null)
+        {
+            throw new ExerciseMediaDraftWorkflowException("The draft exercise is no longer available.");
+        }
+
+        if (IsSourceSnapshotStale(draft.SourceSnapshotJson, exercise))
+        {
+            throw new ExerciseMediaDraftWorkflowException("Draft source snapshot is stale. Create a new draft before publishing.");
+        }
+
+        var now = DateTime.UtcNow;
+        if (generatedVideoUrl is not null)
+        {
+            exercise.LocalVideoUrlOverride = generatedVideoUrl;
+        }
+
+        if (generatedThumbnailUrl is not null)
+        {
+            exercise.LocalThumbnailUrlOverride = generatedThumbnailUrl;
+        }
+
+        exercise.IsManuallyEdited = HasManualOverrides(exercise);
+        exercise.LastEditedAt = exercise.IsManuallyEdited ? now : null;
+        exercise.UpdatedAt = now;
+
+        draft.Status = ExerciseMediaDraftStatuses.Published;
+        draft.PublishedByUserId = publishedByUserId;
+        draft.PublishedAt = now;
+        draft.UpdatedAt = now;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapDraft(draft);
+    }
+
+    private async Task<ExerciseMediaDraft?> GetDraftForUpdateAsync(int draftId, CancellationToken cancellationToken)
+    {
+        return await _dbContext.ExerciseMediaDrafts
+            .Include(draft => draft.ExerciseCatalogItem)
+            .FirstOrDefaultAsync(draft => draft.Id == draftId, cancellationToken);
+    }
+
     private static ExerciseMediaDraftResponse MapDraft(ExerciseMediaDraft draft)
     {
         return new ExerciseMediaDraftResponse
@@ -212,6 +346,88 @@ public class ExerciseMediaDraftService
 
         normalizedMediaType = string.Empty;
         return false;
+    }
+
+    private static bool IsSourceSnapshotStale(string? sourceSnapshotJson, ExerciseCatalogItem exercise)
+    {
+        if (string.IsNullOrWhiteSpace(sourceSnapshotJson))
+        {
+            return true;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(sourceSnapshotJson);
+            var root = document.RootElement;
+
+            if (root.ValueKind != JsonValueKind.Object ||
+                !TryGetSnapshotExerciseId(root, out var snapshotExerciseId) ||
+                !TryGetSnapshotString(root, "name", out var snapshotName) ||
+                !TryGetSnapshotString(root, "source", out var snapshotSource) ||
+                !TryGetSnapshotString(root, "externalId", out var snapshotExternalId))
+            {
+                return true;
+            }
+
+            return snapshotExerciseId != exercise.Id ||
+                !string.Equals(snapshotName, exercise.Name, StringComparison.Ordinal) ||
+                !string.Equals(snapshotSource, exercise.Source, StringComparison.Ordinal) ||
+                !string.Equals(snapshotExternalId, exercise.ExternalId, StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            return true;
+        }
+    }
+
+    private static bool TryGetSnapshotExerciseId(JsonElement root, out int exerciseId)
+    {
+        exerciseId = 0;
+        return root.TryGetProperty("exerciseId", out var value) &&
+            value.ValueKind == JsonValueKind.Number &&
+            value.TryGetInt32(out exerciseId);
+    }
+
+    private static bool TryGetSnapshotString(JsonElement root, string propertyName, out string? value)
+    {
+        value = null;
+        if (!root.TryGetProperty(propertyName, out var property))
+        {
+            return false;
+        }
+
+        if (property.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        value = property.GetString();
+        return true;
+    }
+
+    private static bool IsPublishableMediaUrl(string? value)
+    {
+        return value is null ||
+            (Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+             (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps));
+    }
+
+    private static bool HasManualOverrides(ExerciseCatalogItem item)
+    {
+        return !string.IsNullOrWhiteSpace(item.LocalNameOverride)
+            || !string.IsNullOrWhiteSpace(item.LocalInstructionsOverride)
+            || !string.IsNullOrWhiteSpace(item.LocalThumbnailUrlOverride)
+            || !string.IsNullOrWhiteSpace(item.LocalVideoUrlOverride);
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private static string[] SplitList(string? value)

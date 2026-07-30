@@ -1,12 +1,15 @@
 import { useDeferredValue, useEffect, useState } from 'react'
 import { Copy, KeyRound, Pencil, RefreshCw, Sparkles } from 'lucide-react'
 import {
+  approveExerciseMediaDraft,
   createExerciseMediaDraft,
   fetchAdminExerciseCatalog,
   fetchAdminUsers,
   getExerciseMediaDraft,
   getExerciseMediaDrafts,
   getExerciseMediaStudioExercise,
+  publishExerciseMediaDraft,
+  rejectExerciseMediaDraft,
   resetAdminExerciseCatalogItem,
   resetAdminUserPassword,
   syncAdminExerciseCatalogFromWger,
@@ -25,6 +28,8 @@ import type {
   ExerciseMediaDraftMediaType,
   ExerciseMediaDraftResponse,
   ExerciseMediaStudioExerciseResponse,
+  RejectExerciseMediaDraftRequest,
+  ReviewExerciseMediaDraftRequest,
   UpdateExerciseCatalogItemPayload,
 } from '../types/admin'
 
@@ -320,6 +325,92 @@ export function AdminPage() {
     }
   }
 
+  async function refreshMediaStudioAfterDraftAction(draft: ExerciseMediaDraftResponse) {
+    await loadMediaDrafts()
+
+    if (selectedMediaExerciseId !== '') {
+      await loadStudioExercise(selectedMediaExerciseId)
+    }
+
+    setPromptDraft((current) => (current?.id === draft.id ? draft : current))
+  }
+
+  async function handleApproveMediaDraft(draft: ExerciseMediaDraftResponse) {
+    const reviewNotes = window.prompt('Optional review notes:', draft.reviewNotes ?? '')
+    if (reviewNotes === null) {
+      return
+    }
+
+    const actionKey = `media-studio:approve:${draft.id}`
+    const payload: ReviewExerciseMediaDraftRequest = { reviewNotes }
+
+    try {
+      setPendingActions((current) => ({ ...current, [actionKey]: true }))
+      setErrorMessage(null)
+      setSuccessMessage(null)
+      setMediaStudioError(null)
+
+      const updatedDraft = await approveExerciseMediaDraft(draft.id, payload)
+      await refreshMediaStudioAfterDraftAction(updatedDraft)
+      setSuccessMessage(`Approved ${updatedDraft.mediaType.toLowerCase()} draft for ${updatedDraft.exerciseName}.`)
+    } catch (error) {
+      setMediaStudioError(getRequestErrorMessage(error, 'Unable to approve the exercise media draft.'))
+    } finally {
+      setPendingActions((current) => ({ ...current, [actionKey]: false }))
+    }
+  }
+
+  async function handleRejectMediaDraft(draft: ExerciseMediaDraftResponse) {
+    const rejectionReason = window.prompt('Optional rejection reason:', draft.rejectionReason ?? '')
+    if (rejectionReason === null) {
+      return
+    }
+
+    const actionKey = `media-studio:reject:${draft.id}`
+    const payload: RejectExerciseMediaDraftRequest = { rejectionReason }
+
+    try {
+      setPendingActions((current) => ({ ...current, [actionKey]: true }))
+      setErrorMessage(null)
+      setSuccessMessage(null)
+      setMediaStudioError(null)
+
+      const updatedDraft = await rejectExerciseMediaDraft(draft.id, payload)
+      await refreshMediaStudioAfterDraftAction(updatedDraft)
+      setSuccessMessage(`Rejected ${updatedDraft.mediaType.toLowerCase()} draft for ${updatedDraft.exerciseName}.`)
+    } catch (error) {
+      setMediaStudioError(getRequestErrorMessage(error, 'Unable to reject the exercise media draft.'))
+    } finally {
+      setPendingActions((current) => ({ ...current, [actionKey]: false }))
+    }
+  }
+
+  async function handlePublishMediaDraft(draft: ExerciseMediaDraftResponse) {
+    const confirmed = window.confirm(
+      `Publish this draft for ${draft.exerciseName}? Generated media will replace the current local media override for this exercise.`,
+    )
+    if (!confirmed) {
+      return
+    }
+
+    const actionKey = `media-studio:publish:${draft.id}`
+
+    try {
+      setPendingActions((current) => ({ ...current, [actionKey]: true }))
+      setErrorMessage(null)
+      setSuccessMessage(null)
+      setMediaStudioError(null)
+
+      const updatedDraft = await publishExerciseMediaDraft(draft.id)
+      await refreshMediaStudioAfterDraftAction(updatedDraft)
+      setSuccessMessage(`Published generated media for ${updatedDraft.exerciseName}.`)
+    } catch (error) {
+      setMediaStudioError(getRequestErrorMessage(error, 'Unable to publish the exercise media draft.'))
+    } finally {
+      setPendingActions((current) => ({ ...current, [actionKey]: false }))
+    }
+  }
+
   async function handleCatalogStatusToggle(item: AdminExerciseCatalogItem) {
     const actionKey = `catalog:status:${item.id}`
 
@@ -481,6 +572,267 @@ export function AdminPage() {
       ) : null}
 
       <section className="content-grid admin-grid">
+        <div className="panel panel-span-2" id="media-studio">
+          <div className="panel-header media-studio-panel-header">
+            <div>
+              <h2>Exercise Media Studio</h2>
+              <p>Create AI-ready draft prompts, inspect current media state, and review draft records before anything is published.</p>
+            </div>
+            <div className="toolbar-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => void handleRefreshMediaStudio()}
+                disabled={pendingActions['media-studio:refresh'] ?? false}
+              >
+                <RefreshCw aria-hidden="true" focusable="false" strokeWidth={1.9} />
+                {pendingActions['media-studio:refresh'] ?? false ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+          </div>
+
+          <div className="media-studio-toolbar">
+            <label className="field">
+              <span>Exercise</span>
+              <select
+                className="select-input admin-select"
+                value={selectedMediaExerciseId}
+                onChange={(event) => setSelectedMediaExerciseId(event.target.value ? Number(event.target.value) : '')}
+                disabled={isLoadingCatalog || catalogItems.length === 0}
+              >
+                <option value="">Select an exercise</option>
+                {catalogItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} · {item.source}
+                  </option>
+                ))}
+              </select>
+              <small>Uses the current catalog result set from the management search below.</small>
+            </label>
+
+            <label className="field">
+              <span>Draft media type</span>
+              <select
+                className="select-input admin-select"
+                value={selectedMediaType}
+                onChange={(event) => setSelectedMediaType(event.target.value as ExerciseMediaDraftMediaType)}
+              >
+                {mediaDraftTypeOptions.map((mediaType) => (
+                  <option key={mediaType} value={mediaType}>
+                    {mediaType}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="media-studio-toolbar-actions">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => void handleCreateMediaDraft()}
+                disabled={
+                  selectedMediaExerciseId === '' ||
+                  (pendingActions[`media-studio:create:${selectedMediaExerciseId}`] ?? false)
+                }
+              >
+                <Sparkles aria-hidden="true" focusable="false" strokeWidth={1.9} />
+                {selectedMediaExerciseId !== '' && (pendingActions[`media-studio:create:${selectedMediaExerciseId}`] ?? false)
+                  ? 'Creating...'
+                  : 'Create draft'}
+              </button>
+            </div>
+          </div>
+
+          {mediaStudioError ? <p className="feedback error">{mediaStudioError}</p> : null}
+
+          {isLoadingStudioExercise ? (
+            <StateCard title="Loading studio details" description="Fetching current media state for the selected exercise." loading />
+          ) : selectedStudioExercise ? (
+            <div className="media-studio-summary-grid">
+              <article className="exercise-help-card">
+                <div className="panel-header media-studio-card-header">
+                  <div>
+                    <h3>{selectedStudioExercise.name}</h3>
+                    <p>
+                      {selectedStudioExercise.source}
+                      {selectedStudioExercise.externalId ? ` · External ID ${selectedStudioExercise.externalId}` : ''}
+                    </p>
+                  </div>
+                  <div className="media-studio-badge-row">
+                    <span
+                      className={
+                        selectedStudioExercise.isActive ? 'status-pill status-pill-active' : 'status-pill status-pill-inactive'
+                      }
+                    >
+                      {selectedStudioExercise.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    {selectedStudioExercise.isManuallyEdited ? (
+                      <span className="status-pill media-studio-status-pill">Manual override</span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="media-studio-meta-grid">
+                  <span className="info-pill">{selectedStudioExercise.providerName}</span>
+                  {selectedStudioExercise.primaryMuscle ? (
+                    <span className="info-pill">{formatCatalogLabel(selectedStudioExercise.primaryMuscle)}</span>
+                  ) : null}
+                  {selectedStudioExercise.equipment ? (
+                    <span className="info-pill">{formatCatalogLabel(selectedStudioExercise.equipment)}</span>
+                  ) : null}
+                  {selectedStudioExercise.difficulty ? (
+                    <span className="info-pill">{formatCatalogLabel(selectedStudioExercise.difficulty)}</span>
+                  ) : null}
+                </div>
+
+                <div className="media-studio-link-grid">
+                  <MediaStudioLink label="Effective thumbnail" value={selectedStudioExercise.thumbnailUrl} />
+                  <MediaStudioLink label="Provider thumbnail" value={selectedStudioExercise.providerThumbnailUrl} />
+                  <MediaStudioLink label="Local thumbnail override" value={selectedStudioExercise.localThumbnailUrlOverride} />
+                  <MediaStudioLink label="Effective video" value={selectedStudioExercise.videoUrl} />
+                  <MediaStudioLink label="Provider video" value={selectedStudioExercise.providerVideoUrl} />
+                  <MediaStudioLink label="Local video override" value={selectedStudioExercise.localVideoUrlOverride} />
+                  <MediaStudioValue label="Local media path" value={selectedStudioExercise.localMediaPath} />
+                </div>
+
+                {selectedStudioExercise.instructions ? (
+                  <p className="media-studio-instructions">{truncateText(selectedStudioExercise.instructions, 260)}</p>
+                ) : null}
+              </article>
+
+              <article className="exercise-help-card">
+                <div className="panel-header media-studio-card-header">
+                  <div>
+                    <h3>Latest Drafts For Exercise</h3>
+                    <p>Current draft history for the selected exercise.</p>
+                  </div>
+                </div>
+
+                {selectedStudioExercise.latestDrafts.length === 0 ? (
+                  <StateCard
+                    title="No drafts for this exercise"
+                    description="Create a draft to capture a source snapshot and prompt preview."
+                  />
+                ) : (
+                  <div className="media-studio-latest-drafts">
+                    {selectedStudioExercise.latestDrafts.map((draft) => (
+                      <article key={draft.id} className="suggestion-card suggestion-card-compact">
+                        <div className="media-studio-draft-card-header">
+                          <strong>{draft.mediaType}</strong>
+                          <span className={getMediaStudioStatusClassName(draft.status)}>{formatCatalogLabel(draft.status)}</span>
+                        </div>
+                        <p className="record-hint">
+                          {formatDateTime(draft.createdAt)} · {draft.promptVersion ?? 'No version'}
+                        </p>
+                        <p className="media-studio-prompt-preview">{truncateText(draft.promptText, 180)}</p>
+                        <MediaStudioReviewSummary draft={draft} />
+                        <MediaStudioDraftActions
+                          draft={draft}
+                          pendingActions={pendingActions}
+                          onOpenPrompt={handleOpenPromptDraft}
+                          onApproveDraft={handleApproveMediaDraft}
+                          onRejectDraft={handleRejectMediaDraft}
+                          onPublishDraft={handlePublishMediaDraft}
+                        />
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </article>
+            </div>
+          ) : (
+            <StateCard
+              title="Select an exercise"
+              description="Choose a catalog item below to inspect its current media and latest draft history."
+            />
+          )}
+
+          {isLoadingMediaDrafts ? (
+            <StateCard title="Loading drafts" description="Fetching exercise media drafts." loading />
+          ) : mediaDrafts.length === 0 ? (
+            <StateCard title="No media drafts yet" description="Create the first exercise media draft to start the review workflow." />
+          ) : (
+            <div className="admin-table-shell panel-scroll-region media-studio-table-shell">
+              <table className="admin-table">
+                <caption className="sr-only">Exercise media studio draft list.</caption>
+                <thead>
+                  <tr>
+                    <th>Exercise</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Provider / model</th>
+                    <th>Prompt preview</th>
+                    <th>Generated media</th>
+                    <th>Created / updated</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mediaDrafts.map((draft) => {
+                    const isViewingDraft = pendingActions[`media-studio:view:${draft.id}`] ?? false
+
+                    return (
+                      <tr key={draft.id} className={isViewingDraft ? 'admin-row admin-row-updating' : 'admin-row'}>
+                        <td className="admin-cell-strong">
+                          <div className="admin-user-cell">
+                            <strong>{draft.exerciseName}</strong>
+                            <span className="record-hint">
+                              {draft.exerciseSource} · Draft #{draft.id}
+                            </span>
+                          </div>
+                        </td>
+                        <td>{draft.mediaType}</td>
+                        <td>
+                          <span className={getMediaStudioStatusClassName(draft.status)}>{formatCatalogLabel(draft.status)}</span>
+                          <MediaStudioReviewSummary draft={draft} />
+                        </td>
+                        <td>{formatGenerationLabel(draft)}</td>
+                        <td>
+                          <p className="media-studio-prompt-preview">{truncateText(draft.promptText, 160)}</p>
+                        </td>
+                        <td>
+                          <div className="media-studio-url-stack">
+                            {draft.generatedThumbnailUrl ? (
+                              <a href={draft.generatedThumbnailUrl} target="_blank" rel="noreferrer">
+                                Thumbnail
+                              </a>
+                            ) : null}
+                            {draft.generatedVideoUrl ? (
+                              <a href={draft.generatedVideoUrl} target="_blank" rel="noreferrer">
+                                Video
+                              </a>
+                            ) : null}
+                            {!draft.generatedThumbnailUrl && !draft.generatedVideoUrl ? (
+                              <span className="record-hint">Not generated</span>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="record-hint">
+                          <div className="media-studio-date-stack">
+                            <span>Created {formatDateTime(draft.createdAt)}</span>
+                            <span>Updated {formatDateTime(draft.updatedAt)}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <MediaStudioDraftActions
+                            draft={draft}
+                            pendingActions={pendingActions}
+                            onOpenExercise={openDraftExercise}
+                            onOpenPrompt={handleOpenPromptDraft}
+                            onApproveDraft={handleApproveMediaDraft}
+                            onRejectDraft={handleRejectMediaDraft}
+                            onPublishDraft={handlePublishMediaDraft}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         <div className="panel panel-span-2">
           <div className="panel-header">
             <div>
@@ -669,265 +1021,6 @@ export function AdminPage() {
           )}
         </div>
 
-        <div className="panel panel-span-2">
-          <div className="panel-header">
-            <div>
-              <h2>Exercise Media Studio</h2>
-              <p>Create AI-ready draft prompts, inspect current media state, and review draft records before anything is published.</p>
-            </div>
-            <div className="toolbar-actions">
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() => void handleRefreshMediaStudio()}
-                disabled={pendingActions['media-studio:refresh'] ?? false}
-              >
-                <RefreshCw aria-hidden="true" focusable="false" strokeWidth={1.9} />
-                {pendingActions['media-studio:refresh'] ?? false ? 'Refreshing...' : 'Refresh'}
-              </button>
-            </div>
-          </div>
-
-          <div className="media-studio-toolbar">
-            <label className="field">
-              <span>Exercise</span>
-              <select
-                className="select-input admin-select"
-                value={selectedMediaExerciseId}
-                onChange={(event) => setSelectedMediaExerciseId(event.target.value ? Number(event.target.value) : '')}
-                disabled={isLoadingCatalog || catalogItems.length === 0}
-              >
-                <option value="">Select an exercise</option>
-                {catalogItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} · {item.source}
-                  </option>
-                ))}
-              </select>
-              <small>Uses the current catalog result set from the management search above.</small>
-            </label>
-
-            <label className="field">
-              <span>Draft media type</span>
-              <select
-                className="select-input admin-select"
-                value={selectedMediaType}
-                onChange={(event) => setSelectedMediaType(event.target.value as ExerciseMediaDraftMediaType)}
-              >
-                {mediaDraftTypeOptions.map((mediaType) => (
-                  <option key={mediaType} value={mediaType}>
-                    {mediaType}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="media-studio-toolbar-actions">
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => void handleCreateMediaDraft()}
-                disabled={
-                  selectedMediaExerciseId === '' ||
-                  (pendingActions[`media-studio:create:${selectedMediaExerciseId}`] ?? false)
-                }
-              >
-                <Sparkles aria-hidden="true" focusable="false" strokeWidth={1.9} />
-                {selectedMediaExerciseId !== '' && (pendingActions[`media-studio:create:${selectedMediaExerciseId}`] ?? false)
-                  ? 'Creating...'
-                  : 'Create draft'}
-              </button>
-            </div>
-          </div>
-
-          {mediaStudioError ? <p className="feedback error">{mediaStudioError}</p> : null}
-
-          {isLoadingStudioExercise ? (
-            <StateCard title="Loading studio details" description="Fetching current media state for the selected exercise." loading />
-          ) : selectedStudioExercise ? (
-            <div className="media-studio-summary-grid">
-              <article className="exercise-help-card">
-                <div className="panel-header media-studio-card-header">
-                  <div>
-                    <h3>{selectedStudioExercise.name}</h3>
-                    <p>
-                      {selectedStudioExercise.source}
-                      {selectedStudioExercise.externalId ? ` · External ID ${selectedStudioExercise.externalId}` : ''}
-                    </p>
-                  </div>
-                  <div className="media-studio-badge-row">
-                    <span
-                      className={
-                        selectedStudioExercise.isActive ? 'status-pill status-pill-active' : 'status-pill status-pill-inactive'
-                      }
-                    >
-                      {selectedStudioExercise.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                    {selectedStudioExercise.isManuallyEdited ? (
-                      <span className="status-pill media-studio-status-pill">Manual override</span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="media-studio-meta-grid">
-                  <span className="info-pill">{selectedStudioExercise.providerName}</span>
-                  {selectedStudioExercise.primaryMuscle ? (
-                    <span className="info-pill">{formatCatalogLabel(selectedStudioExercise.primaryMuscle)}</span>
-                  ) : null}
-                  {selectedStudioExercise.equipment ? (
-                    <span className="info-pill">{formatCatalogLabel(selectedStudioExercise.equipment)}</span>
-                  ) : null}
-                  {selectedStudioExercise.difficulty ? (
-                    <span className="info-pill">{formatCatalogLabel(selectedStudioExercise.difficulty)}</span>
-                  ) : null}
-                </div>
-
-                <div className="media-studio-link-grid">
-                  <MediaStudioLink label="Effective thumbnail" value={selectedStudioExercise.thumbnailUrl} />
-                  <MediaStudioLink label="Provider thumbnail" value={selectedStudioExercise.providerThumbnailUrl} />
-                  <MediaStudioLink label="Local thumbnail override" value={selectedStudioExercise.localThumbnailUrlOverride} />
-                  <MediaStudioLink label="Effective video" value={selectedStudioExercise.videoUrl} />
-                  <MediaStudioLink label="Provider video" value={selectedStudioExercise.providerVideoUrl} />
-                  <MediaStudioLink label="Local video override" value={selectedStudioExercise.localVideoUrlOverride} />
-                  <MediaStudioValue label="Local media path" value={selectedStudioExercise.localMediaPath} />
-                </div>
-
-                {selectedStudioExercise.instructions ? (
-                  <p className="media-studio-instructions">{truncateText(selectedStudioExercise.instructions, 260)}</p>
-                ) : null}
-              </article>
-
-              <article className="exercise-help-card">
-                <div className="panel-header media-studio-card-header">
-                  <div>
-                    <h3>Latest Drafts For Exercise</h3>
-                    <p>Current draft history for the selected exercise.</p>
-                  </div>
-                </div>
-
-                {selectedStudioExercise.latestDrafts.length === 0 ? (
-                  <StateCard
-                    title="No drafts for this exercise"
-                    description="Create a draft to capture a source snapshot and prompt preview."
-                  />
-                ) : (
-                  <div className="media-studio-latest-drafts">
-                    {selectedStudioExercise.latestDrafts.map((draft) => (
-                      <article key={draft.id} className="suggestion-card suggestion-card-compact">
-                        <div className="media-studio-draft-card-header">
-                          <strong>{draft.mediaType}</strong>
-                          <span className={getMediaStudioStatusClassName(draft.status)}>{formatCatalogLabel(draft.status)}</span>
-                        </div>
-                        <p className="record-hint">
-                          {formatDateTime(draft.createdAt)} · {draft.promptVersion ?? 'No version'}
-                        </p>
-                        <p className="media-studio-prompt-preview">{truncateText(draft.promptText, 180)}</p>
-                        <div className="admin-actions">
-                          <button type="button" className="ghost-button" onClick={() => void handleOpenPromptDraft(draft.id)}>
-                            View prompt
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </article>
-            </div>
-          ) : (
-            <StateCard
-              title="Select an exercise"
-              description="Choose a catalog item above to inspect its current media and latest draft history."
-            />
-          )}
-
-          {isLoadingMediaDrafts ? (
-            <StateCard title="Loading drafts" description="Fetching exercise media drafts." loading />
-          ) : mediaDrafts.length === 0 ? (
-            <StateCard title="No media drafts yet" description="Create the first exercise media draft to start the review workflow." />
-          ) : (
-            <div className="admin-table-shell panel-scroll-region">
-              <table className="admin-table">
-                <caption className="sr-only">Exercise media studio draft list.</caption>
-                <thead>
-                  <tr>
-                    <th>Exercise</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Provider / model</th>
-                    <th>Prompt preview</th>
-                    <th>Generated media</th>
-                    <th>Created / updated</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mediaDrafts.map((draft) => {
-                    const isViewingDraft = pendingActions[`media-studio:view:${draft.id}`] ?? false
-
-                    return (
-                      <tr key={draft.id} className={isViewingDraft ? 'admin-row admin-row-updating' : 'admin-row'}>
-                        <td className="admin-cell-strong">
-                          <div className="admin-user-cell">
-                            <strong>{draft.exerciseName}</strong>
-                            <span className="record-hint">
-                              {draft.exerciseSource} · Draft #{draft.id}
-                            </span>
-                          </div>
-                        </td>
-                        <td>{draft.mediaType}</td>
-                        <td>
-                          <span className={getMediaStudioStatusClassName(draft.status)}>{formatCatalogLabel(draft.status)}</span>
-                        </td>
-                        <td>{formatGenerationLabel(draft)}</td>
-                        <td>
-                          <p className="media-studio-prompt-preview">{truncateText(draft.promptText, 160)}</p>
-                        </td>
-                        <td>
-                          <div className="media-studio-url-stack">
-                            {draft.generatedThumbnailUrl ? (
-                              <a href={draft.generatedThumbnailUrl} target="_blank" rel="noreferrer">
-                                Thumbnail
-                              </a>
-                            ) : null}
-                            {draft.generatedVideoUrl ? (
-                              <a href={draft.generatedVideoUrl} target="_blank" rel="noreferrer">
-                                Video
-                              </a>
-                            ) : null}
-                            {!draft.generatedThumbnailUrl && !draft.generatedVideoUrl ? (
-                              <span className="record-hint">Not generated</span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="record-hint">
-                          <div className="media-studio-date-stack">
-                            <span>Created {formatDateTime(draft.createdAt)}</span>
-                            <span>Updated {formatDateTime(draft.updatedAt)}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="admin-actions">
-                            <button type="button" className="ghost-button" onClick={() => openDraftExercise(draft.exerciseCatalogItemId)}>
-                              Open exercise
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost-button"
-                              disabled={isViewingDraft}
-                              onClick={() => void handleOpenPromptDraft(draft.id)}
-                            >
-                              {isViewingDraft ? 'Loading...' : 'View prompt'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
       </section>
 
       {resetPasswordUser ? (
@@ -1117,6 +1210,20 @@ export function AdminPage() {
                 <span className="info-pill">Updated {formatDateTime(promptDraft.updatedAt)}</span>
               </div>
 
+              <MediaStudioReviewSummary draft={promptDraft} />
+
+              <div className="media-studio-modal-actions">
+                <MediaStudioDraftActions
+                  draft={promptDraft}
+                  pendingActions={pendingActions}
+                  onClose={closePromptDialog}
+                  onCopyPrompt={handleCopyPrompt}
+                  onApproveDraft={handleApproveMediaDraft}
+                  onRejectDraft={handleRejectMediaDraft}
+                  onPublishDraft={handlePublishMediaDraft}
+                />
+              </div>
+
               <pre className="media-studio-prompt-block">{promptDraft.promptText}</pre>
 
               {promptDraft.sourceSnapshotJson ? (
@@ -1125,21 +1232,6 @@ export function AdminPage() {
                   <pre className="media-studio-snapshot-block">{promptDraft.sourceSnapshotJson}</pre>
                 </details>
               ) : null}
-
-              <div className="action-row">
-                <button type="button" className="ghost-button" onClick={closePromptDialog}>
-                  Close
-                </button>
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={() => void handleCopyPrompt()}
-                  disabled={pendingActions[`media-studio:copy:${promptDraft.id}`] ?? false}
-                >
-                  <Copy aria-hidden="true" focusable="false" strokeWidth={1.9} />
-                  {pendingActions[`media-studio:copy:${promptDraft.id}`] ?? false ? 'Copying...' : 'Copy prompt'}
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -1206,6 +1298,8 @@ function getMediaStudioStatusClassName(status: string) {
       return 'status-pill status-pill-queued'
     case 'Generating':
       return 'status-pill status-pill-generating'
+    case 'Generated':
+      return 'status-pill status-pill-generated'
     case 'NeedsReview':
       return 'status-pill status-pill-needs-review'
     case 'Approved':
@@ -1221,6 +1315,139 @@ function getMediaStudioStatusClassName(status: string) {
     default:
       return 'status-pill media-studio-status-pill'
   }
+}
+
+function canApproveMediaDraft(draft: ExerciseMediaDraftResponse) {
+  return draft.status === 'NeedsReview' || draft.status === 'Generated'
+}
+
+function canRejectMediaDraft(draft: ExerciseMediaDraftResponse) {
+  return draft.status !== 'Published'
+}
+
+function canPublishMediaDraft(draft: ExerciseMediaDraftResponse) {
+  return draft.status === 'Approved'
+}
+
+function hasGeneratedMedia(draft: ExerciseMediaDraftResponse) {
+  return Boolean(draft.generatedVideoUrl || draft.generatedThumbnailUrl)
+}
+
+type MediaStudioDraftActionsProps = {
+  draft: ExerciseMediaDraftResponse
+  pendingActions: PendingActionMap
+  onOpenExercise?: (exerciseId: number) => void
+  onOpenPrompt?: (draftId: number) => Promise<void> | void
+  onCopyPrompt?: () => Promise<void> | void
+  onApproveDraft?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
+  onRejectDraft?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
+  onPublishDraft?: (draft: ExerciseMediaDraftResponse) => Promise<void> | void
+  onClose?: () => void
+}
+
+function MediaStudioDraftActions({
+  draft,
+  pendingActions,
+  onOpenExercise,
+  onOpenPrompt,
+  onCopyPrompt,
+  onApproveDraft,
+  onRejectDraft,
+  onPublishDraft,
+  onClose,
+}: MediaStudioDraftActionsProps) {
+  const isViewingDraft = pendingActions[`media-studio:view:${draft.id}`] ?? false
+  const isApprovingDraft = pendingActions[`media-studio:approve:${draft.id}`] ?? false
+  const isRejectingDraft = pendingActions[`media-studio:reject:${draft.id}`] ?? false
+  const isPublishingDraft = pendingActions[`media-studio:publish:${draft.id}`] ?? false
+  const isCopyingPrompt = pendingActions[`media-studio:copy:${draft.id}`] ?? false
+  const isDraftActionPending = isApprovingDraft || isRejectingDraft || isPublishingDraft
+  const showApprove = canApproveMediaDraft(draft)
+  const showReject = canRejectMediaDraft(draft)
+  const showPublish = canPublishMediaDraft(draft)
+  const hasGeneratedDraftMedia = hasGeneratedMedia(draft)
+
+  return (
+    <div className="media-studio-draft-actions">
+      <div className="admin-actions media-studio-draft-action-group">
+        {onOpenExercise ? (
+          <button type="button" className="ghost-button" onClick={() => onOpenExercise(draft.exerciseCatalogItemId)}>
+            Open exercise
+          </button>
+        ) : null}
+        {onOpenPrompt ? (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={isViewingDraft || isDraftActionPending}
+            onClick={() => void onOpenPrompt(draft.id)}
+          >
+            {isViewingDraft ? 'Loading...' : 'View prompt'}
+          </button>
+        ) : null}
+        {showApprove && onApproveDraft ? (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={isDraftActionPending || isCopyingPrompt}
+            onClick={() => void onApproveDraft(draft)}
+          >
+            {isApprovingDraft ? 'Approving...' : 'Approve'}
+          </button>
+        ) : null}
+        {showReject && onRejectDraft ? (
+          <button
+            type="button"
+            className="ghost-button"
+            disabled={isDraftActionPending || isCopyingPrompt}
+            onClick={() => void onRejectDraft(draft)}
+          >
+            {isRejectingDraft ? 'Rejecting...' : 'Reject'}
+          </button>
+        ) : null}
+        {showPublish && onPublishDraft ? (
+          <button
+            type="button"
+            className="primary-button"
+            disabled={!hasGeneratedDraftMedia || isDraftActionPending || isCopyingPrompt}
+            onClick={() => void onPublishDraft(draft)}
+          >
+            {isPublishingDraft ? 'Publishing...' : 'Publish'}
+          </button>
+        ) : null}
+        {onCopyPrompt ? (
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => void onCopyPrompt()}
+            disabled={isCopyingPrompt || isDraftActionPending}
+          >
+            <Copy aria-hidden="true" focusable="false" strokeWidth={1.9} />
+            {isCopyingPrompt ? 'Copying...' : 'Copy prompt'}
+          </button>
+        ) : null}
+        {onClose ? (
+          <button type="button" className="ghost-button" onClick={onClose} disabled={isDraftActionPending || isCopyingPrompt}>
+            Close
+          </button>
+        ) : null}
+      </div>
+
+      {showPublish && !hasGeneratedDraftMedia ? (
+        <p className="media-studio-draft-helper">Generate or attach media before publishing.</p>
+      ) : null}
+    </div>
+  )
+}
+
+function MediaStudioReviewSummary({ draft }: { draft: ExerciseMediaDraftResponse }) {
+  const message = draft.rejectionReason
+    ? `Rejected: ${draft.rejectionReason}`
+    : draft.reviewNotes
+      ? `Review: ${draft.reviewNotes}`
+      : null
+
+  return message ? <p className="media-studio-review-summary">{truncateText(message, 180)}</p> : null
 }
 
 type MediaStudioLinkProps = {

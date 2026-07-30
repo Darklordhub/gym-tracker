@@ -4,6 +4,7 @@ public static class ExerciseMediaDraftStatuses
 {
     public const string Queued = "Queued";
     public const string Generating = "Generating";
+    public const string Generated = "Generated";
     public const string NeedsReview = "NeedsReview";
     public const string Approved = "Approved";
     public const string Rejected = "Rejected";

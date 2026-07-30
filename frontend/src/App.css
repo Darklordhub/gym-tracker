@@ -10382,6 +10382,7 @@ body {
 
 .status-pill-queued,
 .status-pill-generating,
+.status-pill-generated,
 .status-pill-needs-review,
 .status-pill-approved,
 .status-pill-rejected,
@@ -10410,6 +10411,12 @@ body {
   border-color: color-mix(in srgb, var(--tone-amber) 34%, var(--border));
 }
 
+.status-pill-generated {
+  background: color-mix(in srgb, var(--tone-blue) 16%, var(--surface-elevated));
+  color: var(--tone-blue);
+  border-color: color-mix(in srgb, var(--tone-blue) 34%, var(--border));
+}
+
 .status-pill-approved,
 .status-pill-published {
   background: var(--success-soft);
@@ -10434,9 +10441,9 @@ body {
 .media-studio-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(180px, 220px) auto;
-  gap: 16px;
+  gap: 12px;
   align-items: end;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .media-studio-toolbar-actions {
@@ -10444,11 +10451,19 @@ body {
   justify-content: flex-end;
 }
 
+.media-studio-panel-header {
+  margin-bottom: 16px;
+}
+
+.media-studio-panel-header p {
+  max-width: 44rem;
+}
+
 .media-studio-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin-bottom: 18px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .media-studio-card-header {
@@ -10491,9 +10506,32 @@ body {
   line-height: 1.5;
 }
 
+.media-studio-review-summary {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .media-studio-latest-drafts {
   display: grid;
   gap: 12px;
+}
+
+.media-studio-draft-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.media-studio-draft-action-group {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+}
+
+.media-studio-draft-helper {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .media-studio-draft-card-header {
@@ -10509,13 +10547,26 @@ body {
   gap: 6px;
 }
 
+.media-studio-table-shell {
+  max-height: min(36vh, 320px);
+}
+
 .media-studio-modal {
   max-width: 860px;
+  max-height: min(88vh, 960px);
+  overflow-y: auto;
 }
 
 .media-studio-modal-content {
   display: grid;
   gap: 16px;
+}
+
+.media-studio-modal-actions {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-muted);
 }
 
 .media-studio-prompt-block,

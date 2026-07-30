@@ -67,6 +67,7 @@ export type UpdateExerciseCatalogItemPayload = {
 export type ExerciseMediaDraftStatus =
   | 'Queued'
   | 'Generating'
+  | 'Generated'
   | 'NeedsReview'
   | 'Approved'
   | 'Rejected'
@@ -129,4 +130,13 @@ export type ExerciseMediaStudioExerciseResponse = {
 
 export type CreateExerciseMediaDraftRequest = {
   mediaType?: string | null
+}
+
+export type ReviewExerciseMediaDraftRequest = {
+  reviewNotes?: string | null
+}
+
+export type RejectExerciseMediaDraftRequest = {
+  reviewNotes?: string | null
+  rejectionReason?: string | null
 }
