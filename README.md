@@ -41,6 +41,8 @@ Optional Exercise Media Studio settings:
 - Generated drafts remain in the private area of the media volume and are previewed through Admin-only API endpoints.
 - Publishing copies approved media into the public area of the same volume before updating catalog overrides.
 
+Use the [Exercise Media Studio AI generation enablement runbook](./docs/exercise-media-studio-enablement.md) for the staging test, provider budget controls, production rollout, and rollback procedure.
+
 Example values are provided in [`/.env.example`](./.env.example).
 
 ### Deploy in Portainer
