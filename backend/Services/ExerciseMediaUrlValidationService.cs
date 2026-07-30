@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Headers;
-using System.Net.Sockets;
 
 namespace backend.Services;
 
@@ -44,17 +43,15 @@ public class ExerciseMediaUrlValidationService
         ".m4v",
     };
 
-    private static readonly HashSet<string> BlockedHostnames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "localhost",
-        "localhost.localdomain",
-    };
-
     private readonly HttpClient _httpClient;
+    private readonly IExerciseMediaHostResolver _hostResolver;
 
-    public ExerciseMediaUrlValidationService(HttpClient httpClient)
+    public ExerciseMediaUrlValidationService(
+        HttpClient httpClient,
+        IExerciseMediaHostResolver hostResolver)
     {
         _httpClient = httpClient;
+        _hostResolver = hostResolver;
     }
 
     public bool IsLikelyEmbeddableVideoUrl(string? value)
@@ -187,7 +184,7 @@ public class ExerciseMediaUrlValidationService
     private async Task<ProbeResult> ProbeAsync(string url, ExerciseMediaUrlKind kind, CancellationToken cancellationToken)
     {
         var headResult = await SendAsync(HttpMethod.Head, url, kind, cancellationToken);
-        if (ShouldFallbackToGet(headResult))
+        if (headResult.CanFallbackToGet && ShouldFallbackToGet(headResult))
         {
             var getResult = await SendAsync(HttpMethod.Get, url, kind, cancellationToken);
             if (getResult.CheckedRemotely)
@@ -228,6 +225,11 @@ public class ExerciseMediaUrlValidationService
 
                 using var request = new HttpRequestMessage(method, currentUri);
                 request.Headers.Accept.Clear();
+
+                if (method == HttpMethod.Get)
+                {
+                    request.Headers.Range = new RangeHeaderValue(0, 0);
+                }
 
                 if (kind == ExerciseMediaUrlKind.Image)
                 {
@@ -270,6 +272,7 @@ public class ExerciseMediaUrlValidationService
                         ? null
                         : $"Remote server responded with {(int)response.StatusCode} {response.StatusCode}.",
                     CheckedRemotely = true,
+                    CanFallbackToGet = true,
                 };
             }
 
@@ -287,6 +290,7 @@ public class ExerciseMediaUrlValidationService
                     ? "Remote server validation timed out."
                     : "Unable to validate the URL against the remote server.",
                 CheckedRemotely = true,
+                CanFallbackToGet = true,
             };
         }
     }
@@ -303,87 +307,23 @@ public class ExerciseMediaUrlValidationService
             return "URL must use HTTP or HTTPS.";
         }
 
-        if (IsBlockedHostname(uri.Host))
+        if (!string.IsNullOrEmpty(uri.UserInfo))
         {
-            return "URL points to a blocked network location.";
+            return "URL must not include credentials.";
         }
-
-        IPAddress[] addresses;
 
         try
         {
-            if (IPAddress.TryParse(uri.Host, out var parsedAddress))
-            {
-                addresses = new[] { parsedAddress };
-            }
-            else
-            {
-                addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, cancellationToken);
-            }
+            await ExerciseMediaSafeHttpHandler.ResolveAllowedAddressesAsync(
+                uri.DnsSafeHost,
+                _hostResolver,
+                cancellationToken);
+            return null;
         }
-        catch (Exception exception) when (exception is SocketException or ArgumentException)
+        catch (ExerciseMediaRemoteTargetException exception)
         {
-            return "Unable to resolve the remote host for validation.";
+            return exception.Message;
         }
-
-        if (addresses.Length == 0)
-        {
-            return "Unable to resolve the remote host for validation.";
-        }
-
-        if (addresses.Any(IsBlockedAddress))
-        {
-            return "URL points to a blocked network location.";
-        }
-
-        return null;
-    }
-
-    private static bool IsBlockedAddress(IPAddress address)
-    {
-        var normalizedAddress = NormalizeAddress(address);
-
-        if (IPAddress.IsLoopback(normalizedAddress)
-            || normalizedAddress.Equals(IPAddress.Any)
-            || normalizedAddress.Equals(IPAddress.None)
-            || normalizedAddress.Equals(IPAddress.IPv6Any)
-            || normalizedAddress.Equals(IPAddress.IPv6None))
-        {
-            return true;
-        }
-
-        var bytes = normalizedAddress.GetAddressBytes();
-
-        if (normalizedAddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            return bytes[0] == 10
-                || bytes[0] == 127
-                || (bytes[0] == 169 && bytes[1] == 254)
-                || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
-                || (bytes[0] == 192 && bytes[1] == 168)
-                || bytes.All(static value => value == 0);
-        }
-
-        if (normalizedAddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
-        {
-            return (bytes[0] & 0xFE) == 0xFC
-                || (bytes[0] == 0xFE && (bytes[1] & 0xC0) == 0x80)
-                || bytes.All(static value => value == 0);
-        }
-
-        return false;
-    }
-
-    private static IPAddress NormalizeAddress(IPAddress address)
-    {
-        return address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
-    }
-
-    private static bool IsBlockedHostname(string host)
-    {
-        var normalizedHost = host.Trim().TrimEnd('.');
-        return BlockedHostnames.Contains(normalizedHost)
-            || normalizedHost.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsRedirectStatusCode(HttpStatusCode statusCode)
@@ -428,5 +368,6 @@ public class ExerciseMediaUrlValidationService
         public string? ContentType { get; init; }
         public string? Error { get; init; }
         public bool CheckedRemotely { get; init; }
+        public bool CanFallbackToGet { get; init; }
     }
 }

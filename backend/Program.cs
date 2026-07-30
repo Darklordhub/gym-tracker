@@ -94,14 +94,15 @@ builder.Services.AddHttpClient<UsdaNutritionProvider>(httpClient =>
     httpClient.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddScoped<INutritionProvider>(serviceProvider => serviceProvider.GetRequiredService<UsdaNutritionProvider>());
+builder.Services.AddSingleton<IExerciseMediaHostResolver, ExerciseMediaHostResolver>();
 builder.Services.AddHttpClient<ExerciseMediaUrlValidationService>(httpClient =>
 {
     httpClient.Timeout = TimeSpan.FromSeconds(Math.Clamp(exerciseMediaEnrichmentOptions.UrlValidationTimeoutSeconds, 3, 60));
 })
-.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-{
-    AllowAutoRedirect = false,
-});
+.ConfigurePrimaryHttpMessageHandler(serviceProvider =>
+    ExerciseMediaSafeHttpHandler.Create(
+        serviceProvider.GetRequiredService<IExerciseMediaHostResolver>(),
+        TimeSpan.FromSeconds(Math.Clamp(exerciseMediaEnrichmentOptions.UrlValidationTimeoutSeconds, 3, 60))));
 builder.Services.AddHttpClient<IWgerExerciseCatalogSyncService, WgerExerciseCatalogSyncService>(httpClient =>
 {
     httpClient.BaseAddress = new Uri(wgerOptions.BaseUrl.EndsWith('/') ? wgerOptions.BaseUrl : $"{wgerOptions.BaseUrl}/");
