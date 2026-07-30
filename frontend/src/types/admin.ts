@@ -63,3 +63,70 @@ export type UpdateExerciseCatalogItemPayload = {
   videoUrl: string
   isActive: boolean
 }
+
+export type ExerciseMediaDraftStatus =
+  | 'Queued'
+  | 'Generating'
+  | 'NeedsReview'
+  | 'Approved'
+  | 'Rejected'
+  | 'Published'
+  | 'Failed'
+  | 'Archived'
+
+export type ExerciseMediaDraftMediaType = 'Video' | 'Thumbnail' | 'Image'
+
+export type ExerciseMediaDraftResponse = {
+  id: number
+  exerciseCatalogItemId: number
+  exerciseName: string
+  exerciseSource: string
+  status: ExerciseMediaDraftStatus | string
+  mediaType: ExerciseMediaDraftMediaType | string
+  promptText: string
+  promptVersion: string | null
+  sourceSnapshotJson: string | null
+  generatedThumbnailUrl: string | null
+  generatedVideoUrl: string | null
+  generationProvider: string | null
+  generationModel: string | null
+  providerJobId: string | null
+  reviewNotes: string | null
+  rejectionReason: string | null
+  createdByUserId: number | null
+  reviewedByUserId: number | null
+  publishedByUserId: number | null
+  errorMessage: string | null
+  createdAt: string
+  updatedAt: string
+  generatedAt: string | null
+  reviewedAt: string | null
+  publishedAt: string | null
+}
+
+export type ExerciseMediaStudioExerciseResponse = {
+  id: number
+  name: string
+  providerName: string
+  source: string
+  externalId: string | null
+  instructions: string | null
+  primaryMuscle: string | null
+  secondaryMuscles: string[]
+  equipment: string | null
+  difficulty: string | null
+  videoUrl: string | null
+  providerVideoUrl: string | null
+  localVideoUrlOverride: string | null
+  thumbnailUrl: string | null
+  providerThumbnailUrl: string | null
+  localThumbnailUrlOverride: string | null
+  localMediaPath: string | null
+  isActive: boolean
+  isManuallyEdited: boolean
+  latestDrafts: ExerciseMediaDraftResponse[]
+}
+
+export type CreateExerciseMediaDraftRequest = {
+  mediaType?: string | null
+}

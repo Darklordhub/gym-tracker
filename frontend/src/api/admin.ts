@@ -2,7 +2,10 @@ import { apiClient } from '../lib/http'
 import type {
   AdminExerciseCatalogItem,
   AdminUser,
+  CreateExerciseMediaDraftRequest,
   ExerciseCatalogSyncResult,
+  ExerciseMediaDraftResponse,
+  ExerciseMediaStudioExerciseResponse,
   ResetAdminUserPasswordPayload,
   UpdateExerciseCatalogItemPayload,
   UpdateAdminUserRolePayload,
@@ -51,5 +54,30 @@ export async function resetAdminExerciseCatalogItem(itemId: number) {
 
 export async function syncAdminExerciseCatalogFromWger() {
   const response = await apiClient.post<ExerciseCatalogSyncResult>('/admin/exercise-catalog/sync-wger')
+  return response.data
+}
+
+export async function getExerciseMediaDrafts() {
+  const response = await apiClient.get<ExerciseMediaDraftResponse[]>('/admin/exercise-catalog/media-studio')
+  return response.data
+}
+
+export async function getExerciseMediaDraft(draftId: number) {
+  const response = await apiClient.get<ExerciseMediaDraftResponse>(`/admin/exercise-catalog/media-studio/${draftId}`)
+  return response.data
+}
+
+export async function getExerciseMediaStudioExercise(exerciseId: number) {
+  const response = await apiClient.get<ExerciseMediaStudioExerciseResponse>(
+    `/admin/exercise-catalog/${exerciseId}/media-studio`,
+  )
+  return response.data
+}
+
+export async function createExerciseMediaDraft(exerciseId: number, payload: CreateExerciseMediaDraftRequest) {
+  const response = await apiClient.post<ExerciseMediaDraftResponse>(
+    `/admin/exercise-catalog/${exerciseId}/media-studio/drafts`,
+    payload,
+  )
   return response.data
 }
