@@ -34,6 +34,26 @@ type CardioHistoryEntry = {
   notes: string
 }
 
+function useCompactChartMode() {
+  const [isCompact, setIsCompact] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches,
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 640px)')
+    const handleChange = (event: MediaQueryListEvent) => setIsCompact(event.matches)
+
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  return isCompact
+}
+
 export function ExerciseProgressPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
   const [selectedMode, setSelectedMode] = useState<ProgressMode>('strength')
@@ -889,12 +909,17 @@ function ProgressChart({
   metricLabel: string
   bestLabel: string
 }) {
+  const isCompact = useCompactChartMode()
   const width = 900
-  const height = 300
-  const padding = { top: 20, right: 24, bottom: 44, left: 52 }
+  const height = isCompact ? 252 : 300
+  const padding = isCompact
+    ? { top: 18, right: 16, bottom: 34, left: 42 }
+    : { top: 20, right: 24, bottom: 44, left: 52 }
   const minValue = Math.min(...entries.map((entry) => entry.value))
   const maxValue = Math.max(...entries.map((entry) => entry.value))
   const range = Math.max(maxValue - minValue, 1)
+  const xAxisLabelStep = isCompact ? Math.max(Math.ceil(entries.length / 4), 1) : 1
+  const yTickCount = isCompact ? 3 : 4
 
   const points = entries.map((entry, index) => {
     const x =
@@ -907,6 +932,7 @@ function ProgressChart({
 
     return {
       ...entry,
+      index,
       x,
       y,
       shortDate: new Intl.DateTimeFormat(undefined, {
@@ -918,18 +944,19 @@ function ProgressChart({
 
   const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
   const areaPath = `${linePath} L ${points.at(-1)?.x ?? 0} ${height - padding.bottom} L ${points[0]?.x ?? 0} ${height - padding.bottom} Z`
-  const ticks = Array.from({ length: 4 }, (_, index) => {
-    const value = maxValue - (range / 3) * index
-    const y = padding.top + ((height - padding.top - padding.bottom) / 3) * index
+  const ticks = Array.from({ length: yTickCount }, (_, index) => {
+    const divisor = Math.max(yTickCount - 1, 1)
+    const value = maxValue - (range / divisor) * index
+    const y = padding.top + ((height - padding.top - padding.bottom) / divisor) * index
 
-    return { label: `${value.toFixed(1)} ${metricLabel}`, y }
+    return { label: isCompact ? formatCompactChartValue(value) : `${formatCompactChartValue(value)} ${metricLabel}`, y }
   })
 
   return (
-    <div className="chart-card">
+    <div className="chart-card chart-card-mobile-readable">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="progress-chart"
+        className="progress-chart progress-chart-mobile-readable"
         role="img"
         aria-label={title}
       >
@@ -960,10 +987,12 @@ function ProgressChart({
 
         {points.map((point) => (
           <g key={point.id}>
-            <circle cx={point.x} cy={point.y} r="5" className="chart-point" />
-            <text x={point.x} y={height - 16} textAnchor="middle" className="chart-axis-label">
-              {point.shortDate}
-            </text>
+            <circle cx={point.x} cy={point.y} r={isCompact ? 4 : 5} className="chart-point" />
+            {shouldShowCompactChartLabel(point.index, points.length, xAxisLabelStep, isCompact) ? (
+              <text x={point.x} y={height - 16} textAnchor="middle" className="chart-axis-label">
+                {isCompact ? formatCompactChartDate(point.date) : point.shortDate}
+              </text>
+            ) : null}
           </g>
         ))}
       </svg>
@@ -987,6 +1016,26 @@ function ProgressChart({
       </div>
     </div>
   )
+}
+
+function shouldShowCompactChartLabel(index: number, totalPoints: number, labelStep: number, isCompact: boolean) {
+  if (!isCompact) {
+    return true
+  }
+
+  return index === 0 || index === totalPoints - 1 || index % labelStep === 0
+}
+
+function formatCompactChartDate(date: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'numeric',
+    day: 'numeric',
+  }).format(parseDateOnlyToLocalDate(date))
+}
+
+function formatCompactChartValue(value: number) {
+  const rounded = Number(value.toFixed(1))
+  return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1)
 }
 
 function filterHistoryByDate<T extends { date: string }>(entries: T[], dateFrom: string, dateTo: string) {

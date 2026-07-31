@@ -11609,3 +11609,37 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 640px) {
+  .chart-card-mobile-readable {
+    gap: 12px;
+    overflow: hidden;
+  }
+
+  .progress-chart-mobile-readable {
+    display: block;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .chart-card-mobile-readable .chart-axis-label {
+    font-size: 10px;
+  }
+
+  .chart-card-mobile-readable .chart-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .chart-card-mobile-readable .chart-summary > div {
+    padding: 12px;
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 380px) {
+  .chart-card-mobile-readable .chart-summary {
+    grid-template-columns: 1fr;
+  }
+}

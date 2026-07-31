@@ -29,6 +29,26 @@ const initialFormState = (): FormState => ({
   weightKg: '',
 })
 
+function useCompactChartMode() {
+  const [isCompact, setIsCompact] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches,
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 640px)')
+    const handleChange = (event: MediaQueryListEvent) => setIsCompact(event.matches)
+
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  return isCompact
+}
+
 function validateForm(form: FormState): FormErrors {
   const errors: FormErrors = {}
 
@@ -518,12 +538,17 @@ type ChartEntry = WeightEntry & {
 }
 
 function WeightProgressChart({ entries }: { entries: ChartEntry[] }) {
+  const isCompact = useCompactChartMode()
   const width = 760
-  const height = 280
-  const padding = { top: 20, right: 24, bottom: 44, left: 52 }
+  const height = isCompact ? 248 : 280
+  const padding = isCompact
+    ? { top: 18, right: 16, bottom: 34, left: 42 }
+    : { top: 20, right: 24, bottom: 44, left: 52 }
   const minWeight = Math.min(...entries.map((entry) => entry.weightKg))
   const maxWeight = Math.max(...entries.map((entry) => entry.weightKg))
   const range = Math.max(maxWeight - minWeight, 1)
+  const xAxisLabelStep = isCompact ? Math.max(Math.ceil(entries.length / 4), 1) : 1
+  const yTickCount = isCompact ? 3 : 4
 
   const points = entries.map((entry, index) => {
     const x =
@@ -534,25 +559,31 @@ function WeightProgressChart({ entries }: { entries: ChartEntry[] }) {
       padding.bottom -
       ((entry.weightKg - minWeight) / range) * (height - padding.top - padding.bottom)
 
-    return { ...entry, x, y }
+    return { ...entry, index, x, y }
   })
 
   const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
   const areaPath = `${linePath} L ${points.at(-1)?.x ?? 0} ${height - padding.bottom} L ${points[0]?.x ?? 0} ${height - padding.bottom} Z`
-  const ticks = Array.from({ length: 4 }, (_, index) => {
-    const value = maxWeight - (range / 3) * index
+  const ticks = Array.from({ length: yTickCount }, (_, index) => {
+    const divisor = Math.max(yTickCount - 1, 1)
+    const value = maxWeight - (range / divisor) * index
     const y =
-      padding.top + ((height - padding.top - padding.bottom) / 3) * index
+      padding.top + ((height - padding.top - padding.bottom) / divisor) * index
 
     return {
-      label: `${value.toFixed(1)} kg`,
+      label: isCompact ? formatCompactChartValue(value) : `${formatCompactChartValue(value)} kg`,
       y,
     }
   })
 
   return (
-    <div className="chart-card">
-      <svg viewBox={`0 0 ${width} ${height}`} className="progress-chart" role="img" aria-label="Body weight progress chart">
+    <div className="chart-card chart-card-mobile-readable">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="progress-chart progress-chart-mobile-readable"
+        role="img"
+        aria-label="Body weight progress chart"
+      >
         <defs>
           <linearGradient id="weight-area" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--accent-strong)" stopOpacity="0.28" />
@@ -580,10 +611,12 @@ function WeightProgressChart({ entries }: { entries: ChartEntry[] }) {
 
         {points.map((point) => (
           <g key={point.id}>
-            <circle cx={point.x} cy={point.y} r="5" className="chart-point" />
-            <text x={point.x} y={height - 16} textAnchor="middle" className="chart-axis-label">
-              {point.shortDate}
-            </text>
+            <circle cx={point.x} cy={point.y} r={isCompact ? 4 : 5} className="chart-point" />
+            {shouldShowCompactChartLabel(point.index, points.length, xAxisLabelStep, isCompact) ? (
+              <text x={point.x} y={height - 16} textAnchor="middle" className="chart-axis-label">
+                {isCompact ? formatCompactChartDate(point.date) : point.shortDate}
+              </text>
+            ) : null}
           </g>
         ))}
       </svg>
@@ -609,4 +642,24 @@ function WeightProgressChart({ entries }: { entries: ChartEntry[] }) {
       </div>
     </div>
   )
+}
+
+function shouldShowCompactChartLabel(index: number, totalPoints: number, labelStep: number, isCompact: boolean) {
+  if (!isCompact) {
+    return true
+  }
+
+  return index === 0 || index === totalPoints - 1 || index % labelStep === 0
+}
+
+function formatCompactChartDate(date: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'numeric',
+    day: 'numeric',
+  }).format(parseDateOnlyToLocalDate(date))
+}
+
+function formatCompactChartValue(value: number) {
+  const rounded = Number(value.toFixed(1))
+  return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1)
 }
