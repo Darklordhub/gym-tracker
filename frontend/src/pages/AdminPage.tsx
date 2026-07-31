@@ -889,7 +889,7 @@ export function AdminPage() {
 
                     return (
                       <tr key={draft.id} className={isViewingDraft ? 'admin-row admin-row-updating' : 'admin-row'}>
-                        <td className="admin-cell-strong">
+                        <td className="admin-cell-strong" data-label="Exercise">
                           <div className="admin-user-cell">
                             <strong>{draft.exerciseName}</strong>
                             <span className="record-hint">
@@ -897,18 +897,18 @@ export function AdminPage() {
                             </span>
                           </div>
                         </td>
-                        <td>{draft.mediaType}</td>
-                        <td>
+                        <td data-label="Type">{draft.mediaType}</td>
+                        <td data-label="Status">
                           <span className={getMediaStudioStatusClassName(draft.status)}>{formatCatalogLabel(draft.status)}</span>
                           <MediaStudioReviewSummary draft={draft} />
                         </td>
-                        <td>
+                        <td data-label="Provider / model">
                           <MediaStudioGenerationSummary draft={draft} />
                         </td>
-                        <td>
+                        <td data-label="Prompt">
                           <p className="media-studio-prompt-preview">{truncateText(draft.promptText, 160)}</p>
                         </td>
-                        <td>
+                        <td data-label="Generated media">
                           <div className="media-studio-url-stack">
                             {draft.generatedThumbnailUrl ? (
                               <span className="record-hint">Private thumbnail ready</span>
@@ -921,13 +921,13 @@ export function AdminPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="record-hint">
+                        <td className="record-hint" data-label="Dates">
                           <div className="media-studio-date-stack">
                             <span>Created {formatDateTime(draft.createdAt)}</span>
                             <span>Updated {formatDateTime(draft.updatedAt)}</span>
                           </div>
                         </td>
-                        <td>
+                        <td data-label="Actions">
                           <MediaStudioDraftActions
                             draft={draft}
                             pendingActions={pendingActions}
@@ -987,15 +987,15 @@ export function AdminPage() {
 
                     return (
                       <tr key={user.id} className={isUpdating ? 'admin-row admin-row-updating' : 'admin-row'}>
-                        <td className="admin-cell-strong">
+                        <td className="admin-cell-strong" data-label="User">
                           <div className="admin-user-cell">
                             <strong>{user.email}</strong>
                             <span className="record-hint">Created {formatDate(user.createdAt)}</span>
                           </div>
                         </td>
-                        <td>{user.fullName || 'Not set'}</td>
-                        <td>{user.displayName || 'Not set'}</td>
-                        <td>
+                        <td data-label="Full name">{user.fullName || 'Not set'}</td>
+                        <td data-label="Display name">{user.displayName || 'Not set'}</td>
+                        <td data-label="Role">
                           <label className="admin-select-label">
                             <span className="sr-only">Role for {user.email}</span>
                             <span className="admin-field-hint">Role</span>
@@ -1010,13 +1010,13 @@ export function AdminPage() {
                             </select>
                           </label>
                         </td>
-                        <td>
+                        <td data-label="Status">
                           <span className={user.isActive ? 'status-pill status-pill-active' : 'status-pill status-pill-inactive'}>
                             {user.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td className="record-hint">{formatDate(user.createdAt)}</td>
-                        <td>
+                        <td className="record-hint" data-label="Created">{formatDate(user.createdAt)}</td>
+                        <td data-label="Actions">
                           <div className="admin-actions">
                             <button type="button" className="ghost-button" disabled={isUpdating} onClick={() => openResetPasswordDialog(user)}>
                               <KeyRound aria-hidden="true" focusable="false" strokeWidth={1.9} />
@@ -1097,7 +1097,7 @@ export function AdminPage() {
 
                     return (
                       <tr key={item.id} className={isStatusUpdating ? 'admin-row admin-row-updating' : 'admin-row'}>
-                        <td className="admin-cell-strong">
+                        <td className="admin-cell-strong" data-label="Exercise">
                           <div className="admin-user-cell">
                             <strong>{item.name}</strong>
                             <span className="record-hint">
@@ -1105,16 +1105,16 @@ export function AdminPage() {
                             </span>
                           </div>
                         </td>
-                        <td>{item.source}</td>
-                        <td>{item.primaryMuscle ? formatCatalogLabel(item.primaryMuscle) : 'Not set'}</td>
-                        <td>{item.equipment ? formatCatalogLabel(item.equipment) : 'Not set'}</td>
-                        <td>
+                        <td data-label="Source">{item.source}</td>
+                        <td data-label="Primary muscle">{item.primaryMuscle ? formatCatalogLabel(item.primaryMuscle) : 'Not set'}</td>
+                        <td data-label="Equipment">{item.equipment ? formatCatalogLabel(item.equipment) : 'Not set'}</td>
+                        <td data-label="Status">
                           <span className={item.isActive ? 'status-pill status-pill-active' : 'status-pill status-pill-inactive'}>
                             {item.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td className="record-hint">{item.lastSyncedAt ? formatDate(item.lastSyncedAt) : 'Never'}</td>
-                        <td>
+                        <td className="record-hint" data-label="Last synced">{item.lastSyncedAt ? formatDate(item.lastSyncedAt) : 'Never'}</td>
+                        <td data-label="Actions">
                           <div className="admin-actions">
                             <button type="button" className="ghost-button" onClick={() => openCatalogEditor(item)}>
                               <Pencil aria-hidden="true" focusable="false" strokeWidth={1.9} />

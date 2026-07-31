@@ -11166,3 +11166,103 @@ body {
     min-width: min(480px, calc(100vw - 16px));
   }
 }
+
+@media (max-width: 640px) {
+  .admin-table-shell,
+  .admin-table-shell.panel-scroll-region,
+  .media-studio-table-shell {
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .admin-table {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    gap: 12px;
+    border-collapse: separate;
+  }
+
+  .admin-table thead {
+    display: none;
+  }
+
+  .admin-table tbody {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .admin-table tr {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+      var(--surface-overlay-subtle);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .admin-table tr:hover td {
+    background: transparent;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    display: grid;
+    grid-template-columns: minmax(86px, 0.36fr) minmax(0, 1fr);
+    gap: 10px;
+    min-width: 0;
+    padding: 0;
+    border-bottom: 0;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .admin-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    line-height: 1.35;
+    text-transform: uppercase;
+  }
+
+  .admin-table td.admin-cell-strong {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding-bottom: 4px;
+  }
+
+  .admin-table td.admin-cell-strong::before {
+    display: block;
+  }
+
+  .admin-table td[data-label='Actions'] {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 4px;
+  }
+
+  .admin-table td[data-label='Actions']::before {
+    display: none;
+  }
+
+  .admin-actions,
+  .media-studio-draft-action-group {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .admin-actions button,
+  .media-studio-draft-action-group button {
+    width: 100%;
+    justify-content: center;
+  }
+}
