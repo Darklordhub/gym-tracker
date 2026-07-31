@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 
 type VideoModalProps = {
   title: string
@@ -40,6 +40,24 @@ const DIRECT_VIDEO_TYPES: Record<string, string> = {
 export function VideoModal({ title, videoUrl, onClose }: VideoModalProps) {
   const titleId = useId()
   const presentation = getVideoPresentation(videoUrl)
+  const [playbackSnapshot, setPlaybackSnapshot] = useState<{
+    state: 'loading' | 'delayed' | 'ready' | 'error'
+    videoUrl: string
+  }>({ state: 'loading', videoUrl })
+  const canPlayInline = presentation.kind === 'direct' || presentation.kind === 'embed'
+  const playbackState = playbackSnapshot.videoUrl === videoUrl
+    ? playbackSnapshot.state
+    : canPlayInline
+      ? 'loading'
+      : 'ready'
+  const fallbackHref =
+    presentation.kind === 'direct'
+      ? presentation.src
+      : presentation.kind === 'embed'
+        ? presentation.fallbackHref
+        : presentation.kind === 'external'
+          ? presentation.href
+          : undefined
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -51,6 +69,26 @@ export function VideoModal({ title, videoUrl, onClose }: VideoModalProps) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
+
+  useEffect(() => {
+    if (!canPlayInline) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setPlaybackSnapshot((current) =>
+        current.videoUrl === videoUrl && current.state === 'loading'
+          ? { state: 'delayed', videoUrl }
+          : current,
+      )
+    }, 8000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [canPlayInline, videoUrl])
+
+  function updatePlaybackState(state: 'ready' | 'error') {
+    setPlaybackSnapshot({ state, videoUrl })
+  }
 
   return (
     <div className="modal-backdrop video-modal-backdrop" role="presentation" onClick={onClose}>
@@ -73,16 +111,29 @@ export function VideoModal({ title, videoUrl, onClose }: VideoModalProps) {
         </div>
 
         <div className="video-modal-content">
-          {presentation.kind === 'direct' ? (
+          {presentation.kind === 'direct' && playbackState !== 'error' ? (
             <div className="video-modal-player-shell">
-              <video className="video-modal-player" controls preload="metadata" playsInline>
+              <video
+                className="video-modal-player"
+                controls
+                preload="metadata"
+                playsInline
+                onCanPlay={() => updatePlaybackState('ready')}
+                onLoadedMetadata={() => updatePlaybackState('ready')}
+                onError={() => updatePlaybackState('error')}
+              >
                 <source src={presentation.src} type={presentation.mimeType} />
                 Your browser could not play this video.
               </video>
+              {playbackState !== 'ready' ? (
+                <div className="video-modal-playback-status" role="status">
+                  {playbackState === 'delayed' ? 'Still loading. Use the fallback link if playback does not start.' : 'Loading video...'}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
-          {presentation.kind === 'embed' ? (
+          {presentation.kind === 'embed' && playbackState !== 'error' ? (
             <div className="video-modal-player-shell">
               <iframe
                 className="video-modal-frame"
@@ -92,7 +143,28 @@ export function VideoModal({ title, videoUrl, onClose }: VideoModalProps) {
                 referrerPolicy="strict-origin-when-cross-origin"
                 allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
+                onLoad={() => updatePlaybackState('ready')}
+                onError={() => updatePlaybackState('error')}
               />
+              {playbackState !== 'ready' ? (
+                <div className="video-modal-playback-status" role="status">
+                  {playbackState === 'delayed' ? 'Still loading. Use the fallback link if playback does not start.' : 'Loading embedded video...'}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {canPlayInline && playbackState === 'error' ? (
+            <div className="video-modal-fallback">
+              <strong>Playback could not load</strong>
+              <p>The in-app player reported an error. Open the source directly to continue.</p>
+              {fallbackHref ? (
+                <div className="video-modal-actions">
+                  <a className="ghost-button compact-button video-modal-link" href={fallbackHref} target="_blank" rel="noreferrer">
+                    Open video in new tab
+                  </a>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -120,7 +192,7 @@ export function VideoModal({ title, videoUrl, onClose }: VideoModalProps) {
             </div>
           ) : null}
 
-          {presentation.kind === 'direct' ? (
+          {presentation.kind === 'direct' && playbackState !== 'error' ? (
             <div className="video-modal-actions">
               <span className="video-modal-note">If playback fails, open the source directly.</span>
               <a
@@ -134,7 +206,7 @@ export function VideoModal({ title, videoUrl, onClose }: VideoModalProps) {
             </div>
           ) : null}
 
-          {presentation.kind === 'embed' ? (
+          {presentation.kind === 'embed' && playbackState !== 'error' ? (
             <div className="video-modal-actions">
               <span className="video-modal-note">Playback stays in-app unless you explicitly open the source.</span>
               <a

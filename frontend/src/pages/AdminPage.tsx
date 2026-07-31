@@ -1318,6 +1318,9 @@ export function AdminPage() {
                   {promptDraft.mediaType} · {formatCatalogLabel(promptDraft.status)} · {promptDraft.promptVersion ?? 'No version'}
                 </p>
               </div>
+              <button type="button" className="ghost-button compact-button" onClick={closePromptDialog}>
+                Close
+              </button>
             </div>
 
             <div className="media-studio-modal-content">
