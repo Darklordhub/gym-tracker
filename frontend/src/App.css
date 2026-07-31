@@ -11441,3 +11441,171 @@ body {
     justify-content: center;
   }
 }
+
+@media (max-width: 640px) {
+  .nutrition-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .nutrition-main-column,
+  .nutrition-side-column {
+    display: contents;
+  }
+
+  .nutrition-summary-panel {
+    order: 1;
+  }
+
+  .nutrition-mode-panel {
+    order: 2;
+  }
+
+  .nutrition-create-meal-panel {
+    order: 3;
+  }
+
+  .nutrition-search-panel {
+    order: 4;
+  }
+
+  .nutrition-preview-panel {
+    order: 5;
+  }
+
+  .nutrition-meal-groups,
+  .nutrition-empty-day-panel {
+    order: 6;
+  }
+
+  .nutrition-toolbar-panel,
+  .nutrition-summary-panel,
+  .nutrition-mode-panel,
+  .nutrition-create-meal-panel,
+  .nutrition-search-panel,
+  .nutrition-preview-panel,
+  .nutrition-meal-group,
+  .nutrition-empty-day-panel {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .nutrition-toolbar-date-field,
+  .nutrition-search-field,
+  .nutrition-target-meal-field,
+  .nutrition-item-quantity-field {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .nutrition-toolbar-pills,
+  .nutrition-meal-card-meta,
+  .nutrition-item-pills,
+  .nutrition-preview-pills {
+    gap: 8px;
+  }
+
+  .nutrition-create-meal-form,
+  .nutrition-meal-edit-form,
+  .nutrition-add-item-form,
+  .nutrition-search-controls,
+  .nutrition-add-item-controls {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .nutrition-search-input-shell {
+    min-height: 52px;
+    border-radius: 16px;
+  }
+
+  .nutrition-search-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .nutrition-search-toolbar button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .nutrition-search-result-list {
+    max-height: min(42dvh, 360px);
+    overflow-y: auto;
+    padding-right: 2px;
+    overscroll-behavior: contain;
+  }
+
+  .nutrition-search-result {
+    gap: 12px;
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .nutrition-search-result-header,
+  .nutrition-search-result-footer,
+  .nutrition-preview-heading,
+  .nutrition-meal-card-header,
+  .nutrition-item-actions {
+    align-items: stretch;
+  }
+
+  .nutrition-search-result .info-pill,
+  .nutrition-search-result-hint {
+    align-self: start;
+  }
+
+  .nutrition-preview-grid,
+  .nutrition-calculation-preview-grid,
+  .nutrition-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .nutrition-preview-card,
+  .nutrition-calculation-preview,
+  .nutrition-meal-card,
+  .nutrition-item-card {
+    gap: 12px;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .nutrition-meal-card-actions,
+  .nutrition-create-meal-actions,
+  .nutrition-meal-edit-actions,
+  .nutrition-item-action-row,
+  .nutrition-add-item-form .action-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .nutrition-meal-card-actions button,
+  .nutrition-create-meal-actions button,
+  .nutrition-meal-edit-actions button,
+  .nutrition-item-action-row button,
+  .nutrition-add-item-form .action-row button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .nutrition-item-actions {
+    gap: 12px;
+  }
+
+  .nutrition-item-card input,
+  .nutrition-add-item-controls input,
+  .nutrition-add-item-controls select {
+    min-height: 52px;
+  }
+}
+
+@media (max-width: 380px) {
+  .nutrition-preview-grid,
+  .nutrition-calculation-preview-grid,
+  .nutrition-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
