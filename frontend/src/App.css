@@ -5360,7 +5360,7 @@ body {
     border-radius: 16px;
   }
 
-  .action-row {
+  .workout-sticky-actions {
     position: sticky;
     bottom: max(10px, env(safe-area-inset-bottom, 0px));
     z-index: 2;
@@ -5370,7 +5370,7 @@ body {
     backdrop-filter: blur(16px);
   }
 
-  .action-row-prominent {
+  .workout-sticky-actions.action-row-prominent {
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
   }
 
@@ -5538,7 +5538,7 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .action-row {
+  .workout-sticky-actions {
     padding: 6px;
     border-radius: 18px;
   }
