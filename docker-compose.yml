@@ -49,6 +49,7 @@ services:
       App__AllowStartupWithMigrationFailure: ${APP_ALLOW_STARTUP_WITH_MIGRATION_FAILURE:-false}
       ConnectionStrings__DefaultConnection: Host=gym-tracker-db;Port=5432;Database=${POSTGRES_DB:-gymtrackerdb};Username=${POSTGRES_USER:-gymuser};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set to a strong secret}
       Cors__AllowedOrigins__0: ${APP_BASE_URL:-http://localhost:8080}
+      Cors__AllowedOrigins__1: ${CAPACITOR_APP_ORIGIN:-https://app.stride.local}
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY must be set to a random string at least 32 characters long}
       Jwt__Issuer: ${JWT_ISSUER:-gym-tracker-api}
       Jwt__Audience: ${JWT_AUDIENCE:-gym-tracker-app}

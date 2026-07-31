@@ -43,6 +43,8 @@ Optional Exercise Media Studio settings:
 
 Use the [Exercise Media Studio AI generation enablement runbook](./docs/exercise-media-studio-enablement.md) for the staging test, provider budget controls, production rollout, and rollback procedure.
 
+Use the [Android Capacitor runbook](./docs/android-capacitor.md) to build and release the packaged Android client. The Android build embeds the existing frontend and requires a public HTTPS API URL at build time.
+
 Example values are provided in [`/.env.example`](./.env.example).
 
 ### Deploy in Portainer
