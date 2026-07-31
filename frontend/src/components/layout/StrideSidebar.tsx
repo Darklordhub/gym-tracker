@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import type { StrideSidebarNavItem } from './strideLayoutTypes'
 
@@ -41,12 +41,26 @@ export function StrideSidebar({
   onToggleTheme,
   onLogout,
 }: StrideSidebarProps) {
+  const sidebarInnerRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    requestAnimationFrame(() => {
+      if (sidebarInnerRef.current) {
+        sidebarInnerRef.current.scrollTop = 0
+      }
+    })
+  }, [isOpen])
+
   return (
     <aside
       id="primary-navigation"
       className={isOpen ? 'app-sidebar app-sidebar-open' : 'app-sidebar'}
     >
-      <div className="sidebar-inner">
+      <div className="sidebar-inner" ref={sidebarInnerRef}>
         <div className="sidebar-brand">
           <div className="brand-mark" aria-hidden="true">
             <span />

@@ -11660,13 +11660,24 @@ body {
   .sidebar-inner {
     height: auto;
     max-height: calc(100dvh - max(8px, env(safe-area-inset-top, 0px)) - max(10px, env(safe-area-inset-bottom, 0px)));
+    display: flex;
+    flex-direction: column;
     gap: 9px;
     padding: 12px 10px 10px;
     border-radius: 18px;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.035),
       0 18px 42px rgba(0, 0, 0, 0.34);
+  }
+
+  .sidebar-inner::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
 
   .sidebar-brand {
@@ -11714,10 +11725,15 @@ body {
 
   .sidebar-section {
     gap: 6px;
+    flex: 0 0 auto;
   }
 
   .sidebar-inner > .sidebar-section:not(.sidebar-section-secondary) {
+    display: grid;
+    grid-template-rows: auto auto;
+    flex: 0 0 auto;
     min-height: 0;
+    overflow: visible;
   }
 
   .sidebar-section-header {
@@ -11741,19 +11757,27 @@ body {
     white-space: nowrap;
   }
 
+  .sidebar-section-primary .sidebar-section-count {
+    display: none;
+  }
+
   .sidebar-section-primary {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
   }
 
   .sidebar-section-admin {
+    flex: 0 0 auto;
     padding-top: 7px;
+    overflow: visible;
   }
 
   .sidebar-nav {
     gap: 4px;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    overflow-y: visible;
     padding-right: 0;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
   }
 
   .sidebar-nav::-webkit-scrollbar {
@@ -11803,25 +11827,28 @@ body {
   }
 
   .sidebar-section-secondary {
+    flex: 0 0 auto;
+    margin-top: 0;
     gap: 6px;
     padding-top: 8px;
+    overflow: visible;
   }
 
   .sidebar-section-secondary .account-panel {
-    gap: 8px;
-    padding: 8px;
-    border-radius: 14px;
+    gap: 6px;
+    padding: 7px;
+    border-radius: 13px;
   }
 
   .sidebar-section-secondary .user-pill {
-    gap: 8px;
-    padding: 7px 8px;
-    border-radius: 11px;
+    gap: 7px;
+    padding: 6px 7px;
+    border-radius: 10px;
   }
 
   .sidebar-section-secondary .avatar-ring {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
   }
 
   .sidebar-section-secondary .avatar-inner {
@@ -11839,13 +11866,13 @@ body {
   }
 
   .sidebar-actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
   }
 
   .sidebar-action-button {
     width: 100%;
-    min-height: 40px;
+    min-height: 36px;
     justify-content: center;
     gap: 7px;
     padding: 6px 9px;
@@ -11877,6 +11904,6 @@ body {
   }
 
   .sidebar-action-button {
-    min-height: 38px;
+    min-height: 36px;
   }
 }
