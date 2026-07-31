@@ -10832,3 +10832,230 @@ body {
       max(8px, env(safe-area-inset-left, 0px));
   }
 }
+
+/* Mobile overflow containment for dense app surfaces. */
+@media (max-width: 767px) {
+  .panel,
+  .hero-panel,
+  .auth-card,
+  .modal-panel,
+  .state-card,
+  .stat-card,
+  .forge-stat-card,
+  .assistant-card,
+  .dashboard-metric-card,
+  .goal-progress-card,
+  .exercise-card,
+  .workout-card,
+  .record-card,
+  .exercise-history-card,
+  .exercise-summary-card,
+  .template-card,
+  .entry-card,
+  .weekly-average-card,
+  .suggestion-card,
+  .chart-card,
+  .nutrition-toolbar-panel,
+  .nutrition-main-column,
+  .nutrition-side-column,
+  .nutrition-summary-panel,
+  .nutrition-create-meal-panel,
+  .nutrition-meal-card,
+  .nutrition-preview-card,
+  .nutrition-calculation-preview,
+  .nutrition-item-card,
+  .nutrition-search-result,
+  .exercise-library-card,
+  .exercise-library-modal,
+  .video-modal,
+  .workout-details-modal,
+  .media-studio-modal {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .panel-header,
+  .section-title-row,
+  .exercise-card-header,
+  .workout-card-header,
+  .assistant-card-header,
+  .goal-progress-header,
+  .notification-panel-header,
+  .notification-card-header,
+  .notification-card-footer,
+  .media-studio-draft-card-header,
+  .nutrition-meal-card-header,
+  .nutrition-search-result-header,
+  .nutrition-search-result-footer,
+  .nutrition-preview-heading,
+  .nutrition-item-actions,
+  .session-banner,
+  .toggle-row {
+    min-width: 0;
+  }
+
+  .panel-header > *,
+  .section-title-row > *,
+  .exercise-card-header > *,
+  .workout-card-header > *,
+  .assistant-card-header > *,
+  .media-studio-draft-card-header > *,
+  .nutrition-meal-card-heading,
+  .nutrition-search-result-copy,
+  .nutrition-item-copy,
+  .nutrition-toolbar-copy,
+  .nutrition-preview-heading,
+  .exercise-summary-copy,
+  .exercise-summary-meta,
+  .entry-copy,
+  .weekly-average-copy,
+  .weekly-average-meta {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-table-shell,
+  .admin-table-shell.panel-scroll-region,
+  .media-studio-table-shell {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .admin-table {
+    max-width: none;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .chart-card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .progress-chart {
+    min-width: min(520px, calc(100vw - 20px));
+    max-width: none;
+  }
+
+  .action-row,
+  .toolbar-actions,
+  .entry-actions,
+  .workout-card-actions,
+  .template-card-footer,
+  .nutrition-create-meal-actions,
+  .nutrition-meal-edit-actions,
+  .nutrition-meal-card-actions,
+  .nutrition-item-action-row,
+  .video-modal-actions,
+  .media-studio-toolbar-actions,
+  .media-studio-draft-action-group,
+  .media-studio-modal-actions {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .action-row button,
+  .toolbar-actions button,
+  .entry-actions button,
+  .workout-card-actions button,
+  .template-card-footer button,
+  .nutrition-create-meal-actions button,
+  .nutrition-meal-edit-actions button,
+  .nutrition-meal-card-actions button,
+  .nutrition-item-action-row button,
+  .video-modal-actions button,
+  .media-studio-toolbar-actions button,
+  .media-studio-draft-action-group button,
+  .media-studio-modal-actions button,
+  .primary-button,
+  .secondary-button,
+  .ghost-button,
+  .danger-button,
+  .subtle-danger-button {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .field,
+  .filter-field,
+  .search-field,
+  .template-name-field,
+  .admin-select-label,
+  .admin-select,
+  .select-input,
+  .text-area,
+  .field input,
+  .field select,
+  .field textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .status-pill,
+  .status-pill-queued,
+  .status-pill-generating,
+  .status-pill-generated,
+  .status-pill-needs-review,
+  .status-pill-approved,
+  .status-pill-rejected,
+  .status-pill-published,
+  .status-pill-failed,
+  .status-pill-archived,
+  .media-studio-status-pill,
+  .info-pill,
+  .pr-badge,
+  .eyebrow {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .modal-backdrop,
+  .video-modal-backdrop {
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
+  .video-modal-content,
+  .video-modal-player-shell,
+  .video-modal-fallback,
+  .video-modal-player,
+  .video-modal-frame,
+  .media-studio-modal-content,
+  .media-studio-private-preview,
+  .media-studio-private-preview video,
+  .media-studio-private-preview img {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .media-studio-prompt-block,
+  .media-studio-snapshot-block,
+  .media-studio-link,
+  .media-studio-text-value,
+  .media-studio-generation-summary {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 430px) {
+  .media-studio-draft-action-group {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-chart {
+    min-width: min(480px, calc(100vw - 16px));
+  }
+}
