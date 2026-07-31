@@ -1273,7 +1273,7 @@ export function WorkoutsPage() {
               )}
             </div>
 
-            <div className="action-row action-row-prominent workout-sticky-actions">
+            <div className="action-row action-row-prominent">
               <button type="submit" className="primary-button" disabled={isSaving}>
                 {isSaving ? 'Saving...' : 'Save workout'}
               </button>

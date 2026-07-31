@@ -11266,3 +11266,178 @@ body {
     justify-content: center;
   }
 }
+
+@media (max-width: 640px) {
+  .workouts-panel-full,
+  .workouts-panel-strength,
+  .workouts-panel-templates,
+  .workouts-panel-cardio,
+  .workouts-panel-history {
+    min-width: 0;
+  }
+
+  .workouts-active-shell {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .workouts-active-shell,
+  .workouts-strength-form,
+  .workouts-template-toolbar,
+  .workouts-exercise-builder {
+    gap: 12px;
+  }
+
+  .workouts-panel-strength .exercise-builder,
+  .workouts-panel-full .exercise-builder {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .workouts-active-banner {
+    margin-bottom: 12px;
+  }
+
+  .workouts-active-banner .session-banner-copy,
+  .workouts-active-banner .session-banner-metrics {
+    min-width: 0;
+  }
+
+  .workouts-active-banner .session-banner-metrics {
+    width: 100%;
+  }
+
+  .exercise-card {
+    gap: 14px;
+  }
+
+  .exercise-card-header,
+  .section-title-row,
+  .exercise-help-header {
+    align-items: stretch;
+  }
+
+  .exercise-card-header button,
+  .section-title-row button,
+  .exercise-help-header button,
+  .exercise-card-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .catalog-selected-card,
+  .catalog-suggestion-item {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .catalog-selected-thumb,
+  .catalog-suggestion-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+  }
+
+  .catalog-suggestions-panel {
+    max-height: min(42vh, 320px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .exercise-help-card {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .exercise-help-body {
+    gap: 12px;
+  }
+
+  .exercise-help-media {
+    width: min(100%, 132px);
+    min-height: 132px;
+    max-width: 132px;
+  }
+
+  .exercise-help-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .exercise-help-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .set-list {
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .set-card {
+    gap: 10px;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .set-card-header {
+    align-items: center;
+    gap: 10px;
+  }
+
+  .set-card-header .compact-button {
+    min-height: 42px;
+    padding-inline: 12px;
+  }
+
+  .exercise-fields {
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .exercise-fields .field input {
+    min-height: 52px;
+    height: 52px;
+    font-size: 1rem;
+  }
+
+  .workouts-strength-form > .action-row {
+    position: static;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .workout-sticky-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .workout-sticky-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 430px) {
+  .workouts-active-shell {
+    padding-bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .workout-sticky-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .set-card-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .set-card-header .compact-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
