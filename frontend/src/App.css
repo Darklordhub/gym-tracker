@@ -12016,6 +12016,29 @@ body {
     overflow-y: hidden;
   }
 
+  .auth-shell {
+    place-items: start center;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+    width: 100%;
+    max-width: 100%;
+    padding:
+      calc(36px + env(safe-area-inset-top, 0px))
+      max(14px, env(safe-area-inset-right, 0px))
+      calc(32px + env(safe-area-inset-bottom, 0px))
+      max(14px, env(safe-area-inset-left, 0px));
+    overflow-x: clip;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .auth-card {
+    width: min(100%, 520px);
+  }
+
   .content-container {
     min-height: auto;
     align-content: start;
