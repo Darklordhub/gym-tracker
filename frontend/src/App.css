@@ -11647,14 +11647,40 @@ body {
 
 /* Mobile drawer polish for real-phone Chrome and Capacitor WebView. */
 @media (max-width: 767px) {
+  html:not(.nav-open),
+  body:not(.nav-open) {
+    overflow-y: auto;
+  }
+
+  html.nav-open,
+  body.nav-open {
+    overflow: hidden;
+    overscroll-behavior: contain;
+  }
+
+  .shell-backdrop {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .shell-backdrop-visible {
+    visibility: visible;
+    pointer-events: auto;
+  }
+
   .app-sidebar {
     width: min(336px, calc(100vw - 24px));
     max-width: calc(100vw - 24px);
+    pointer-events: none;
     padding:
       max(8px, env(safe-area-inset-top, 0px))
       0
       max(10px, env(safe-area-inset-bottom, 0px))
       max(8px, env(safe-area-inset-left, 0px));
+  }
+
+  .app-sidebar-open {
+    pointer-events: auto;
   }
 
   .sidebar-inner {

@@ -16,7 +16,7 @@ export function StrideShell({
   children,
 }: StrideShellProps) {
   return (
-    <div className="forge-shell">
+    <div className={isMobileNavOpen ? 'forge-shell forge-shell-nav-open' : 'forge-shell'}>
       <div
         className={isMobileNavOpen ? 'shell-backdrop shell-backdrop-visible' : 'shell-backdrop'}
         onClick={onCloseMobileNav}

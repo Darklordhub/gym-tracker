@@ -109,6 +109,11 @@ const NOTIFICATION_READ_STORAGE_KEY = 'gym-tracker-notifications-read'
 const APP_BRAND_NAME = 'GYM Tracker'
 const APP_BRAND_SHORT = 'GYM Tracker'
 
+function unlockMobileNavScroll() {
+  document.documentElement.classList.remove('nav-open')
+  document.body.classList.remove('nav-open')
+}
+
 function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => getPreferredTheme())
 
@@ -225,9 +230,26 @@ function AppLayout({
     window.localStorage.setItem(NOTIFICATION_READ_STORAGE_KEY, JSON.stringify(allIds))
   }
 
+  function closeMobileNav() {
+    unlockMobileNavScroll()
+    setIsMobileNavOpen(false)
+  }
+
+  function toggleMobileNav() {
+    setIsMobileNavOpen((current) => {
+      const next = !current
+
+      if (!next) {
+        unlockMobileNavScroll()
+      }
+
+      return next
+    })
+  }
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setIsMobileNavOpen(false)
+      closeMobileNav()
       setIsNotificationsOpen(false)
     }, 0)
 
@@ -301,18 +323,19 @@ function AppLayout({
 
   useEffect(() => {
     if (!isMobileNavOpen) {
-      document.body.classList.remove('nav-open')
+      unlockMobileNavScroll()
       return
     }
 
+    document.documentElement.classList.add('nav-open')
     document.body.classList.add('nav-open')
-    return () => document.body.classList.remove('nav-open')
+    return unlockMobileNavScroll
   }, [isMobileNavOpen])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        setIsMobileNavOpen(false)
+        closeMobileNav()
         setIsNotificationsOpen(false)
       }
     }
@@ -355,7 +378,7 @@ function AppLayout({
   return (
     <StrideShell
       isMobileNavOpen={isMobileNavOpen}
-      onCloseMobileNav={() => setIsMobileNavOpen(false)}
+      onCloseMobileNav={closeMobileNav}
       sidebar={(
         <StrideSidebar
           isOpen={isMobileNavOpen}
@@ -364,7 +387,7 @@ function AppLayout({
           brandSubtitle="Track training, recovery, and progress in one controlled workspace."
           primaryNavItems={sidebarPrimaryNavItems}
           adminNavItems={sidebarAdminNavItems}
-          onNavigate={() => setIsMobileNavOpen(false)}
+          onNavigate={closeMobileNav}
           roleLabel={accountRole}
           accountLabel={accountLabel}
           accountEmail={authState?.user.email}
@@ -380,7 +403,7 @@ function AppLayout({
       topbar={(
         <StrideTopbar
           isMobileNavOpen={isMobileNavOpen}
-          onToggleMobileNav={() => setIsMobileNavOpen((current) => !current)}
+          onToggleMobileNav={toggleMobileNav}
           navigationControlsId="primary-navigation"
           brandShort={APP_BRAND_SHORT}
           topbarMeta={topbarMeta}
