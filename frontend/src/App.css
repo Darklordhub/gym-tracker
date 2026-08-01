@@ -11933,3 +11933,53 @@ body {
     min-height: 36px;
   }
 }
+
+/* Mobile page scrolling belongs to the main content pane, not the body. */
+@media (max-width: 767px) {
+  html,
+  body,
+  #root,
+  html:not(.nav-open),
+  body:not(.nav-open) {
+    height: 100%;
+    min-height: 100dvh;
+    overflow-y: hidden;
+  }
+
+  .forge-shell {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-main {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow-x: clip;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .forge-shell-nav-open .app-content {
+    overflow-y: hidden;
+  }
+
+  .content-container {
+    min-height: auto;
+    align-content: start;
+  }
+}
