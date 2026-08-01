@@ -46,6 +46,8 @@ type DraftMediaPreview = {
   objectUrl: string
 }
 
+const catalogMobilePageSize = 5
+const catalogMobileQuery = '(max-width: 640px)'
 const mediaDraftTypeOptions: ExerciseMediaDraftMediaType[] = ['Video', 'Thumbnail', 'Image']
 
 const initialCatalogFormState = (): UpdateExerciseCatalogItemPayload => ({
@@ -81,7 +83,14 @@ export function AdminPage() {
   const [selectedStudioExercise, setSelectedStudioExercise] = useState<ExerciseMediaStudioExerciseResponse | null>(null)
   const [promptDraft, setPromptDraft] = useState<ExerciseMediaDraftResponse | null>(null)
   const [draftMediaPreview, setDraftMediaPreview] = useState<DraftMediaPreview | null>(null)
+  const [mobileCatalogVisibleCount, setMobileCatalogVisibleCount] = useState(catalogMobilePageSize)
+  const isMobileCatalogList = useMediaQuery(catalogMobileQuery)
   const deferredCatalogSearch = useDeferredValue(catalogSearch)
+  const visibleCatalogItems = isMobileCatalogList
+    ? catalogItems.slice(0, mobileCatalogVisibleCount)
+    : catalogItems
+  const catalogVisibleCount = Math.min(visibleCatalogItems.length, catalogItems.length)
+  const canLoadMoreCatalogItems = isMobileCatalogList && catalogVisibleCount < catalogItems.length
 
   useEffect(() => {
     void loadUsers()
@@ -91,6 +100,16 @@ export function AdminPage() {
   useEffect(() => {
     void loadCatalog(deferredCatalogSearch)
   }, [deferredCatalogSearch])
+
+  useEffect(() => {
+    setMobileCatalogVisibleCount(catalogMobilePageSize)
+  }, [deferredCatalogSearch])
+
+  useEffect(() => {
+    if (isMobileCatalogList) {
+      setMobileCatalogVisibleCount(catalogMobilePageSize)
+    }
+  }, [isMobileCatalogList])
 
   useEffect(() => {
     if (selectedMediaExerciseId === '' && catalogItems.length > 0) {
@@ -1092,7 +1111,7 @@ export function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {catalogItems.map((item) => {
+                  {visibleCatalogItems.map((item) => {
                     const isStatusUpdating = pendingActions[`catalog:status:${item.id}`] ?? false
 
                     return (
@@ -1135,6 +1154,22 @@ export function AdminPage() {
                   })}
                 </tbody>
               </table>
+              {isMobileCatalogList ? (
+                <div className="catalog-mobile-load-more">
+                  <p>
+                    Showing {catalogVisibleCount} of {catalogItems.length}
+                  </p>
+                  {canLoadMoreCatalogItems ? (
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => setMobileCatalogVisibleCount((current) => current + catalogMobilePageSize)}
+                    >
+                      Load 5 more
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           )}
         </div>
@@ -1704,4 +1739,30 @@ function MediaStudioValue({ label, value }: MediaStudioValueProps) {
       <span className={value ? 'media-studio-text-value' : 'record-hint'}>{value || 'Not set'}</span>
     </div>
   )
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false
+    }
+
+    return window.matchMedia(query).matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const mediaQueryList = window.matchMedia(query)
+    const handleChange = () => setMatches(mediaQueryList.matches)
+
+    handleChange()
+    mediaQueryList.addEventListener('change', handleChange)
+
+    return () => mediaQueryList.removeEventListener('change', handleChange)
+  }, [query])
+
+  return matches
 }

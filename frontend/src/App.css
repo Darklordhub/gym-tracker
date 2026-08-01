@@ -11273,6 +11273,24 @@ body {
     width: 100%;
     justify-content: center;
   }
+
+  .catalog-mobile-load-more {
+    display: grid;
+    gap: 10px;
+    padding: 4px 2px 0;
+  }
+
+  .catalog-mobile-load-more p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+    text-align: center;
+  }
+
+  .catalog-mobile-load-more button {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 640px) {
