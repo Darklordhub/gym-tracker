@@ -95,6 +95,7 @@ export function AiWorkoutGeneratorPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState<GeneratorFormState>(initialFormState)
   const [plan, setPlan] = useState<AiWorkoutPlan | null>(null)
+  const [isParametersOpen, setIsParametersOpen] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [planActionErrorMessage, setPlanActionErrorMessage] = useState<string | null>(null)
@@ -119,6 +120,7 @@ export function AiWorkoutGeneratorPage() {
       setPlanActionFeedback(null)
       const nextPlan = await generateAiWorkout(payload)
       setPlan(nextPlan)
+      setIsParametersOpen(false)
     } catch (error) {
       console.error('AI workout generator request failed.', {
         error,
@@ -235,14 +237,34 @@ export function AiWorkoutGeneratorPage() {
 
       <section className="ai-workout-grid">
         <section className="panel ai-workout-panel">
-          <div className="panel-header">
+          <div className="panel-header ai-workout-parameters-desktop-header">
             <div>
               <h2>Generate a plan</h2>
               <p>Choose the goal, split, duration, and any constraints you want the generator to honor.</p>
             </div>
           </div>
 
-          <form className="ai-workout-form" onSubmit={handleSubmit}>
+          <button
+            type="button"
+            className={`ai-workout-parameters-toggle${isParametersOpen ? ' ai-workout-parameters-toggle-open' : ''}`}
+            aria-expanded={isParametersOpen}
+            aria-controls="ai-workout-parameters-body"
+            onClick={() => setIsParametersOpen((current) => !current)}
+          >
+            <span className="ai-workout-parameters-toggle-copy">
+              <strong>Workout parameters</strong>
+              <small>Configure focus, exclusions, warm-up, and cooldown</small>
+            </span>
+            <span className="ai-workout-parameters-toggle-icon" aria-hidden="true">
+              {isParametersOpen ? '−' : '+'}
+            </span>
+          </button>
+
+          <div
+            id="ai-workout-parameters-body"
+            className={`ai-workout-parameters-body${isParametersOpen ? ' ai-workout-parameters-body-open' : ''}`}
+          >
+            <form className="ai-workout-form" onSubmit={handleSubmit}>
             <div className="ai-workout-form-grid">
               <label className="field">
                 <span>Goal</span>
@@ -422,7 +444,8 @@ export function AiWorkoutGeneratorPage() {
               </button>
               <span className="record-hint">Generate first, then save the plan into history or start it in the normal active workout flow.</span>
             </div>
-          </form>
+            </form>
+          </div>
         </section>
 
         <section className="panel ai-workout-panel">

@@ -8966,6 +8966,14 @@ body {
   gap: 1rem;
 }
 
+.ai-workout-parameters-body {
+  min-width: 0;
+}
+
+.ai-workout-parameters-toggle {
+  display: none;
+}
+
 .ai-workout-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -9253,6 +9261,67 @@ body {
 }
 
 @media (max-width: 640px) {
+  .ai-workout-parameters-desktop-header {
+    display: none;
+  }
+
+  .ai-workout-parameters-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-width: 0;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface-overlay-strong);
+    color: var(--text-strong);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .ai-workout-parameters-toggle:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent-strong) 55%, transparent);
+    outline-offset: 2px;
+  }
+
+  .ai-workout-parameters-toggle-copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .ai-workout-parameters-toggle-copy strong,
+  .ai-workout-parameters-toggle-copy small {
+    overflow-wrap: anywhere;
+  }
+
+  .ai-workout-parameters-toggle-copy small {
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .ai-workout-parameters-toggle-icon {
+    flex: 0 0 auto;
+    color: var(--accent-strong);
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .ai-workout-parameters-body {
+    display: none;
+  }
+
+  .ai-workout-parameters-body-open {
+    display: block;
+  }
+
+  .ai-workout-parameters-body-open .ai-workout-form {
+    gap: 0.85rem;
+  }
+
   .ai-workout-form-grid,
   .ai-workout-plan-summary,
   .ai-workout-exercise-card {
