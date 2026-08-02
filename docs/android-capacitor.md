@@ -28,18 +28,24 @@ Do not edit `android/app/src/main/assets/public` directly. Capacitor regenerates
 
 ## Building the Android bundle
 
-The API base URL is compiled into the frontend bundle. It is a public URL, not a secret. Set it to the external HTTPS application origin with `/api`, then run the guarded build command:
+The API base URL is compiled into the frontend bundle. It is a public URL, not a secret. `npm run build:android` defaults to STRIDE's production API origin, `https://gym.mediaplexserverbadri.trade`. The frontend adds `/api` exactly once, so application calls resolve as `https://gym.mediaplexserverbadri.trade/api/...`.
 
 ```bash
-VITE_API_BASE_URL=https://gym.example.com/api npm run build:android
+npm run build:android
 ```
 
-`build:android` rejects missing, HTTP, localhost, `.local`, and private IPv4 API URLs before compiling. It runs the existing Vite build and synchronizes the result to Android.
+For a different staging or production deployment, pass its public HTTPS application origin without a trailing `/api` requirement:
+
+```bash
+VITE_API_BASE_URL=https://gym.example.com npm run build:android
+```
+
+`build:android` rejects HTTP, localhost, `.local`, and private IPv4 API URLs before compiling. It verifies that the compiled bundle contains the configured public origin, then synchronizes it to Android.
 
 For a debug APK on a machine with the Android SDK and JDK:
 
 ```bash
-VITE_API_BASE_URL=https://gym.example.com/api npm run android:debug
+npm run android:debug
 ```
 
 The generated debug APK is normally at `frontend/android/app/build/outputs/apk/debug/app-debug.apk`.
@@ -59,9 +65,20 @@ APP_BASE_URL=https://gym.example.com
 CAPACITOR_APP_ORIGIN=https://app.stride.local
 ```
 
-`VITE_API_BASE_URL` is only needed on the Android build machine. Do not add `OPENAI_API_KEY`, JWT signing keys, database passwords, or other backend secrets to frontend environment files or Android resources.
+`VITE_API_BASE_URL` is only needed when overriding the Android build default. Do not add `OPENAI_API_KEY`, JWT signing keys, database passwords, or other backend secrets to frontend environment files or Android resources.
 
 Android cleartext traffic is disabled in the generated app. Use a trusted HTTPS certificate for the public STRIDE domain; HTTP API endpoints and LAN development servers are intentionally unsupported by the Android build command.
+
+## Login troubleshooting
+
+If login fails only in the Android app, rebuild and reinstall the APK with `npm run android:debug`. The packaged WebView uses `https://app.stride.local` for its internal application files, so relative `/api` requests would target the wrong origin. The Android build embeds the public API origin instead; verify it before sync with:
+
+```bash
+VITE_API_BASE_URL=https://gym.mediaplexserverbadri.trade node scripts/verify-android-build.mjs --check-dist
+grep -R "gym.mediaplexserverbadri.trade" dist/assets dist/index.html
+```
+
+The backend must also allow `https://app.stride.local` through CORS, as described above.
 
 ## Sync and maintenance commands
 

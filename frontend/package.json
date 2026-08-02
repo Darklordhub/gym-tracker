@@ -11,7 +11,7 @@
     "cap:copy": "cap copy",
     "cap:sync": "cap sync",
     "cap:open:android": "cap open android",
-    "build:android": "node scripts/verify-android-build.mjs && npm run build && npm run cap:sync -- android",
+    "build:android": "node scripts/build-android.mjs",
     "android:debug": "npm run build:android && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {

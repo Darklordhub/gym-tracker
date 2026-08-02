@@ -10,9 +10,23 @@ function normalizeApiBaseUrl() {
     return '/api'
   }
 
-  return configuredApiBaseUrl.endsWith('/')
-    ? configuredApiBaseUrl.slice(0, -1)
-    : configuredApiBaseUrl
+  try {
+    const apiUrl = new URL(configuredApiBaseUrl)
+    const normalizedPath = apiUrl.pathname.replace(/\/+$/, '')
+
+    // API modules use paths such as /Auth/login, so the configured public origin
+    // must always resolve to exactly one /api segment.
+    apiUrl.pathname = normalizedPath.endsWith('/api')
+      ? normalizedPath
+      : `${normalizedPath}/api`
+    apiUrl.search = ''
+    apiUrl.hash = ''
+
+    return apiUrl.toString().replace(/\/$/, '')
+  } catch {
+    // Keep the legacy relative behavior for malformed optional web configuration.
+    return '/api'
+  }
 }
 
 export const apiClient = axios.create({
