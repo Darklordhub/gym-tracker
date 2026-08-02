@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import axios from 'axios'
 import { Dumbbell, PlayCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -90,6 +90,7 @@ const initialFormState: GeneratorFormState = {
 }
 
 const excludedExerciseSearchCache = new Map<string, ExerciseCatalogItem[]>()
+const AI_WORKOUT_INSTRUCTION_PREVIEW_LENGTH = 150
 
 export function AiWorkoutGeneratorPage() {
   const navigate = useNavigate()
@@ -103,6 +104,8 @@ export function AiWorkoutGeneratorPage() {
   const [isSavingWorkout, setIsSavingWorkout] = useState(false)
   const [isStartingWorkout, setIsStartingWorkout] = useState(false)
   const [videoTarget, setVideoTarget] = useState<{ title: string; url: string } | null>(null)
+  const parametersSectionRef = useRef<HTMLElement | null>(null)
+  const parametersToggleRef = useRef<HTMLButtonElement | null>(null)
   const totalPlanExercises = plan?.sections.reduce((total, section) => total + section.exercises.length, 0) ?? 0
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -183,6 +186,14 @@ export function AiWorkoutGeneratorPage() {
     }
   }
 
+  function handleAdjustParameters() {
+    setIsParametersOpen(true)
+    window.requestAnimationFrame(() => {
+      parametersSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      parametersToggleRef.current?.focus({ preventScroll: true })
+    })
+  }
+
   function toggleTargetMuscle(value: TargetMuscleValue) {
     setForm((current) => ({
       ...current,
@@ -207,7 +218,7 @@ export function AiWorkoutGeneratorPage() {
   }
 
   return (
-    <main className="page-shell ai-workout-shell">
+    <main className={`page-shell ai-workout-shell${plan ? ' ai-workout-shell-has-plan' : ''}`}>
       <section className="hero-panel ai-workout-hero">
         <div className="ai-workout-hero-copy">
           <span className="eyebrow">FORGE / Generator</span>
@@ -237,7 +248,7 @@ export function AiWorkoutGeneratorPage() {
       </section>
 
       <section className="ai-workout-grid">
-        <section className="panel ai-workout-panel">
+        <section ref={parametersSectionRef} className="panel ai-workout-panel">
           <div className="panel-header ai-workout-parameters-desktop-header">
             <div>
               <h2>Generate a plan</h2>
@@ -247,6 +258,7 @@ export function AiWorkoutGeneratorPage() {
 
           <button
             type="button"
+            ref={parametersToggleRef}
             className={`ai-workout-parameters-toggle${isParametersOpen ? ' ai-workout-parameters-toggle-open' : ''}`}
             aria-expanded={isParametersOpen}
             aria-controls="ai-workout-parameters-body"
@@ -566,10 +578,12 @@ export function AiWorkoutGeneratorPage() {
                                   <p className="ai-workout-exercise-instructions">
                                     {getInstructionPreview(exercise.instructions)}
                                   </p>
-                                  <details className="ai-workout-instructions">
-                                    <summary>View full instructions</summary>
-                                    <p className="ai-workout-instructions-full">{exercise.instructions}</p>
-                                  </details>
+                                  {hasExpandedInstructions(exercise.instructions) ? (
+                                    <details className="ai-workout-instructions">
+                                      <summary>View full instructions</summary>
+                                      <p className="ai-workout-instructions-full">{exercise.instructions}</p>
+                                    </details>
+                                  ) : null}
                                 </>
                               ) : null}
 
@@ -608,6 +622,30 @@ export function AiWorkoutGeneratorPage() {
           )}
         </section>
       </section>
+
+      {plan ? (
+        <div className="ai-workout-mobile-actions" aria-label="Workout plan actions">
+          <button
+            type="button"
+            className="primary-button"
+            onClick={handleStartWorkout}
+            disabled={isStartingWorkout || isSavingWorkout || isGenerating}
+          >
+            {isStartingWorkout ? 'Starting...' : 'Start Workout'}
+          </button>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={handleSaveWorkout}
+            disabled={isSavingWorkout || isStartingWorkout || isGenerating}
+          >
+            {isSavingWorkout ? 'Saving...' : 'Save Workout'}
+          </button>
+          <button type="button" className="ghost-button" onClick={handleAdjustParameters}>
+            Adjust parameters
+          </button>
+        </div>
+      ) : null}
 
       {videoTarget ? (
         <VideoModal title={videoTarget.title} videoUrl={videoTarget.url} onClose={() => setVideoTarget(null)} />
@@ -843,13 +881,16 @@ function getExerciseChips(exercise: AiWorkoutExercise) {
 
 function getInstructionPreview(instructions: string) {
   const normalizedInstructions = instructions.trim()
-  const previewLength = 150
 
-  if (normalizedInstructions.length <= previewLength) {
+  if (normalizedInstructions.length <= AI_WORKOUT_INSTRUCTION_PREVIEW_LENGTH) {
     return normalizedInstructions
   }
 
-  return `${normalizedInstructions.slice(0, previewLength).trimEnd()}…`
+  return `${normalizedInstructions.slice(0, AI_WORKOUT_INSTRUCTION_PREVIEW_LENGTH).trimEnd()}…`
+}
+
+function hasExpandedInstructions(instructions: string) {
+  return instructions.trim().length > AI_WORKOUT_INSTRUCTION_PREVIEW_LENGTH
 }
 
 function PlanExerciseMedia({ exercise }: { exercise: AiWorkoutExercise }) {

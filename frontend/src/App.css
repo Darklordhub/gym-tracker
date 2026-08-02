@@ -8974,6 +8974,10 @@ body {
   display: none;
 }
 
+.ai-workout-mobile-actions {
+  display: none;
+}
+
 .ai-workout-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -9388,6 +9392,37 @@ body {
 }
 
 @media (max-width: 640px) {
+  .ai-workout-shell.ai-workout-shell-has-plan {
+    padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .ai-workout-mobile-actions {
+    position: fixed;
+    right: max(8px, env(safe-area-inset-right, 0px));
+    bottom: 0;
+    left: max(8px, env(safe-area-inset-left, 0px));
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0.65rem max(8px, env(safe-area-inset-right, 0px)) calc(0.65rem + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+    border-top: 1px solid var(--border-strong);
+    background: var(--surface-strong);
+    box-shadow: 0 -16px 32px rgba(0, 0, 0, 0.24);
+  }
+
+  .ai-workout-mobile-actions button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .ai-workout-mobile-actions button:last-child {
+    grid-column: 1 / -1;
+  }
+
   .ai-workout-parameters-desktop-header {
     display: none;
   }
