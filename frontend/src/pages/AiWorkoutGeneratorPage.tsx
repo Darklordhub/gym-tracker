@@ -103,6 +103,7 @@ export function AiWorkoutGeneratorPage() {
   const [isSavingWorkout, setIsSavingWorkout] = useState(false)
   const [isStartingWorkout, setIsStartingWorkout] = useState(false)
   const [videoTarget, setVideoTarget] = useState<{ title: string; url: string } | null>(null)
+  const totalPlanExercises = plan?.sections.reduce((total, section) => total + section.exercises.length, 0) ?? 0
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -464,8 +465,8 @@ export function AiWorkoutGeneratorPage() {
               description="Choose your constraints on the left, then generate a workout to see the recommended sections and exercises."
             />
           ) : (
-            <div className="ai-workout-plan">
-              <article className="ai-workout-plan-summary">
+            <div className="ai-workout-plan ai-workout-result-stack">
+              <article className="ai-workout-plan-summary ai-workout-result-summary">
                 <div>
                   <span className="stat-label">Workout blueprint</span>
                   <h3>{plan.title}</h3>
@@ -476,10 +477,11 @@ export function AiWorkoutGeneratorPage() {
                 <div className="ai-workout-summary-pills">
                   <span className="info-pill">{plan.estimatedDurationMinutes} min</span>
                   <span className="info-pill info-pill-strength">{plan.sections.length} sections</span>
+                  <span className="info-pill info-pill-strength">{totalPlanExercises} exercises</span>
                 </div>
               </article>
 
-              <article className="ai-workout-plan-actions-card">
+              <article className="ai-workout-plan-actions-card ai-workout-result-actions">
                 <div className="ai-workout-plan-actions-copy">
                   <span className="stat-label">Use this plan</span>
                   <p>
@@ -510,55 +512,63 @@ export function AiWorkoutGeneratorPage() {
                 {planActionErrorMessage ? <p className="feedback error">{planActionErrorMessage}</p> : null}
               </article>
 
-              <div className="ai-workout-section-list">
-                {plan.sections.map((section) => (
-                  <article key={section.name} className="ai-workout-section-card">
-                    <div className="ai-workout-section-header">
-                      <h3>{section.name}</h3>
-                      <span className="record-hint">{section.exercises.length} exercises</span>
-                    </div>
+              <div className="ai-workout-section-list ai-workout-timeline" role="list" aria-label="Generated workout sections">
+                {plan.sections.map((section, sectionIndex) => (
+                  <div key={section.name} className="ai-workout-timeline-item" role="listitem">
+                    <span className="ai-workout-timeline-node" aria-hidden="true">
+                      {sectionIndex + 1}
+                    </span>
+                    <article className="ai-workout-section-card ai-workout-workout-block">
+                      <div className="ai-workout-section-header">
+                        <div className="ai-workout-section-heading">
+                          <span className="stat-label">Block {sectionIndex + 1}</span>
+                          <h3>{section.name}</h3>
+                        </div>
+                        <span className="record-hint">{section.exercises.length} exercises</span>
+                      </div>
 
-                    <div className="ai-workout-exercise-list">
-                      {section.exercises.map((exercise) => (
-                        <article key={`${section.name}-${exercise.name}`} className="ai-workout-exercise-card">
-                          <PlanExerciseMedia exercise={exercise} />
+                      <div className="ai-workout-exercise-list">
+                        {section.exercises.map((exercise) => (
+                          <article key={`${section.name}-${exercise.name}`} className="ai-workout-exercise-card">
+                            <PlanExerciseMedia exercise={exercise} />
 
-                          <div className="ai-workout-exercise-copy">
-                            <div className="ai-workout-exercise-header">
-                              <strong>{exercise.name}</strong>
-                              <div className="ai-workout-exercise-pills">
-                                {exercise.category ? <span className="info-pill">{exercise.category}</span> : null}
-                                {exercise.targetMuscle ? <span className="info-pill">{exercise.targetMuscle}</span> : null}
+                            <div className="ai-workout-exercise-copy">
+                              <div className="ai-workout-exercise-header">
+                                <strong>{exercise.name}</strong>
+                                <div className="ai-workout-exercise-pills">
+                                  {exercise.category ? <span className="info-pill">{exercise.category}</span> : null}
+                                  {exercise.targetMuscle ? <span className="info-pill">{exercise.targetMuscle}</span> : null}
+                                </div>
                               </div>
+
+                              <div className="ai-workout-prescription-grid">
+                                <span><strong>{exercise.sets}</strong> sets</span>
+                                <span><strong>{exercise.reps}</strong></span>
+                                <span><strong>{exercise.restSeconds}s</strong> rest</span>
+                              </div>
+
+                              {exercise.suggestedWeight ? (
+                                <p className="ai-workout-prescription-note">{exercise.suggestedWeight}</p>
+                              ) : null}
+
+                              <p className="ai-workout-exercise-instructions">{exercise.instructions}</p>
+
+                              {exercise.videoUrl ? (
+                                <button
+                                  type="button"
+                                  className="ghost-button compact-button ai-workout-video-button"
+                                  onClick={() => setVideoTarget({ title: exercise.name, url: exercise.videoUrl! })}
+                                >
+                                  <PlayCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
+                                  Watch demo
+                                </button>
+                              ) : null}
                             </div>
-
-                            <div className="ai-workout-prescription-grid">
-                              <span><strong>{exercise.sets}</strong> sets</span>
-                              <span><strong>{exercise.reps}</strong></span>
-                              <span><strong>{exercise.restSeconds}s</strong> rest</span>
-                            </div>
-
-                            {exercise.suggestedWeight ? (
-                              <p className="ai-workout-prescription-note">{exercise.suggestedWeight}</p>
-                            ) : null}
-
-                            <p className="ai-workout-exercise-instructions">{exercise.instructions}</p>
-
-                            {exercise.videoUrl ? (
-                              <button
-                                type="button"
-                                className="ghost-button compact-button ai-workout-video-button"
-                                onClick={() => setVideoTarget({ title: exercise.name, url: exercise.videoUrl! })}
-                              >
-                                <PlayCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
-                                Watch demo
-                              </button>
-                            ) : null}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </article>
+                          </article>
+                        ))}
+                      </div>
+                    </article>
+                  </div>
                 ))}
               </div>
 

@@ -9114,6 +9114,15 @@ body {
   align-items: start;
 }
 
+.ai-workout-result-stack {
+  gap: 1.1rem;
+}
+
+.ai-workout-result-summary,
+.ai-workout-result-actions {
+  min-width: 0;
+}
+
 .ai-workout-plan-actions-card {
   gap: 0.9rem;
 }
@@ -9162,6 +9171,60 @@ body {
   justify-content: space-between;
   gap: 0.75rem;
   align-items: baseline;
+}
+
+.ai-workout-timeline {
+  position: relative;
+  gap: 1rem;
+}
+
+.ai-workout-timeline::before {
+  position: absolute;
+  top: 1rem;
+  bottom: 1rem;
+  left: 0.75rem;
+  width: 1px;
+  background: var(--border-strong);
+  content: '';
+}
+
+.ai-workout-timeline-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.ai-workout-timeline-node {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--accent-border-strong);
+  border-radius: 50%;
+  background: var(--surface-strong);
+  color: var(--accent-strong);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ai-workout-workout-block {
+  min-width: 0;
+}
+
+.ai-workout-section-heading {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.ai-workout-section-heading h3 {
+  overflow-wrap: anywhere;
 }
 
 .ai-workout-exercise-list {
@@ -9326,6 +9389,41 @@ body {
   .ai-workout-plan-summary,
   .ai-workout-exercise-card {
     grid-template-columns: 1fr;
+  }
+
+  .ai-workout-result-summary,
+  .ai-workout-result-actions {
+    gap: 0.75rem;
+    padding: 0.9rem;
+  }
+
+  .ai-workout-timeline {
+    gap: 0.75rem;
+  }
+
+  .ai-workout-timeline::before {
+    top: 0.8rem;
+    bottom: 0.8rem;
+    left: 0.65rem;
+  }
+
+  .ai-workout-timeline-item {
+    grid-template-columns: 1.3rem minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  .ai-workout-timeline-node {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 0.64rem;
+  }
+
+  .ai-workout-workout-block {
+    padding: 0.85rem;
+  }
+
+  .ai-workout-section-header {
+    align-items: start;
   }
 
   .ai-workout-target-chip {
