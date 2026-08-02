@@ -9283,11 +9283,47 @@ body {
   gap: 0.45rem;
 }
 
+.ai-workout-exercise-header > strong {
+  overflow-wrap: anywhere;
+}
+
 .ai-workout-prescription-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem 1rem;
   color: var(--text-secondary);
+}
+
+.ai-workout-exercise-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.ai-workout-exercise-stats span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-overlay-muted);
+}
+
+.ai-workout-exercise-stats small {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.ai-workout-exercise-stats strong {
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-size: 0.9rem;
 }
 
 .ai-workout-prescription-grid strong,
@@ -9302,6 +9338,34 @@ body {
 .ai-workout-exercise-instructions {
   color: var(--text-secondary);
   line-height: 1.55;
+}
+
+.ai-workout-instructions {
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 0.55rem;
+}
+
+.ai-workout-instructions summary {
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.ai-workout-instructions-full {
+  margin: 0.55rem 0 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.ai-workout-exercise-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
 .ai-workout-video-button {
@@ -9386,9 +9450,14 @@ body {
   }
 
   .ai-workout-form-grid,
-  .ai-workout-plan-summary,
-  .ai-workout-exercise-card {
+  .ai-workout-plan-summary {
     grid-template-columns: 1fr;
+  }
+
+  .ai-workout-exercise-card {
+    grid-template-columns: minmax(76px, 88px) minmax(0, 1fr);
+    gap: 0.65rem;
+    padding: 0.75rem;
   }
 
   .ai-workout-result-summary,
@@ -9426,6 +9495,22 @@ body {
     align-items: start;
   }
 
+  .ai-workout-exercise-copy {
+    gap: 0.55rem;
+  }
+
+  .ai-workout-exercise-stats {
+    gap: 0.35rem;
+  }
+
+  .ai-workout-exercise-stats span {
+    padding: 0.4rem;
+  }
+
+  .ai-workout-exercise-stats small {
+    font-size: 0.6rem;
+  }
+
   .ai-workout-target-chip {
     width: 100%;
     justify-content: center;
@@ -9449,7 +9534,8 @@ body {
   }
 
   .ai-workout-exercise-media {
-    max-width: 132px;
+    max-width: 88px;
+    min-height: 0;
   }
 }
 

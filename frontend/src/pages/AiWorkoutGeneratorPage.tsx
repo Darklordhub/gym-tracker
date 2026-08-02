@@ -535,34 +535,56 @@ export function AiWorkoutGeneratorPage() {
                             <div className="ai-workout-exercise-copy">
                               <div className="ai-workout-exercise-header">
                                 <strong>{exercise.name}</strong>
-                                <div className="ai-workout-exercise-pills">
-                                  {exercise.category ? <span className="info-pill">{exercise.category}</span> : null}
-                                  {exercise.targetMuscle ? <span className="info-pill">{exercise.targetMuscle}</span> : null}
+                                <div className="ai-workout-exercise-pills" aria-label="Exercise tags">
+                                  {getExerciseChips(exercise).map((chip) => (
+                                    <span key={chip} className="info-pill">{chip}</span>
+                                  ))}
                                 </div>
                               </div>
 
-                              <div className="ai-workout-prescription-grid">
-                                <span><strong>{exercise.sets}</strong> sets</span>
-                                <span><strong>{exercise.reps}</strong></span>
-                                <span><strong>{exercise.restSeconds}s</strong> rest</span>
+                              <div className="ai-workout-prescription-grid ai-workout-exercise-stats" aria-label="Exercise prescription">
+                                <span>
+                                  <small>Sets</small>
+                                  <strong>{exercise.sets}</strong>
+                                </span>
+                                <span>
+                                  <small>Reps</small>
+                                  <strong>{exercise.reps}</strong>
+                                </span>
+                                <span>
+                                  <small>Rest</small>
+                                  <strong>{exercise.restSeconds}s</strong>
+                                </span>
                               </div>
 
-                              {exercise.suggestedWeight ? (
-                                <p className="ai-workout-prescription-note">{exercise.suggestedWeight}</p>
+                            {exercise.suggestedWeight ? (
+                              <p className="ai-workout-prescription-note">{exercise.suggestedWeight}</p>
+                            ) : null}
+
+                              {exercise.instructions.trim() ? (
+                                <>
+                                  <p className="ai-workout-exercise-instructions">
+                                    {getInstructionPreview(exercise.instructions)}
+                                  </p>
+                                  <details className="ai-workout-instructions">
+                                    <summary>View full instructions</summary>
+                                    <p className="ai-workout-instructions-full">{exercise.instructions}</p>
+                                  </details>
+                                </>
                               ) : null}
 
-                              <p className="ai-workout-exercise-instructions">{exercise.instructions}</p>
-
-                              {exercise.videoUrl ? (
-                                <button
-                                  type="button"
-                                  className="ghost-button compact-button ai-workout-video-button"
-                                  onClick={() => setVideoTarget({ title: exercise.name, url: exercise.videoUrl! })}
-                                >
-                                  <PlayCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
-                                  Watch demo
-                                </button>
-                              ) : null}
+                              <div className="ai-workout-exercise-actions">
+                                {exercise.videoUrl ? (
+                                  <button
+                                    type="button"
+                                    className="ghost-button compact-button ai-workout-video-button"
+                                    onClick={() => setVideoTarget({ title: exercise.name, url: exercise.videoUrl! })}
+                                  >
+                                    <PlayCircle aria-hidden="true" focusable="false" strokeWidth={1.9} />
+                                    Watch demo
+                                  </button>
+                                ) : null}
+                              </div>
                             </div>
                           </article>
                         ))}
@@ -812,6 +834,22 @@ function filterExcludedExerciseResults(
 ) {
   const selectedIds = new Set(selectedItems.map((item) => item.id))
   return items.filter((item) => !selectedIds.has(item.id))
+}
+
+function getExerciseChips(exercise: AiWorkoutExercise) {
+  return Array.from(new Set([exercise.category, exercise.targetMuscle].filter((value): value is string => Boolean(value?.trim()))))
+    .slice(0, 3)
+}
+
+function getInstructionPreview(instructions: string) {
+  const normalizedInstructions = instructions.trim()
+  const previewLength = 150
+
+  if (normalizedInstructions.length <= previewLength) {
+    return normalizedInstructions
+  }
+
+  return `${normalizedInstructions.slice(0, previewLength).trimEnd()}…`
 }
 
 function PlanExerciseMedia({ exercise }: { exercise: AiWorkoutExercise }) {
