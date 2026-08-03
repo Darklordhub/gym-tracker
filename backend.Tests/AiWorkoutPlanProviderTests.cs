@@ -56,7 +56,7 @@ public class AiWorkoutPlanProviderTests
     }
 
     [Fact]
-    public async Task CandidateLimit_IsEnforcedBeforeMakingHttpRequest()
+    public async Task InvalidCandidateConfiguration_IsRejectedBeforeMakingHttpRequest()
     {
         var handler = new StubHttpMessageHandler((_, _) =>
             throw new InvalidOperationException("HTTP should not be called with too many candidates."));
@@ -74,7 +74,7 @@ public class AiWorkoutPlanProviderTests
         var exception = await Assert.ThrowsAsync<AiWorkoutPlanProviderException>(() =>
             provider.GeneratePlanAsync(request));
 
-        Assert.Equal("The AI workout provider input is invalid.", exception.Message);
+        Assert.Equal("AI workout candidate limit must be between 10 and 100.", exception.Message);
         Assert.Equal(0, handler.CallCount);
     }
 

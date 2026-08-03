@@ -173,9 +173,11 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
             throw new AiWorkoutPlanProviderException("The configured AI workout provider is not available.");
         }
 
-        if (_generationOptions.MaxCandidateExercises is < 1 or > 200)
+        if (_generationOptions.MaxCandidateExercises is
+            < AiWorkoutGenerationOptions.MinCandidateExercises or
+            > AiWorkoutGenerationOptions.MaxCandidateExercisesLimit)
         {
-            throw new AiWorkoutPlanProviderException("AI workout candidate limit must be between 1 and 200.");
+            throw new AiWorkoutPlanProviderException("AI workout candidate limit must be between 10 and 100.");
         }
 
         if (_generationOptions.TimeoutSeconds is < 5 or > 120)

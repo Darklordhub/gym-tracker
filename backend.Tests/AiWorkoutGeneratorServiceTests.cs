@@ -21,15 +21,22 @@ public class AiWorkoutGeneratorServiceTests
         await context.Database.EnsureCreatedAsync();
 
         var now = DateTime.UtcNow;
+        var excludedExercise = CreateCatalogItem("Barbell bench press", "Chest", "Triceps", "Barbell", now);
+        var inactiveExercise = CreateCatalogItem("Inactive leg press", "Quadriceps", "Glutes", "Machine", now);
+        inactiveExercise.IsActive = false;
         context.ExerciseCatalogItems.AddRange(
-            CreateCatalogItem("Barbell bench press", "Chest", "Triceps", "Barbell", now),
+            excludedExercise,
+            inactiveExercise,
             CreateCatalogItem("Seated cable row", "Back", "Biceps", "Cable", now),
             CreateCatalogItem("Barbell back squat", "Quadriceps", "Glutes,Hamstrings", "Barbell", now),
             CreateCatalogItem("Romanian deadlift", "Hamstrings", "Glutes,Lower back", "Barbell", now),
             CreateCatalogItem("Dumbbell shoulder press", "Shoulders", "Triceps", "Dumbbell", now),
             CreateCatalogItem("Plank", "Abdominals", "Obliques", "Bodyweight", now));
         await context.SaveChangesAsync();
-        var catalogIds = (await context.ExerciseCatalogItems.Select(item => item.Id).ToListAsync()).ToHashSet();
+        var activeCatalogIds = (await context.ExerciseCatalogItems
+            .Where(item => item.IsActive)
+            .Select(item => item.Id)
+            .ToListAsync()).ToHashSet();
 
         var service = new AiWorkoutGeneratorService(context);
         var plan = await service.GenerateAsync(
@@ -40,17 +47,24 @@ public class AiWorkoutGeneratorServiceTests
                 PreferredWorkoutType = "full body",
                 DurationMinutes = 45,
                 FitnessLevel = "intermediate",
-                IncludeWarmup = false,
-                IncludeCooldown = false,
+                ExcludedExercises = [excludedExercise.Name],
+                IncludeWarmup = true,
+                IncludeCooldown = true,
             },
             CancellationToken.None);
 
-        var section = Assert.Single(plan.Sections);
+        Assert.Equal(["Warm-up", "Main workout", "Cooldown"], plan.Sections.Select(section => section.Name));
+        var section = plan.Sections.Single(section => section.Name == "Main workout");
         Assert.NotEmpty(section.Exercises);
         Assert.Contains(
             section.Exercises,
             exercise => exercise.ExerciseCatalogItemId.HasValue &&
-                        catalogIds.Contains(exercise.ExerciseCatalogItemId.Value));
+                        activeCatalogIds.Contains(exercise.ExerciseCatalogItemId.Value));
+        Assert.All(
+            section.Exercises.Where(exercise => exercise.ExerciseCatalogItemId.HasValue),
+            exercise => Assert.Contains(exercise.ExerciseCatalogItemId!.Value, activeCatalogIds));
+        Assert.DoesNotContain(section.Exercises, exercise => exercise.Name == excludedExercise.Name);
+        Assert.DoesNotContain(section.Exercises, exercise => exercise.Name == inactiveExercise.Name);
 
         var constructor = Assert.Single(typeof(AiWorkoutGeneratorService).GetConstructors());
         Assert.Equal(
