@@ -66,11 +66,17 @@ services:
       MediaGeneration__MaxJobsPerHour: ${MEDIA_GENERATION_MAX_JOBS_PER_HOUR:-3}
       MediaGeneration__MaxJobsPerDraftPerDay: ${MEDIA_GENERATION_MAX_JOBS_PER_DRAFT_PER_DAY:-2}
       MediaGeneration__CooldownSeconds: ${MEDIA_GENERATION_COOLDOWN_SECONDS:-120}
+      AiWorkoutGeneration__Enabled: ${AI_WORKOUT_GENERATION_ENABLED:-false}
+      AiWorkoutGeneration__Provider: ${AI_WORKOUT_GENERATION_PROVIDER:-OpenAI}
+      AiWorkoutGeneration__MaxCandidateExercises: ${AI_WORKOUT_GENERATION_MAX_CANDIDATE_EXERCISES:-60}
+      AiWorkoutGeneration__TimeoutSeconds: ${AI_WORKOUT_GENERATION_TIMEOUT_SECONDS:-45}
       OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       OpenAI__VideoModel: ${OPENAI_VIDEO_MODEL:-sora-2}
       OpenAI__VideoSeconds: ${OPENAI_VIDEO_SECONDS:-4}
       OpenAI__VideoSize: ${OPENAI_VIDEO_SIZE:-1280x720}
       OpenAI__TimeoutSeconds: ${OPENAI_TIMEOUT_SECONDS:-60}
+      OpenAI__WorkoutModel: ${OPENAI_WORKOUT_MODEL:-gpt-5-mini}
+      OpenAI__WorkoutMaxOutputTokens: ${OPENAI_WORKOUT_MAX_OUTPUT_TOKENS:-2000}
     depends_on:
       - gym-tracker-db
     volumes:

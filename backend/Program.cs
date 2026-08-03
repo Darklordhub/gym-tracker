@@ -24,6 +24,9 @@ var exerciseMediaEnrichmentOptions = builder.Configuration
 var exerciseMediaStorageOptions = builder.Configuration
     .GetSection(ExerciseMediaStorageOptions.SectionName)
     .Get<ExerciseMediaStorageOptions>() ?? new ExerciseMediaStorageOptions();
+var aiWorkoutGenerationOptions = builder.Configuration
+    .GetSection(AiWorkoutGenerationOptions.SectionName)
+    .Get<AiWorkoutGenerationOptions>() ?? new AiWorkoutGenerationOptions();
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()?
@@ -53,6 +56,8 @@ builder.Services.Configure<ExerciseMediaEnrichmentOptions>(builder.Configuration
 builder.Services.Configure<ExerciseMediaStorageOptions>(builder.Configuration.GetSection(ExerciseMediaStorageOptions.SectionName));
 builder.Services.Configure<MediaGenerationOptions>(builder.Configuration.GetSection(MediaGenerationOptions.SectionName));
 builder.Services.Configure<OpenAiVideoGenerationOptions>(builder.Configuration.GetSection(OpenAiVideoGenerationOptions.SectionName));
+builder.Services.Configure<AiWorkoutGenerationOptions>(builder.Configuration.GetSection(AiWorkoutGenerationOptions.SectionName));
+builder.Services.Configure<OpenAiWorkoutGenerationOptions>(builder.Configuration.GetSection(OpenAiWorkoutGenerationOptions.SectionName));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -69,6 +74,20 @@ builder.Services.AddScoped<ProgressiveOverloadService>();
 builder.Services.AddScoped<ExerciseCatalogService>();
 builder.Services.AddScoped<ExerciseCatalogSeedService>();
 builder.Services.AddScoped<IAiWorkoutGeneratorService, AiWorkoutGeneratorService>();
+builder.Services.AddHttpClient<OpenAiWorkoutPlanProvider>(httpClient =>
+{
+    var timeoutSeconds = aiWorkoutGenerationOptions.TimeoutSeconds is >= 5 and <= 120
+        ? aiWorkoutGenerationOptions.TimeoutSeconds
+        : AiWorkoutGenerationOptions.DefaultTimeoutSeconds;
+
+    httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
+    httpClient.DefaultRequestHeaders.Accept.Add(
+        new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+    httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+})
+.RedactLoggedHeaders(static _ => true);
+builder.Services.AddScoped<IAiWorkoutPlanProvider>(serviceProvider =>
+    serviceProvider.GetRequiredService<OpenAiWorkoutPlanProvider>());
 builder.Services.AddScoped<INutritionService, NutritionService>();
 builder.Services.AddScoped<INutritionRollupService, NutritionRollupService>();
 builder.Services.AddScoped<IMealService, MealService>();
