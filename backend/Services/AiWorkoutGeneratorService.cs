@@ -243,7 +243,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 {
                     await _generationLimiter.MarkFailedAsync(
                         reservation,
-                        errorCategory ?? "LocalFallbackFailure",
+                        "LocalFallbackFailure",
                         CancellationToken.None);
                 }
                 catch (Exception)

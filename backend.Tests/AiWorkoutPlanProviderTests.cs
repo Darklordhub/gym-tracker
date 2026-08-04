@@ -56,6 +56,71 @@ public class AiWorkoutPlanProviderTests
     }
 
     [Fact]
+    public async Task UndocumentedPlaceholderModel_IsRejectedWithoutMakingHttpRequest()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            throw new InvalidOperationException("HTTP should not be called with an unsupported placeholder model."));
+        var provider = CreateProvider(
+            handler,
+            enabled: true,
+            apiKey: "test-key",
+            workoutModel: "gpt-5.5-mini");
+
+        var exception = await Assert.ThrowsAsync<AiWorkoutPlanProviderException>(() =>
+            provider.GeneratePlanAsync(CreateValidRequest()));
+
+        Assert.Equal("The configured OpenAI workout model is not supported.", exception.Message);
+        Assert.Equal(0, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task StructuredResponseOutsideWorkoutSafetyBounds_IsRejected()
+    {
+        var providerOutput = JsonSerializer.Serialize(new
+        {
+            sections = new[]
+            {
+                new
+                {
+                    name = "Main workout",
+                    exercises = new[]
+                    {
+                        new
+                        {
+                            exerciseCatalogItemId = 42,
+                            sets = 9,
+                            reps = "6-8",
+                            restSeconds = 120,
+                            suggestedWeight = (string?)null,
+                            rationale = (string?)null,
+                        },
+                    },
+                },
+            },
+        });
+        var providerEnvelope = JsonSerializer.Serialize(new
+        {
+            status = "completed",
+            output = new[]
+            {
+                new
+                {
+                    type = "message",
+                    content = new[] { new { type = "output_text", text = providerOutput } },
+                },
+            },
+        });
+        var handler = new StubHttpMessageHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(providerEnvelope, Encoding.UTF8, "application/json"),
+        }));
+        var provider = CreateProvider(handler, enabled: true, apiKey: "test-key");
+
+        await Assert.ThrowsAsync<AiWorkoutPlanProviderException>(() =>
+            provider.GeneratePlanAsync(CreateValidRequest()));
+    }
+
+    [Fact]
     public async Task InvalidCandidateConfiguration_IsRejectedBeforeMakingHttpRequest()
     {
         var handler = new StubHttpMessageHandler((_, _) =>

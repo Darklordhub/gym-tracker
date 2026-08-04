@@ -17,8 +17,6 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
     private static readonly HashSet<string> SupportedWorkoutModels = new(StringComparer.Ordinal)
     {
         "gpt-5-mini",
-        "gpt-5.5-mini",
-        "gpt-5-mini",
         "gpt-4o-mini",
     };
 
@@ -280,10 +278,10 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
                 if (exercise is null ||
                     !candidateIds.Contains(exercise.ExerciseCatalogItemId) ||
                     !selectedIds.Add(exercise.ExerciseCatalogItemId) ||
-                    exercise.Sets is < 1 or > 20 ||
+                    exercise.Sets is < 1 or > 8 ||
                     string.IsNullOrWhiteSpace(exercise.Reps) ||
                     exercise.Reps.Length > 40 ||
-                    exercise.RestSeconds is < 0 or > 900 ||
+                    exercise.RestSeconds is < 15 or > 300 ||
                     exercise.SuggestedWeight?.Length > 60 ||
                     exercise.Rationale?.Length > 240)
                 {
@@ -337,9 +335,9 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
                           "type": "object",
                           "properties": {
                             "exerciseCatalogItemId": { "type": "integer" },
-                            "sets": { "type": "integer", "minimum": 1, "maximum": 20 },
+                            "sets": { "type": "integer", "minimum": 1, "maximum": 8 },
                             "reps": { "type": "string", "maxLength": 40 },
-                            "restSeconds": { "type": "integer", "minimum": 0, "maximum": 900 },
+                            "restSeconds": { "type": "integer", "minimum": 15, "maximum": 300 },
                             "suggestedWeight": { "type": ["string", "null"] },
                             "rationale": { "type": ["string", "null"] }
                           },

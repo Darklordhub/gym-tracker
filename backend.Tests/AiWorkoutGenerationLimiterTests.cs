@@ -23,7 +23,9 @@ public class AiWorkoutGenerationLimiterTests
         Assert.False(result.IsReserved);
         var attempts = await database.Context.AiWorkoutGenerationAttempts.ToListAsync();
         Assert.Equal(2, attempts.Count);
-        Assert.Equal(AiWorkoutGenerationAttemptStatuses.RateLimited, attempts.Single(attempt => attempt.Status == AiWorkoutGenerationAttemptStatuses.RateLimited).Status);
+        var rateLimitedAttempt = attempts.Single(attempt => attempt.Status == AiWorkoutGenerationAttemptStatuses.RateLimited);
+        Assert.Equal(AiWorkoutGenerationAttemptStatuses.RateLimited, rateLimitedAttempt.Status);
+        Assert.NotNull(rateLimitedAttempt.CompletedAtUtc);
     }
 
     [Fact]

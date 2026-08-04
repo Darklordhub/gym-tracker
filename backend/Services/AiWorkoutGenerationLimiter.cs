@@ -184,6 +184,7 @@ public sealed class AiWorkoutGenerationLimiter : IAiWorkoutGenerationLimiter
         CandidateExerciseCount = request.CandidateExerciseCount,
         PromptVersion = request.PromptVersion.Trim(),
         StartedAtUtc = now,
+        CompletedAtUtc = status == AiWorkoutGenerationAttemptStatuses.RateLimited ? now : null,
         CreatedAtUtc = now,
         ErrorCategory = NormalizeOptional(errorCategory, 80),
         SafeErrorMessage = NormalizeOptional(safeErrorMessage, 400),
