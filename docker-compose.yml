@@ -70,6 +70,10 @@ services:
       AiWorkoutGeneration__Provider: ${AI_WORKOUT_GENERATION_PROVIDER:-OpenAI}
       AiWorkoutGeneration__MaxCandidateExercises: ${AI_WORKOUT_GENERATION_MAX_CANDIDATE_EXERCISES:-60}
       AiWorkoutGeneration__TimeoutSeconds: ${AI_WORKOUT_GENERATION_TIMEOUT_SECONDS:-45}
+      AiWorkoutGeneration__MaxGenerationsPerUserPerDay: ${AI_WORKOUT_GENERATION_MAX_PER_USER_DAY:-5}
+      AiWorkoutGeneration__MaxGenerationsPerUserPerHour: ${AI_WORKOUT_GENERATION_MAX_PER_USER_HOUR:-2}
+      AiWorkoutGeneration__MaxGlobalGenerationsPerDay: ${AI_WORKOUT_GENERATION_MAX_GLOBAL_DAY:-50}
+      AiWorkoutGeneration__CooldownSeconds: ${AI_WORKOUT_GENERATION_COOLDOWN_SECONDS:-120}
       OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       OpenAI__VideoModel: ${OPENAI_VIDEO_MODEL:-sora-2}
       OpenAI__VideoSeconds: ${OPENAI_VIDEO_SECONDS:-4}

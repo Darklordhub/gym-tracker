@@ -47,6 +47,7 @@ public class AiWorkoutGeneratorServiceTests
             context,
             candidateSelector,
             provider,
+            new ThrowingLimiter(),
             Options.Create(new AiWorkoutGenerationOptions { Enabled = false }),
             NullLogger<AiWorkoutGeneratorService>.Instance);
         var plan = await service.GenerateAsync(
@@ -97,6 +98,7 @@ public class AiWorkoutGeneratorServiceTests
     {
         public int CallCount { get; private set; }
         public string ProviderName => "Test";
+        public string? ModelName => "test-model";
 
         public void ValidateConfiguration()
         {
@@ -109,6 +111,23 @@ public class AiWorkoutGeneratorServiceTests
             CallCount++;
             throw new InvalidOperationException("Provider must not run while the feature is disabled.");
         }
+    }
+
+    private sealed class ThrowingLimiter : IAiWorkoutGenerationLimiter
+    {
+        public Task<AiWorkoutGenerationReservationResult> ReserveAsync(
+            AiWorkoutGenerationReservationRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Limiter must not run while the feature is disabled.");
+
+        public Task MarkSucceededAsync(AiWorkoutGenerationReservation reservation, int selectedExerciseCount, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Limiter must not run while the feature is disabled.");
+
+        public Task MarkFallbackSucceededAsync(AiWorkoutGenerationReservation reservation, string errorCategory, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Limiter must not run while the feature is disabled.");
+
+        public Task MarkFailedAsync(AiWorkoutGenerationReservation reservation, string errorCategory, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Limiter must not run while the feature is disabled.");
     }
 
     private static ExerciseCatalogItem CreateCatalogItem(

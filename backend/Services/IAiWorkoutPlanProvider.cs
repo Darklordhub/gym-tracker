@@ -55,6 +55,7 @@ public sealed class AiWorkoutPlanProviderException : Exception
 public interface IAiWorkoutPlanProvider
 {
     string ProviderName { get; }
+    string? ModelName { get; }
 
     void ValidateConfiguration();
 

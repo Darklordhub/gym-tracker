@@ -52,6 +52,10 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
                     ],
                 },
             ],
+        }, async () =>
+        {
+            var reservedAttempt = Assert.Single(await database.Context.AiWorkoutGenerationAttempts.ToListAsync());
+            Assert.Equal(AiWorkoutGenerationAttemptStatuses.Reserved, reservedAttempt.Status);
         });
         var service = database.CreateService(selector, provider, enabled: true);
 
@@ -78,6 +82,12 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
         Assert.Equal("80 kg", exercise.SuggestedWeight);
         Assert.Contains(plan.Notes, note => note.Contains("STRIDE catalog candidates", StringComparison.Ordinal));
         Assert.DoesNotContain(plan.Notes, note => note.Contains("never reach", StringComparison.Ordinal));
+        var attempt = Assert.Single(await database.Context.AiWorkoutGenerationAttempts.ToListAsync());
+        Assert.Equal(AiWorkoutGenerationAttemptStatuses.Succeeded, attempt.Status);
+        Assert.Equal(1, attempt.CandidateExerciseCount);
+        Assert.Equal(1, attempt.SelectedExerciseCount);
+        Assert.Equal("Fake", attempt.Provider);
+        Assert.Equal("fake-model", attempt.Model);
     }
 
     [Fact]
@@ -184,6 +194,55 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
         Assert.Contains(plan.Notes, note => note == "Generated with the local STRIDE planner.");
         Assert.DoesNotContain(plan.Notes, note => note.Contains(rawProviderText, StringComparison.Ordinal));
         Assert.NotEmpty(plan.Sections);
+        var attempt = Assert.Single(await database.Context.AiWorkoutGenerationAttempts.ToListAsync());
+        Assert.Equal(AiWorkoutGenerationAttemptStatuses.FallbackSucceeded, attempt.Status);
+        Assert.Equal("ProviderFailure", attempt.ErrorCategory);
+        Assert.DoesNotContain(rawProviderText, attempt.SafeErrorMessage ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EnabledProvider_RateLimitedUserGetsLocalFallbackWithoutCallingProvider()
+    {
+        await using var database = await WorkoutGeneratorTestDatabase.CreateAsync();
+        var active = CreateExercise("Barbell back squat", "Quadriceps", isActive: true);
+        database.Context.ExerciseCatalogItems.AddRange(active, CreateExercise("Cable row", "Back", isActive: true));
+        database.Context.AiWorkoutGenerationAttempts.Add(new AiWorkoutGenerationAttempt
+        {
+            UserId = 1,
+            Status = AiWorkoutGenerationAttemptStatuses.Succeeded,
+            Provider = "Fake",
+            Model = "fake-model",
+            RequestHash = new string('a', 64),
+            CandidateExerciseCount = 1,
+            SelectedExerciseCount = 1,
+            PromptVersion = "workout-plan-v1",
+            StartedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            CompletedAtUtc = DateTime.UtcNow.AddMinutes(-4),
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+        });
+        await database.Context.SaveChangesAsync();
+
+        var provider = new FakeProvider(ResultFor(active.Id));
+        var plan = await database.CreateService(
+                new FakeCandidateSelector([CandidateFrom(active)]),
+                provider,
+                enabled: true,
+                generationOptions: new AiWorkoutGenerationOptions
+                {
+                    Enabled = true,
+                    MaxCandidateExercises = 60,
+                    MaxGenerationsPerUserPerHour = 1,
+                    MaxGenerationsPerUserPerDay = 5,
+                    MaxGlobalGenerationsPerDay = 50,
+                    CooldownSeconds = 0,
+                })
+            .GenerateAsync("1", FullBodyRequest(), CancellationToken.None);
+
+        Assert.Equal(0, provider.CallCount);
+        Assert.Contains(plan.Notes, note => note.Contains("temporarily limited", StringComparison.Ordinal));
+        Assert.Contains(
+            await database.Context.AiWorkoutGenerationAttempts.ToListAsync(),
+            attempt => attempt.Status == AiWorkoutGenerationAttemptStatuses.RateLimited);
     }
 
     private static AiWorkoutGenerateRequest FullBodyRequest() => new()
@@ -265,11 +324,18 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
     {
         private readonly AiWorkoutPlanProviderResult? _result;
         private readonly Exception? _exception;
+        private readonly Func<Task>? _onGenerate;
 
-        public FakeProvider(AiWorkoutPlanProviderResult result) => _result = result;
+        public FakeProvider(AiWorkoutPlanProviderResult result, Func<Task>? onGenerate = null)
+        {
+            _result = result;
+            _onGenerate = onGenerate;
+        }
+
         public FakeProvider(Exception exception) => _exception = exception;
 
         public string ProviderName => "Fake";
+        public string? ModelName => "fake-model";
         public int CallCount { get; private set; }
         public AiWorkoutPlanProviderRequest? LastRequest { get; private set; }
 
@@ -277,18 +343,23 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
         {
         }
 
-        public Task<AiWorkoutPlanProviderResult> GeneratePlanAsync(
+        public async Task<AiWorkoutPlanProviderResult> GeneratePlanAsync(
             AiWorkoutPlanProviderRequest request,
             CancellationToken cancellationToken = default)
         {
             CallCount++;
             LastRequest = request;
+            if (_onGenerate is not null)
+            {
+                await _onGenerate();
+            }
+
             if (_exception is not null)
             {
                 throw _exception;
             }
 
-            return Task.FromResult(_result!);
+            return _result!;
         }
     }
 
@@ -317,16 +388,23 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
         public AiWorkoutGeneratorService CreateService(
             IAiWorkoutCandidateSelector selector,
             IAiWorkoutPlanProvider provider,
-            bool enabled) => new(
+            bool enabled,
+            AiWorkoutGenerationOptions? generationOptions = null)
+        {
+            var options = generationOptions ?? new AiWorkoutGenerationOptions
+            {
+                Enabled = enabled,
+                MaxCandidateExercises = 60,
+            };
+
+            return new AiWorkoutGeneratorService(
                 Context,
                 selector,
                 provider,
-                Options.Create(new AiWorkoutGenerationOptions
-                {
-                    Enabled = enabled,
-                    MaxCandidateExercises = 60,
-                }),
+                new AiWorkoutGenerationLimiter(Context, Options.Create(options), TimeProvider.System),
+                Options.Create(options),
                 NullLogger<AiWorkoutGeneratorService>.Instance);
+        }
 
         public async ValueTask DisposeAsync()
         {

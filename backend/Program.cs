@@ -74,6 +74,8 @@ builder.Services.AddScoped<ProgressiveOverloadService>();
 builder.Services.AddScoped<ExerciseCatalogService>();
 builder.Services.AddScoped<ExerciseCatalogSeedService>();
 builder.Services.AddScoped<IAiWorkoutCandidateSelector, AiWorkoutCandidateSelector>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IAiWorkoutGenerationLimiter, AiWorkoutGenerationLimiter>();
 builder.Services.AddScoped<IAiWorkoutGeneratorService, AiWorkoutGeneratorService>();
 builder.Services.AddHttpClient<OpenAiWorkoutPlanProvider>(httpClient =>
 {

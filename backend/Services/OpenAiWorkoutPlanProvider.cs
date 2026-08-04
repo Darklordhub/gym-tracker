@@ -45,6 +45,9 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
     }
 
     public string ProviderName => Name;
+    public string? ModelName => string.IsNullOrWhiteSpace(_openAiOptions.WorkoutModel)
+        ? null
+        : _openAiOptions.WorkoutModel.Trim();
 
     public async Task<AiWorkoutPlanProviderResult> GeneratePlanAsync(
         AiWorkoutPlanProviderRequest request,

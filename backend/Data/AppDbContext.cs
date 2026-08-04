@@ -31,6 +31,7 @@ public class AppDbContext : DbContext
     public DbSet<ExerciseCatalogItem> ExerciseCatalogItems => Set<ExerciseCatalogItem>();
     public DbSet<ExerciseMediaDraft> ExerciseMediaDrafts => Set<ExerciseMediaDraft>();
     public DbSet<ExerciseMediaGenerationAttempt> ExerciseMediaGenerationAttempts => Set<ExerciseMediaGenerationAttempt>();
+    public DbSet<AiWorkoutGenerationAttempt> AiWorkoutGenerationAttempts => Set<AiWorkoutGenerationAttempt>();
     public DbSet<NutritionCatalogItem> NutritionCatalogItems => Set<NutritionCatalogItem>();
     public DbSet<NutritionCatalogPortion> NutritionCatalogPortions => Set<NutritionCatalogPortion>();
 
@@ -284,6 +285,38 @@ public class AppDbContext : DbContext
             .Property(attempt => attempt.ErrorMessage)
             .HasMaxLength(4000);
 
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .Property(attempt => attempt.Status)
+            .HasMaxLength(30);
+
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .Property(attempt => attempt.Provider)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .Property(attempt => attempt.Model)
+            .HasMaxLength(160);
+
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .Property(attempt => attempt.RequestHash)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .Property(attempt => attempt.PromptVersion)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .Property(attempt => attempt.ErrorCategory)
+            .HasMaxLength(80);
+
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .Property(attempt => attempt.SafeErrorMessage)
+            .HasMaxLength(400);
+
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .Property(attempt => attempt.EstimatedCost)
+            .HasPrecision(12, 6);
+
         modelBuilder.Entity<NutritionCatalogItem>()
             .Property(item => item.Source)
             .HasMaxLength(40);
@@ -458,6 +491,12 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<ExerciseMediaGenerationAttempt>()
             .HasIndex(attempt => new { attempt.ExerciseCatalogItemId, attempt.CreatedAt });
+
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .HasIndex(attempt => attempt.StartedAtUtc);
+
+        modelBuilder.Entity<AiWorkoutGenerationAttempt>()
+            .HasIndex(attempt => new { attempt.UserId, attempt.StartedAtUtc });
 
         modelBuilder.Entity<UserCycleEntry>()
             .HasIndex(entry => new { entry.UserId, entry.PeriodStartDate })
