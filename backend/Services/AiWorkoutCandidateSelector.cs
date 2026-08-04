@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace backend.Services;
 
-internal sealed class AiWorkoutCandidateSelector : IAiWorkoutCandidateSelector
+public sealed class AiWorkoutCandidateSelector : IAiWorkoutCandidateSelector
 {
     private const int MinimumSuitabilityScore = 14;
 

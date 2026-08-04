@@ -2,7 +2,7 @@ using backend.Dtos;
 
 namespace backend.Services;
 
-internal sealed class AiWorkoutCandidate
+public sealed class AiWorkoutCandidate
 {
     public int ExerciseCatalogItemId { get; init; }
     public string Name { get; init; } = string.Empty;
@@ -22,7 +22,7 @@ internal sealed class AiWorkoutCandidate
     public bool MeetsMinimumSuitability { get; init; }
 }
 
-internal interface IAiWorkoutCandidateSelector
+public interface IAiWorkoutCandidateSelector
 {
     Task<IReadOnlyList<AiWorkoutCandidate>> SelectCandidatesAsync(
         string userId,

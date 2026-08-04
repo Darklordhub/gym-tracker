@@ -1,8 +1,11 @@
 using System.Globalization;
+using backend.Configuration;
 using backend.Data;
 using backend.Dtos;
 using backend.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace backend.Services;
 
@@ -121,10 +124,23 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
     };
 
     private readonly AppDbContext _dbContext;
+    private readonly IAiWorkoutCandidateSelector _candidateSelector;
+    private readonly IAiWorkoutPlanProvider _workoutPlanProvider;
+    private readonly AiWorkoutGenerationOptions _generationOptions;
+    private readonly ILogger<AiWorkoutGeneratorService> _logger;
 
-    public AiWorkoutGeneratorService(AppDbContext dbContext)
+    public AiWorkoutGeneratorService(
+        AppDbContext dbContext,
+        IAiWorkoutCandidateSelector candidateSelector,
+        IAiWorkoutPlanProvider workoutPlanProvider,
+        IOptions<AiWorkoutGenerationOptions> generationOptions,
+        ILogger<AiWorkoutGeneratorService> logger)
     {
         _dbContext = dbContext;
+        _candidateSelector = candidateSelector;
+        _workoutPlanProvider = workoutPlanProvider;
+        _generationOptions = generationOptions.Value;
+        _logger = logger;
     }
 
     public async Task<AiWorkoutPlanDto> GenerateAsync(
@@ -142,7 +158,35 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             throw new InvalidOperationException("Authenticated user identifier is invalid.");
         }
 
-        // TODO: Replace this deterministic planner with a provider-backed LLM implementation behind the same interface when external AI integration is introduced.
+        if (!_generationOptions.Enabled)
+        {
+            return await GenerateLocalAsync(parsedUserId, request, cancellationToken);
+        }
+
+        try
+        {
+            return await GenerateProviderPlanAsync(userId, parsedUserId, request, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Do not attach the exception: provider exception messages can contain remote response text.
+            _logger.LogWarning("AI workout provider generation failed; using the local planner fallback.");
+
+            var fallbackPlan = await GenerateLocalAsync(parsedUserId, request, cancellationToken);
+            fallbackPlan.Notes.Add("Generated with the local STRIDE planner.");
+            return fallbackPlan;
+        }
+    }
+
+    private async Task<AiWorkoutPlanDto> GenerateLocalAsync(
+        int parsedUserId,
+        AiWorkoutGenerateRequest request,
+        CancellationToken cancellationToken)
+    {
         var goals = await _dbContext.GoalSettings
             .AsNoTracking()
             .FirstOrDefaultAsync(goal => goal.UserId == parsedUserId, cancellationToken);
@@ -221,6 +265,207 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             Notes = BuildPlanNotes(context, mainWorkout, recentWorkouts.Count, variation),
         };
     }
+
+    private async Task<AiWorkoutPlanDto> GenerateProviderPlanAsync(
+        string userId,
+        int parsedUserId,
+        AiWorkoutGenerateRequest request,
+        CancellationToken cancellationToken)
+    {
+        _workoutPlanProvider.ValidateConfiguration();
+
+        var goals = await _dbContext.GoalSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(goal => goal.UserId == parsedUserId, cancellationToken);
+
+        var recentWorkoutCount = await _dbContext.Workouts
+            .AsNoTracking()
+            .Where(workout => workout.UserId == parsedUserId)
+            .OrderByDescending(workout => workout.Date)
+            .ThenByDescending(workout => workout.Id)
+            .Take(12)
+            .CountAsync(cancellationToken);
+
+        var context = BuildContext(request, goals, recentWorkoutCount);
+        var selectedCandidates = await _candidateSelector.SelectCandidatesAsync(userId, request, cancellationToken);
+        var candidateLimit = _generationOptions.GetEffectiveMaxCandidateExercises();
+
+        if (selectedCandidates.Count is 0 || selectedCandidates.Count > candidateLimit)
+        {
+            throw new InvalidOperationException("Candidate selection is outside the configured boundary.");
+        }
+
+        var providerRequest = new AiWorkoutPlanProviderRequest
+        {
+            Goal = context.Goal,
+            WorkoutType = context.WorkoutType,
+            DurationMinutes = context.DurationMinutes,
+            FitnessLevel = context.FitnessLevel,
+            TargetMuscles = context.TargetMuscles,
+            ExcludedExercises = context.ExcludedExercises.OrderBy(value => value, StringComparer.Ordinal).ToList(),
+            // STRIDE owns warm-up and cooldown so the provider only plans catalog-backed working sections.
+            IncludeWarmup = false,
+            IncludeCooldown = false,
+            CandidateExercises = selectedCandidates
+                .Select(candidate => new AiWorkoutCandidateExercise
+                {
+                    ExerciseCatalogItemId = candidate.ExerciseCatalogItemId,
+                    Name = candidate.Name,
+                    PrimaryMuscle = candidate.TargetMuscle,
+                    SecondaryMuscles = candidate.SecondaryMuscles,
+                    Equipment = candidate.Equipment,
+                    Difficulty = candidate.Difficulty,
+                })
+                .ToList(),
+        };
+
+        var providerResult = await _workoutPlanProvider.GeneratePlanAsync(providerRequest, cancellationToken);
+        var providerSections = await ValidateAndRehydrateProviderSectionsAsync(
+            providerResult,
+            selectedCandidates,
+            context,
+            cancellationToken);
+
+        var sections = new List<AiWorkoutSectionDto>();
+        if (context.IncludeWarmup)
+        {
+            sections.Add(new AiWorkoutSectionDto
+            {
+                Name = "Warm-up",
+                Exercises = BuildWarmupExercises(context),
+            });
+        }
+
+        sections.AddRange(providerSections);
+
+        if (context.IncludeCooldown)
+        {
+            sections.Add(new AiWorkoutSectionDto
+            {
+                Name = "Cooldown",
+                Exercises = BuildCooldownExercises(context),
+            });
+        }
+
+        return new AiWorkoutPlanDto
+        {
+            Title = $"{FormatLabel(context.WorkoutType)} {FormatLabel(context.Goal)} Plan",
+            Goal = FormatLabel(context.Goal),
+            WorkoutType = FormatLabel(context.WorkoutType),
+            EstimatedDurationMinutes = EstimateDurationMinutes(sections, context.DurationMinutes),
+            Difficulty = FormatLabel(context.FitnessLevel),
+            Sections = sections,
+            Notes = BuildProviderPlanNotes(context),
+        };
+    }
+
+    private async Task<List<AiWorkoutSectionDto>> ValidateAndRehydrateProviderSectionsAsync(
+        AiWorkoutPlanProviderResult? providerResult,
+        IReadOnlyList<AiWorkoutCandidate> selectedCandidates,
+        WorkoutGenerationContext context,
+        CancellationToken cancellationToken)
+    {
+        var candidateIds = selectedCandidates
+            .Select(candidate => candidate.ExerciseCatalogItemId)
+            .Where(id => id > 0)
+            .ToHashSet();
+
+        if (candidateIds.Count != selectedCandidates.Count || providerResult?.Sections is not { Count: > 0 })
+        {
+            throw new InvalidOperationException("Provider output is invalid.");
+        }
+
+        var mainSections = providerResult.Sections
+            .Where(section => section is not null && !IsProviderWarmupOrCooldown(section.Name))
+            .ToList();
+
+        if (mainSections.Count is 0 or > 6 || mainSections.Any(section => !IsSafeProviderSectionName(section.Name)))
+        {
+            throw new InvalidOperationException("Provider output is invalid.");
+        }
+
+        var providerExercises = new List<(string SectionName, AiWorkoutPlanProviderExercise Exercise)>();
+        foreach (var section in mainSections)
+        {
+            if (section.Exercises is not { Count: > 0 })
+            {
+                throw new InvalidOperationException("Provider output is invalid.");
+            }
+
+            providerExercises.AddRange(section.Exercises.Select(exercise => (section.Name.Trim(), exercise)));
+        }
+
+        var maximumExerciseCount = Math.Min(10, GetMainExerciseCount(context.WorkoutType, context.DurationMinutes) + 3);
+        if (providerExercises.Count is 0 or > 10 || providerExercises.Count > maximumExerciseCount)
+        {
+            throw new InvalidOperationException("Provider output is invalid.");
+        }
+
+        var selectedIds = new HashSet<int>();
+        foreach (var (_, exercise) in providerExercises)
+        {
+            if (exercise is null
+                || !candidateIds.Contains(exercise.ExerciseCatalogItemId)
+                || !selectedIds.Add(exercise.ExerciseCatalogItemId)
+                || exercise.Sets is < 1 or > 8
+                || exercise.RestSeconds is < 15 or > 300
+                || !IsSafeProviderText(exercise.Reps, 40)
+                || !IsSafeOptionalProviderText(exercise.SuggestedWeight, 60))
+            {
+                throw new InvalidOperationException("Provider output is invalid.");
+            }
+        }
+
+        var selectedCatalogItems = await _dbContext.ExerciseCatalogItems
+            .AsNoTracking()
+            .Where(item => item.IsActive && selectedIds.Contains(item.Id))
+            .OrderBy(item => item.Id)
+            .ToListAsync(cancellationToken);
+
+        var catalogCandidates = BuildCatalogCandidates(selectedCatalogItems, context.ExcludedExercises);
+        if (catalogCandidates.Count != selectedIds.Count)
+        {
+            throw new InvalidOperationException("Provider output is invalid.");
+        }
+
+        var catalogById = catalogCandidates.ToDictionary(candidate => candidate.Id);
+        return mainSections.Select(section => new AiWorkoutSectionDto
+        {
+            Name = section.Name.Trim(),
+            Exercises = section.Exercises.Select(exercise =>
+            {
+                var catalogCandidate = catalogById[exercise.ExerciseCatalogItemId];
+                return CreateExerciseDto(
+                    name: catalogCandidate.Name,
+                    category: FormatLabel(catalogCandidate.Category),
+                    targetMuscle: catalogCandidate.PrimaryMuscle ?? FormatLabel(catalogCandidate.FocusGroup),
+                    sets: exercise.Sets,
+                    reps: exercise.Reps.Trim(),
+                    suggestedWeight: exercise.SuggestedWeight?.Trim(),
+                    restSeconds: exercise.RestSeconds,
+                    instructions: catalogCandidate.Instructions ?? BuildFallbackInstruction(catalogCandidate.FocusGroup, catalogCandidate.Category),
+                    exerciseCatalogItemId: catalogCandidate.Id,
+                    thumbnailUrl: catalogCandidate.ThumbnailUrl,
+                    videoUrl: catalogCandidate.VideoUrl);
+            }).ToList(),
+        }).ToList();
+    }
+
+    private static bool IsProviderWarmupOrCooldown(string? sectionName)
+    {
+        var normalized = NormalizeText(sectionName).Replace("-", " ", StringComparison.Ordinal);
+        return normalized is "warmup" or "warm up" or "cooldown" or "cool down";
+    }
+
+    private static bool IsSafeProviderSectionName(string? value) => IsSafeProviderText(value, 80);
+
+    private static bool IsSafeOptionalProviderText(string? value, int maximumLength) =>
+        string.IsNullOrWhiteSpace(value) || IsSafeProviderText(value, maximumLength);
+
+    private static bool IsSafeProviderText(string? value, int maximumLength) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Length <= maximumLength
+        && !value.Any(char.IsControl);
 
     internal static WorkoutGenerationContext BuildContext(
         AiWorkoutGenerateRequest request,
@@ -1381,6 +1626,23 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         else if (context.Goal == "fat loss" || context.Goal == "general fitness")
         {
             notes.Add("Rest times are shorter to keep the session moving while still preserving controlled exercise quality.");
+        }
+
+        return notes;
+    }
+
+    private static List<string> BuildProviderPlanNotes(WorkoutGenerationContext context)
+    {
+        var notes = new List<string>
+        {
+            "This plan is read-only for the MVP and is not saved to your workout log automatically.",
+            "Swap out any movement that causes pain, and keep 1-3 reps in reserve on early work sets unless you intentionally want a hard top set.",
+            "Generated with AI using STRIDE catalog candidates.",
+        };
+
+        if (context.TargetMuscles.Count > 0)
+        {
+            notes.Add($"Target muscles were prioritized in this order: {string.Join(", ", context.TargetMuscles.Select(FormatLabel))}.");
         }
 
         return notes;

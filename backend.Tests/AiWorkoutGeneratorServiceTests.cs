@@ -1,9 +1,12 @@
+using backend.Configuration;
 using backend.Data;
 using backend.Dtos;
 using backend.Models;
 using backend.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace backend.Tests;
 
@@ -38,7 +41,14 @@ public class AiWorkoutGeneratorServiceTests
             .Select(item => item.Id)
             .ToListAsync()).ToHashSet();
 
-        var service = new AiWorkoutGeneratorService(context);
+        var candidateSelector = new ThrowingCandidateSelector();
+        var provider = new ThrowingProvider();
+        var service = new AiWorkoutGeneratorService(
+            context,
+            candidateSelector,
+            provider,
+            Options.Create(new AiWorkoutGenerationOptions { Enabled = false }),
+            NullLogger<AiWorkoutGeneratorService>.Instance);
         var plan = await service.GenerateAsync(
             "1",
             new AiWorkoutGenerateRequest
@@ -65,11 +75,40 @@ public class AiWorkoutGeneratorServiceTests
             exercise => Assert.Contains(exercise.ExerciseCatalogItemId!.Value, activeCatalogIds));
         Assert.DoesNotContain(section.Exercises, exercise => exercise.Name == excludedExercise.Name);
         Assert.DoesNotContain(section.Exercises, exercise => exercise.Name == inactiveExercise.Name);
+        Assert.Equal(0, candidateSelector.CallCount);
+        Assert.Equal(0, provider.CallCount);
+    }
 
-        var constructor = Assert.Single(typeof(AiWorkoutGeneratorService).GetConstructors());
-        Assert.Equal(
-            [typeof(AppDbContext)],
-            constructor.GetParameters().Select(parameter => parameter.ParameterType).ToArray());
+    private sealed class ThrowingCandidateSelector : IAiWorkoutCandidateSelector
+    {
+        public int CallCount { get; private set; }
+
+        public Task<IReadOnlyList<AiWorkoutCandidate>> SelectCandidatesAsync(
+            string userId,
+            AiWorkoutGenerateRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            throw new InvalidOperationException("Candidate selector must not run while the feature is disabled.");
+        }
+    }
+
+    private sealed class ThrowingProvider : IAiWorkoutPlanProvider
+    {
+        public int CallCount { get; private set; }
+        public string ProviderName => "Test";
+
+        public void ValidateConfiguration()
+        {
+        }
+
+        public Task<AiWorkoutPlanProviderResult> GeneratePlanAsync(
+            AiWorkoutPlanProviderRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            throw new InvalidOperationException("Provider must not run while the feature is disabled.");
+        }
     }
 
     private static ExerciseCatalogItem CreateCatalogItem(
