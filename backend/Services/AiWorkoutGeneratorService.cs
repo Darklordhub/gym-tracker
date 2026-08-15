@@ -377,7 +377,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 Model = _workoutPlanProvider.ModelName,
                 RequestHash = BuildProviderRequestHash(context, selectedCandidates.Count),
                 CandidateExerciseCount = selectedCandidates.Count,
-                PromptVersion = "workout-plan-v1",
+                PromptVersion = "workout-plan-v2",
             },
             cancellationToken);
 
@@ -393,6 +393,8 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 Goal = context.Goal,
                 WorkoutType = context.WorkoutType,
                 DurationMinutes = context.DurationMinutes,
+                RecommendedMainExerciseCount = context.RecommendedMainExerciseCount,
+                MaximumMainExerciseCount = context.MaximumMainExerciseCount,
                 FitnessLevel = context.FitnessLevel,
                 TargetMuscles = context.TargetMuscles,
                 ExcludedExercises = context.ExcludedExercises.OrderBy(value => value, StringComparer.Ordinal).ToList(),
@@ -464,11 +466,21 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                 "Cancelled");
             throw;
         }
+        catch (AiWorkoutPlanProviderException exception)
+        {
+            var errorCategory = AiWorkoutProviderFailureCategories.Normalize(exception.ErrorCategory);
+            _logger.LogWarning(
+                "AI workout provider output was rejected. Category {ErrorCategory}.",
+                errorCategory);
+            throw new AiWorkoutProviderGenerationFailedException(
+                reservationResult.Reservation,
+                errorCategory);
+        }
         catch (Exception)
         {
             throw new AiWorkoutProviderGenerationFailedException(
                 reservationResult.Reservation,
-                "ProviderFailure");
+                AiWorkoutProviderFailureCategories.ProviderFailure);
         }
     }
 
@@ -492,6 +504,8 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             context.Goal,
             context.WorkoutType,
             context.DurationMinutes.ToString(CultureInfo.InvariantCulture),
+            context.RecommendedMainExerciseCount.ToString(CultureInfo.InvariantCulture),
+            context.MaximumMainExerciseCount.ToString(CultureInfo.InvariantCulture),
             context.FitnessLevel,
             string.Join(',', context.TargetMuscles.OrderBy(value => value, StringComparer.Ordinal)),
             context.ExcludedExercises.Count.ToString(CultureInfo.InvariantCulture),
@@ -512,18 +526,38 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             .Where(id => id > 0)
             .ToHashSet();
 
-        if (candidateIds.Count != selectedCandidates.Count || providerResult?.Sections is not { Count: > 0 })
+        if (candidateIds.Count != selectedCandidates.Count)
         {
-            throw new InvalidOperationException("Provider output is invalid.");
+            throw CreateProviderValidationFailure(
+                AiWorkoutProviderFailureCategories.OpenAiValidationFailure);
+        }
+
+        if (providerResult?.Sections is not { Count: > 0 })
+        {
+            throw CreateProviderValidationFailure(
+                AiWorkoutProviderFailureCategories.OpenAiNoSections);
+        }
+
+        if (providerResult.Sections.Any(section => section is not null && IsProviderWarmupOrCooldown(section.Name)))
+        {
+            throw CreateProviderValidationFailure(
+                AiWorkoutProviderFailureCategories.OpenAiValidationFailure);
         }
 
         var mainSections = providerResult.Sections
-            .Where(section => section is not null && !IsProviderWarmupOrCooldown(section.Name))
+            .Where(section => section is not null)
             .ToList();
 
-        if (mainSections.Count is 0 or > 6 || mainSections.Any(section => !IsSafeProviderSectionName(section.Name)))
+        if (mainSections.Count == 0)
         {
-            throw new InvalidOperationException("Provider output is invalid.");
+            throw CreateProviderValidationFailure(
+                AiWorkoutProviderFailureCategories.OpenAiNoSections);
+        }
+
+        if (mainSections.Count > 6 || mainSections.Any(section => !IsSafeProviderSectionName(section.Name)))
+        {
+            throw CreateProviderValidationFailure(
+                AiWorkoutProviderFailureCategories.OpenAiValidationFailure);
         }
 
         var providerExercises = new List<(string SectionName, AiWorkoutPlanProviderExercise Exercise)>();
@@ -531,43 +565,114 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         {
             if (section.Exercises is not { Count: > 0 })
             {
-                throw new InvalidOperationException("Provider output is invalid.");
+                throw CreateProviderValidationFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiNoExercises);
             }
 
             providerExercises.AddRange(section.Exercises.Select(exercise => (section.Name.Trim(), exercise)));
         }
 
-        var maximumExerciseCount = Math.Min(10, GetMainExerciseCount(context.WorkoutType, context.DurationMinutes) + 3);
-        if (providerExercises.Count is 0 or > 10 || providerExercises.Count > maximumExerciseCount)
+        if (providerExercises.Count == 0)
         {
-            throw new InvalidOperationException("Provider output is invalid.");
+            throw CreateProviderValidationFailure(
+                AiWorkoutProviderFailureCategories.OpenAiNoExercises);
+        }
+
+        if (providerExercises.Count > context.MaximumMainExerciseCount)
+        {
+            throw CreateDurationExerciseCapFailure(
+                context,
+                providerExercises.Count,
+                mainSections.Count);
         }
 
         var selectedIds = new HashSet<int>();
         foreach (var (_, exercise) in providerExercises)
         {
-            if (exercise is null
-                || !candidateIds.Contains(exercise.ExerciseCatalogItemId)
-                || !selectedIds.Add(exercise.ExerciseCatalogItemId)
-                || exercise.Sets is < 1 or > 8
-                || exercise.RestSeconds is < 15 or > 300
-                || !IsSafeProviderText(exercise.Reps, 40)
-                || !IsSafeOptionalProviderText(exercise.SuggestedWeight, 60))
+            if (exercise is null)
             {
-                throw new InvalidOperationException("Provider output is invalid.");
+                throw CreateProviderValidationFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiValidationFailure);
+            }
+
+            if (!candidateIds.Contains(exercise.ExerciseCatalogItemId))
+            {
+                throw CreateProviderValidationFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiUnknownExerciseId,
+                    [exercise.ExerciseCatalogItemId]);
+            }
+
+            if (!selectedIds.Add(exercise.ExerciseCatalogItemId))
+            {
+                throw CreateProviderValidationFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiDuplicateExerciseId,
+                    [exercise.ExerciseCatalogItemId]);
+            }
+
+            if (exercise.Sets is < 1 or > 8)
+            {
+                throw CreateProviderValidationFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiInvalidSets,
+                    [exercise.ExerciseCatalogItemId]);
+            }
+
+            if (exercise.RestSeconds is < 15 or > 300)
+            {
+                throw CreateProviderValidationFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiInvalidRest,
+                    [exercise.ExerciseCatalogItemId]);
+            }
+
+            if (!IsSafeProviderText(exercise.Reps, 40))
+            {
+                throw CreateProviderValidationFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiInvalidReps,
+                    [exercise.ExerciseCatalogItemId]);
+            }
+
+            if (!IsSafeOptionalProviderText(exercise.SuggestedWeight, 60))
+            {
+                throw CreateProviderValidationFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiValidationFailure,
+                    [exercise.ExerciseCatalogItemId]);
             }
         }
 
         var selectedCatalogItems = await _dbContext.ExerciseCatalogItems
             .AsNoTracking()
-            .Where(item => item.IsActive && selectedIds.Contains(item.Id))
+            .Where(item => selectedIds.Contains(item.Id))
             .OrderBy(item => item.Id)
             .ToListAsync(cancellationToken);
+
+        var missingIds = selectedIds
+            .Except(selectedCatalogItems.Select(item => item.Id))
+            .OrderBy(id => id)
+            .ToList();
+        if (missingIds.Count > 0)
+        {
+            throw CreateProviderValidationFailure(
+                AiWorkoutProviderFailureCategories.OpenAiUnknownExerciseId,
+                missingIds);
+        }
+
+        var inactiveIds = selectedCatalogItems
+            .Where(item => !item.IsActive)
+            .Select(item => item.Id)
+            .OrderBy(id => id)
+            .ToList();
+        if (inactiveIds.Count > 0)
+        {
+            throw CreateProviderValidationFailure(
+                AiWorkoutProviderFailureCategories.OpenAiInactiveExerciseId,
+                inactiveIds);
+        }
 
         var catalogCandidates = BuildCatalogCandidates(selectedCatalogItems, context.ExcludedExercises);
         if (catalogCandidates.Count != selectedIds.Count)
         {
-            throw new InvalidOperationException("Provider output is invalid.");
+            throw CreateProviderValidationFailure(
+                AiWorkoutProviderFailureCategories.OpenAiValidationFailure,
+                selectedIds.OrderBy(id => id).ToList());
         }
 
         var catalogById = catalogCandidates.ToDictionary(candidate => candidate.Id);
@@ -591,6 +696,37 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
                     videoUrl: catalogCandidate.VideoUrl);
             }).ToList(),
         }).ToList();
+    }
+
+    private AiWorkoutPlanProviderException CreateProviderValidationFailure(
+        string errorCategory,
+        IReadOnlyCollection<int>? rejectedExerciseIds = null)
+    {
+        _logger.LogWarning(
+            "AI workout provider plan rejected during STRIDE validation. Category {ErrorCategory}, RejectedExerciseIds {RejectedExerciseIds}, RejectedExerciseCount {RejectedExerciseCount}.",
+            errorCategory,
+            rejectedExerciseIds is null ? null : string.Join(',', rejectedExerciseIds.Take(10)),
+            rejectedExerciseIds?.Count ?? 0);
+        return new AiWorkoutPlanProviderException(
+            "The AI workout provider returned an invalid workout plan.",
+            errorCategory);
+    }
+
+    private AiWorkoutPlanProviderException CreateDurationExerciseCapFailure(
+        WorkoutGenerationContext context,
+        int returnedMainExerciseCount,
+        int providerSectionCount)
+    {
+        _logger.LogWarning(
+            "AI workout provider plan rejected during STRIDE validation. Category {ErrorCategory}, RequestedDurationMinutes {RequestedDurationMinutes}, MaximumMainExerciseCount {MaximumMainExerciseCount}, ReturnedMainExerciseCount {ReturnedMainExerciseCount}, ProviderSectionCount {ProviderSectionCount}.",
+            AiWorkoutProviderFailureCategories.OpenAiDurationExerciseCapExceeded,
+            context.DurationMinutes,
+            context.MaximumMainExerciseCount,
+            returnedMainExerciseCount,
+            providerSectionCount);
+        return new AiWorkoutPlanProviderException(
+            "The AI workout provider returned an invalid workout plan.",
+            AiWorkoutProviderFailureCategories.OpenAiDurationExerciseCapExceeded);
     }
 
     private static bool IsProviderWarmupOrCooldown(string? sectionName)
@@ -637,6 +773,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
         var workoutType = NormalizeWorkoutType(request.PreferredWorkoutType, requestedTargetMuscles, goals?.WeeklyWorkoutTarget);
         var fitnessLevel = NormalizeFitnessLevel(request.FitnessLevel, recentWorkoutCount);
         var durationMinutes = Math.Clamp(request.DurationMinutes ?? GetDefaultDurationMinutes(fitnessLevel), 20, 180);
+        var recommendedMainExerciseCount = GetMainExerciseCount(workoutType, durationMinutes);
 
         return new WorkoutGenerationContext
         {
@@ -644,6 +781,8 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             WorkoutType = workoutType,
             FitnessLevel = fitnessLevel,
             DurationMinutes = durationMinutes,
+            RecommendedMainExerciseCount = recommendedMainExerciseCount,
+            MaximumMainExerciseCount = GetMaximumMainExerciseCount(recommendedMainExerciseCount),
             TargetMuscles = requestedTargetMuscles,
             ExcludedExercises = NormalizeDistinctList(request.ExcludedExercises).ToHashSet(StringComparer.Ordinal),
             IncludeWarmup = request.IncludeWarmup,
@@ -1084,7 +1223,7 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
 
     internal static List<WorkoutSlot> BuildMainSlots(WorkoutGenerationContext context, Random random)
     {
-        var slotCount = GetMainExerciseCount(context.WorkoutType, context.DurationMinutes);
+        var slotCount = context.RecommendedMainExerciseCount;
         if (context.TargetMuscles.Count > 0)
         {
             var slots = new List<WorkoutSlot>(slotCount);
@@ -1684,6 +1823,9 @@ public class AiWorkoutGeneratorService : IAiWorkoutGeneratorService
             _ => baseCount,
         };
     }
+
+    private static int GetMaximumMainExerciseCount(int recommendedMainExerciseCount) =>
+        Math.Min(10, recommendedMainExerciseCount + 3);
 
     private static int EstimateDurationMinutes(IReadOnlyCollection<AiWorkoutSectionDto> sections, int requestedDurationMinutes)
     {

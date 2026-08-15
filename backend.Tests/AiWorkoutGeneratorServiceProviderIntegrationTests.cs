@@ -1,3 +1,6 @@
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using backend.Configuration;
 using backend.Data;
 using backend.Dtos;
@@ -12,6 +15,90 @@ namespace backend.Tests;
 
 public class AiWorkoutGeneratorServiceProviderIntegrationTests
 {
+    [Fact]
+    public async Task OpenAiResponsesApiOutput_ReturnsRehydratedPlanAndRecordsSucceeded()
+    {
+        await using var database = await WorkoutGeneratorTestDatabase.CreateAsync();
+        var catalogExercise = CreateExercise("Original barbell squat", "Quadriceps", isActive: true);
+        catalogExercise.LocalNameOverride = "STRIDE catalog squat";
+        catalogExercise.LocalInstructionsOverride = "Use the STRIDE-approved squat setup.";
+        catalogExercise.LocalThumbnailUrlOverride = "/media/catalog-squat-thumb.jpg";
+        catalogExercise.LocalVideoUrlOverride = "/media/catalog-squat.mp4";
+        database.Context.ExerciseCatalogItems.AddRange(
+            catalogExercise,
+            CreateExercise("Cable row", "Back", isActive: true));
+        await database.Context.SaveChangesAsync();
+
+        var providerOutput = JsonSerializer.Serialize(new
+        {
+            sections = new[]
+            {
+                new
+                {
+                    name = "Strength block",
+                    exercises = new[]
+                    {
+                        new
+                        {
+                            exerciseCatalogItemId = catalogExercise.Id,
+                            sets = 4,
+                            reps = "5 reps",
+                            restSeconds = 180,
+                            suggestedWeight = "80 kg",
+                            rationale = "Use the bounded catalog selection.",
+                        },
+                    },
+                },
+            },
+        });
+        var providerEnvelope = JsonSerializer.Serialize(new
+        {
+            id = "resp_integration_test",
+            status = "completed",
+            output = new object[]
+            {
+                new { id = "rs_test", type = "reasoning", summary = Array.Empty<object>() },
+                new
+                {
+                    id = "msg_test",
+                    type = "message",
+                    status = "completed",
+                    role = "assistant",
+                    content = new[] { new { type = "output_text", text = providerOutput } },
+                },
+            },
+            error = (object?)null,
+            incomplete_details = (object?)null,
+        });
+        var handler = new StubHttpMessageHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(providerEnvelope, Encoding.UTF8, "application/json"),
+        }));
+        var provider = CreateOpenAiProvider(handler);
+        var service = database.CreateService(
+            new FakeCandidateSelector([CandidateFrom(catalogExercise)]),
+            provider,
+            enabled: true);
+
+        var plan = await service.GenerateAsync("1", FullBodyRequest(), CancellationToken.None);
+
+        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(["Warm-up", "Strength block", "Cooldown"], plan.Sections.Select(section => section.Name));
+        Assert.DoesNotContain(plan.Notes, note => note == "Generated with the local STRIDE planner.");
+        var exercise = Assert.Single(plan.Sections.Single(section => section.Name == "Strength block").Exercises);
+        Assert.Equal(catalogExercise.Id, exercise.ExerciseCatalogItemId);
+        Assert.Equal("STRIDE catalog squat", exercise.Name);
+        Assert.Equal("Use the STRIDE-approved squat setup.", exercise.Instructions);
+        Assert.Equal("/media/catalog-squat-thumb.jpg", exercise.ThumbnailUrl);
+        Assert.Equal("/media/catalog-squat.mp4", exercise.VideoUrl);
+        var attempt = Assert.Single(await database.Context.AiWorkoutGenerationAttempts.ToListAsync());
+        Assert.Equal(AiWorkoutGenerationAttemptStatuses.Succeeded, attempt.Status);
+        Assert.Equal(OpenAiWorkoutPlanProvider.Name, attempt.Provider);
+        Assert.Equal("workout-plan-v2", attempt.PromptVersion);
+        Assert.Null(attempt.ErrorCategory);
+        Assert.Null(attempt.SafeErrorMessage);
+    }
+
     [Fact]
     public async Task EnabledProvider_UsesOnlyBoundedCandidatesAndRehydratesCatalogExerciseData()
     {
@@ -66,6 +153,9 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
         var providerRequest = Assert.IsType<AiWorkoutPlanProviderRequest>(provider.LastRequest);
         Assert.Single(providerRequest.CandidateExercises);
         Assert.Equal(catalogExercise.Id, providerRequest.CandidateExercises[0].ExerciseCatalogItemId);
+        Assert.Equal(45, providerRequest.DurationMinutes);
+        Assert.Equal(5, providerRequest.RecommendedMainExerciseCount);
+        Assert.Equal(8, providerRequest.MaximumMainExerciseCount);
         Assert.False(providerRequest.IncludeWarmup);
         Assert.False(providerRequest.IncludeCooldown);
 
@@ -108,6 +198,9 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
         Assert.Equal(1, provider.CallCount);
         Assert.Contains(plan.Notes, note => note == "Generated with the local STRIDE planner.");
         Assert.DoesNotContain(plan.Sections.SelectMany(section => section.Exercises), exercise => exercise.ExerciseCatalogItemId == inactive.Id);
+        var attempt = Assert.Single(await database.Context.AiWorkoutGenerationAttempts.ToListAsync());
+        Assert.Equal(AiWorkoutProviderFailureCategories.OpenAiInactiveExerciseId, attempt.ErrorCategory);
+        Assert.Equal("The AI workout provider did not produce a usable workout plan.", attempt.SafeErrorMessage);
     }
 
     [Fact]
@@ -124,6 +217,8 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
 
         Assert.Equal(1, provider.CallCount);
         Assert.Contains(plan.Notes, note => note == "Generated with the local STRIDE planner.");
+        var attempt = Assert.Single(await database.Context.AiWorkoutGenerationAttempts.ToListAsync());
+        Assert.Equal(AiWorkoutProviderFailureCategories.OpenAiUnknownExerciseId, attempt.ErrorCategory);
     }
 
     [Fact]
@@ -174,6 +269,46 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
             .GenerateAsync("1", FullBodyRequest(), CancellationToken.None);
 
         Assert.Contains(plan.Notes, note => note == "Generated with the local STRIDE planner.");
+        var attempt = Assert.Single(await database.Context.AiWorkoutGenerationAttempts.ToListAsync());
+        Assert.Equal(AiWorkoutProviderFailureCategories.OpenAiDuplicateExerciseId, attempt.ErrorCategory);
+    }
+
+    [Fact]
+    public async Task EnabledProvider_RejectsExerciseCountAboveDurationCapAndRecordsCategory()
+    {
+        await using var database = await WorkoutGeneratorTestDatabase.CreateAsync();
+        var catalogExercises = Enumerable.Range(1, 10)
+            .Select(index => CreateExercise($"Test exercise {index}", "Quadriceps", isActive: true))
+            .ToList();
+        database.Context.ExerciseCatalogItems.AddRange(catalogExercises);
+        await database.Context.SaveChangesAsync();
+
+        var provider = new FakeProvider(new AiWorkoutPlanProviderResult
+        {
+            Sections =
+            [
+                new AiWorkoutPlanProviderSection
+                {
+                    Name = "Main",
+                    Exercises = catalogExercises.Select(exercise => ProviderExercise(exercise.Id)).ToList(),
+                },
+            ],
+        });
+        var request = FullBodyRequest();
+        request.DurationMinutes = 60;
+        var plan = await database.CreateService(
+                new FakeCandidateSelector(catalogExercises.Select(CandidateFrom).ToList()),
+                provider,
+                enabled: true)
+            .GenerateAsync("1", request, CancellationToken.None);
+
+        Assert.Contains(plan.Notes, note => note == "Generated with the local STRIDE planner.");
+        Assert.Equal(60, provider.LastRequest?.DurationMinutes);
+        Assert.Equal(6, provider.LastRequest?.RecommendedMainExerciseCount);
+        Assert.Equal(9, provider.LastRequest?.MaximumMainExerciseCount);
+        var attempt = Assert.Single(await database.Context.AiWorkoutGenerationAttempts.ToListAsync());
+        Assert.Equal(AiWorkoutGenerationAttemptStatuses.FallbackSucceeded, attempt.Status);
+        Assert.Equal(AiWorkoutProviderFailureCategories.OpenAiDurationExerciseCapExceeded, attempt.ErrorCategory);
     }
 
     [Fact]
@@ -275,6 +410,33 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
         RestSeconds = 90,
     };
 
+    private static OpenAiWorkoutPlanProvider CreateOpenAiProvider(HttpMessageHandler handler)
+    {
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://example.test/v1/"),
+            Timeout = TimeSpan.FromSeconds(45),
+        };
+        var generationOptions = new AiWorkoutGenerationOptions
+        {
+            Enabled = true,
+            Provider = OpenAiWorkoutPlanProvider.Name,
+            MaxCandidateExercises = 60,
+            TimeoutSeconds = 45,
+        };
+
+        return new OpenAiWorkoutPlanProvider(
+            httpClient,
+            Options.Create(generationOptions),
+            Options.Create(new OpenAiWorkoutGenerationOptions
+            {
+                ApiKey = "test-only-key",
+                WorkoutModel = "gpt-5-mini",
+                WorkoutMaxOutputTokens = 2000,
+            }),
+            NullLogger<OpenAiWorkoutPlanProvider>.Instance);
+    }
+
     private static AiWorkoutCandidate CandidateFrom(ExerciseCatalogItem item) => new()
     {
         ExerciseCatalogItemId = item.Id,
@@ -317,6 +479,20 @@ public class AiWorkoutGeneratorServiceProviderIntegrationTests
         {
             CallCount++;
             return Task.FromResult(candidates);
+        }
+    }
+
+    private sealed class StubHttpMessageHandler(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) : HttpMessageHandler
+    {
+        public int CallCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            return handler(request, cancellationToken);
         }
     }
 

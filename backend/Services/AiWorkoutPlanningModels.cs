@@ -6,6 +6,8 @@ internal sealed class WorkoutGenerationContext
     public string WorkoutType { get; init; } = "full-body";
     public string FitnessLevel { get; init; } = "intermediate";
     public int DurationMinutes { get; init; } = 45;
+    public int RecommendedMainExerciseCount { get; init; } = 5;
+    public int MaximumMainExerciseCount { get; init; } = 8;
     public IReadOnlyList<string> TargetMuscles { get; init; } = [];
     public HashSet<string> ExcludedExercises { get; init; } = new(StringComparer.Ordinal);
     public bool IncludeWarmup { get; init; }

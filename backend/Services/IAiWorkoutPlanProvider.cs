@@ -5,6 +5,8 @@ public sealed class AiWorkoutPlanProviderRequest
     public string Goal { get; init; } = string.Empty;
     public string WorkoutType { get; init; } = string.Empty;
     public int DurationMinutes { get; init; }
+    public int RecommendedMainExerciseCount { get; init; }
+    public int MaximumMainExerciseCount { get; init; }
     public string FitnessLevel { get; init; } = string.Empty;
     public IReadOnlyList<string> TargetMuscles { get; init; } = [];
     public IReadOnlyList<string> ExcludedExercises { get; init; } = [];
@@ -46,10 +48,15 @@ public sealed class AiWorkoutPlanProviderExercise
 
 public sealed class AiWorkoutPlanProviderException : Exception
 {
-    public AiWorkoutPlanProviderException(string message)
+    public AiWorkoutPlanProviderException(
+        string message,
+        string errorCategory = AiWorkoutProviderFailureCategories.ProviderFailure)
         : base(message)
     {
+        ErrorCategory = errorCategory;
     }
+
+    public string ErrorCategory { get; }
 }
 
 public interface IAiWorkoutPlanProvider

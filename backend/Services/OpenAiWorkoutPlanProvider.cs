@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using backend.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace backend.Services;
@@ -26,20 +27,21 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
         PropertyNameCaseInsensitive = true,
     };
 
-    private static readonly JsonElement WorkoutPlanSchema = CreateWorkoutPlanSchema();
-
     private readonly HttpClient _httpClient;
     private readonly AiWorkoutGenerationOptions _generationOptions;
     private readonly OpenAiWorkoutGenerationOptions _openAiOptions;
+    private readonly ILogger<OpenAiWorkoutPlanProvider> _logger;
 
     public OpenAiWorkoutPlanProvider(
         HttpClient httpClient,
         IOptions<AiWorkoutGenerationOptions> generationOptions,
-        IOptions<OpenAiWorkoutGenerationOptions> openAiOptions)
+        IOptions<OpenAiWorkoutGenerationOptions> openAiOptions,
+        ILogger<OpenAiWorkoutPlanProvider> logger)
     {
         _httpClient = httpClient;
         _generationOptions = generationOptions.Value;
         _openAiOptions = openAiOptions.Value;
+        _logger = logger;
     }
 
     public string ProviderName => Name;
@@ -55,6 +57,9 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
         ValidateRequest(request);
 
         var providerInput = JsonSerializer.Serialize(request, JsonOptions);
+        var workoutPlanSchema = CreateWorkoutPlanSchema(request.MaximumMainExerciseCount);
+        var capInstructions = FormattableString.Invariant(
+            $"The workout duration is {request.DurationMinutes} minutes. Select no more than {request.MaximumMainExerciseCount} main exercises total across all provider-generated main sections combined. Aim for {request.RecommendedMainExerciseCount} main exercises when that produces a high-quality plan. Do not add extra main sections to bypass the total exercise cap. Prefer fewer, higher-quality exercises over many movements. Warm-up and cooldown are generated locally by STRIDE and must not be included.");
         var payload = new
         {
             model = _openAiOptions.WorkoutModel.Trim(),
@@ -65,7 +70,12 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
                 new
                 {
                     role = "system",
-                    content = "Build a safe workout plan using only the supplied candidate exercise IDs. Return only the requested structured output and never invent exercise IDs.",
+                    content = "Build a safe catalog-backed working workout plan using only the supplied candidate exercise IDs. Return only the requested structured output, never invent exercise IDs, and never include warm-up or cooldown sections.",
+                },
+                new
+                {
+                    role = "developer",
+                    content = capInstructions,
                 },
                 new
                 {
@@ -80,7 +90,7 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
                     type = "json_schema",
                     name = "workout_plan",
                     strict = true,
-                    schema = WorkoutPlanSchema,
+                    schema = workoutPlanSchema,
                 },
             },
         };
@@ -103,14 +113,52 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
 
             if (response.Content.Headers.ContentLength is > MaxResponseContentLength)
             {
-                throw new AiWorkoutPlanProviderException("The AI workout provider returned an invalid response.");
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiSchemaMismatch,
+                    "The AI workout provider returned an invalid response.",
+                    httpStatus: response.StatusCode);
             }
 
-            await using var responseStream = await response.Content.ReadAsStreamAsync(timeoutSource.Token);
-            var providerResponse = await JsonSerializer.DeserializeAsync<OpenAiResponse>(
-                responseStream,
-                JsonOptions,
-                timeoutSource.Token);
+            OpenAiResponse? providerResponse;
+            try
+            {
+                await using var responseStream = await response.Content.ReadAsStreamAsync(timeoutSource.Token);
+                providerResponse = await JsonSerializer.DeserializeAsync<OpenAiResponse>(
+                    responseStream,
+                    JsonOptions,
+                    timeoutSource.Token);
+            }
+            catch (JsonException)
+            {
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiSchemaMismatch,
+                    "The AI workout provider returned an invalid response.",
+                    httpStatus: response.StatusCode);
+            }
+            catch (NotSupportedException)
+            {
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiSchemaMismatch,
+                    "The AI workout provider returned an invalid response.",
+                    httpStatus: response.StatusCode);
+            }
+
+            var outputItemCount = providerResponse?.Output?.Count ?? 0;
+            _logger.LogInformation(
+                "OpenAI workout response received. HttpStatus {HttpStatus}, ResponseId {ResponseId}, ResponseStatus {ResponseStatus}, OutputItemCount {OutputItemCount}.",
+                (int)response.StatusCode,
+                providerResponse?.Id,
+                providerResponse?.Status,
+                outputItemCount);
+
+            if (providerResponse?.Error is not null)
+            {
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiHttpFailure,
+                    "The AI workout provider request failed.",
+                    providerResponse,
+                    response.StatusCode);
+            }
 
             var contentItems = providerResponse?.Output?
                 .Where(item => string.Equals(item.Type, "message", StringComparison.Ordinal))
@@ -119,46 +167,117 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
 
             if (contentItems.Any(item => string.Equals(item.Type, "refusal", StringComparison.Ordinal)))
             {
-                throw new AiWorkoutPlanProviderException("The AI workout provider declined the workout request.");
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiValidationFailure,
+                    "The AI workout provider declined the workout request.",
+                    providerResponse,
+                    response.StatusCode);
+            }
+
+            var nestedOutputTextParts = contentItems
+                .Where(item => string.Equals(item.Type, "output_text", StringComparison.Ordinal))
+                .Select(item => item.Text)
+                .Where(text => text is not null)
+                .Cast<string>()
+                .ToList();
+            var outputText = nestedOutputTextParts.Count > 0
+                ? string.Concat(nestedOutputTextParts)
+                : providerResponse?.OutputText;
+
+            if (string.IsNullOrWhiteSpace(outputText))
+            {
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiEmptyOutput,
+                    "The AI workout provider returned an invalid response.",
+                    providerResponse,
+                    response.StatusCode);
             }
 
             if (!string.Equals(providerResponse?.Status, "completed", StringComparison.Ordinal))
             {
-                throw new AiWorkoutPlanProviderException("The AI workout provider did not complete the workout plan.");
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiValidationFailure,
+                    "The AI workout provider did not complete the workout plan.",
+                    providerResponse,
+                    response.StatusCode);
             }
 
-            var outputText = contentItems
-                .FirstOrDefault(item => string.Equals(item.Type, "output_text", StringComparison.Ordinal))?
-                .Text;
-            if (string.IsNullOrWhiteSpace(outputText) || outputText.Length > MaxResponseContentLength)
+            if (outputText.Length > MaxResponseContentLength)
             {
-                throw new AiWorkoutPlanProviderException("The AI workout provider returned an invalid response.");
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiSchemaMismatch,
+                    "The AI workout provider returned an invalid response.",
+                    providerResponse,
+                    response.StatusCode);
             }
 
-            var result = JsonSerializer.Deserialize<AiWorkoutPlanProviderResult>(outputText, JsonOptions);
+            JsonDocument outputDocument;
+            try
+            {
+                outputDocument = JsonDocument.Parse(outputText);
+            }
+            catch (JsonException)
+            {
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiJsonParseFailure,
+                    "The AI workout provider returned an invalid response.",
+                    providerResponse,
+                    response.StatusCode);
+            }
+
+            AiWorkoutPlanProviderResult? result;
+            using (outputDocument)
+            {
+                if (outputDocument.RootElement.ValueKind != JsonValueKind.Object)
+                {
+                    throw CreateFailure(
+                        AiWorkoutProviderFailureCategories.OpenAiSchemaMismatch,
+                        "The AI workout provider returned an invalid workout plan.",
+                        providerResponse,
+                        response.StatusCode);
+                }
+
+                try
+                {
+                    result = outputDocument.RootElement.Deserialize<AiWorkoutPlanProviderResult>(JsonOptions);
+                }
+                catch (JsonException)
+                {
+                    throw CreateFailure(
+                        AiWorkoutProviderFailureCategories.OpenAiSchemaMismatch,
+                        "The AI workout provider returned an invalid workout plan.",
+                        providerResponse,
+                        response.StatusCode);
+                }
+            }
+
             if (result is null)
             {
-                throw new AiWorkoutPlanProviderException("The AI workout provider returned an invalid workout plan.");
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiSchemaMismatch,
+                    "The AI workout provider returned an invalid workout plan.",
+                    providerResponse,
+                    response.StatusCode);
             }
 
-            ValidateResult(result, request);
+            ValidateResult(result, request, providerResponse, response.StatusCode);
             return result;
+        }
+        catch (AiWorkoutPlanProviderException)
+        {
+            throw;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new AiWorkoutPlanProviderException("The AI workout provider request timed out.");
+            throw CreateFailure(
+                AiWorkoutProviderFailureCategories.OpenAiHttpFailure,
+                "The AI workout provider request timed out.");
         }
         catch (HttpRequestException)
         {
-            throw new AiWorkoutPlanProviderException("The AI workout provider is currently unavailable.");
-        }
-        catch (NotSupportedException)
-        {
-            throw new AiWorkoutPlanProviderException("The AI workout provider returned an invalid response.");
-        }
-        catch (JsonException)
-        {
-            throw new AiWorkoutPlanProviderException("The AI workout provider returned an invalid response.");
+            throw CreateFailure(
+                AiWorkoutProviderFailureCategories.OpenAiHttpFailure,
+                "The AI workout provider is currently unavailable.");
         }
     }
 
@@ -210,9 +329,16 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
         if (string.IsNullOrWhiteSpace(request.Goal) || request.Goal.Length > 80 ||
             string.IsNullOrWhiteSpace(request.WorkoutType) || request.WorkoutType.Length > 60 ||
             string.IsNullOrWhiteSpace(request.FitnessLevel) || request.FitnessLevel.Length > 40 ||
-            request.DurationMinutes is < 15 or > 180)
+            request.DurationMinutes is < 15 or > 180 ||
+            request.RecommendedMainExerciseCount is < 1 or > 10 ||
+            request.MaximumMainExerciseCount is < 1 or > 10 ||
+            request.RecommendedMainExerciseCount > request.MaximumMainExerciseCount ||
+            request.IncludeWarmup ||
+            request.IncludeCooldown)
         {
-            throw new AiWorkoutPlanProviderException("The AI workout provider input is invalid.");
+            throw new AiWorkoutPlanProviderException(
+                "The AI workout provider input is invalid.",
+                AiWorkoutProviderFailureCategories.OpenAiValidationFailure);
         }
 
         if (request.TargetMuscles is null ||
@@ -225,7 +351,9 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
             request.CandidateExercises.Count is < 1 ||
             request.CandidateExercises.Count > _generationOptions.MaxCandidateExercises)
         {
-            throw new AiWorkoutPlanProviderException("The AI workout provider input is invalid.");
+            throw new AiWorkoutPlanProviderException(
+                "The AI workout provider input is invalid.",
+                AiWorkoutProviderFailureCategories.OpenAiValidationFailure);
         }
 
         var candidateIds = new HashSet<int>();
@@ -243,18 +371,63 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
                 candidate.SecondaryMuscles.Count > 12 ||
                 candidate.SecondaryMuscles.Any(value => string.IsNullOrWhiteSpace(value) || value.Length > 80))
             {
-                throw new AiWorkoutPlanProviderException("The AI workout provider input is invalid.");
+                throw new AiWorkoutPlanProviderException(
+                    "The AI workout provider input is invalid.",
+                    AiWorkoutProviderFailureCategories.OpenAiValidationFailure);
             }
         }
     }
 
-    private static void ValidateResult(
+    private void ValidateResult(
         AiWorkoutPlanProviderResult result,
-        AiWorkoutPlanProviderRequest request)
+        AiWorkoutPlanProviderRequest request,
+        OpenAiResponse? providerResponse,
+        HttpStatusCode httpStatus)
     {
-        if (result.Sections is null || result.Sections.Count is < 1 or > 10)
+        if (result.Sections is null || result.Sections.Count < 1)
         {
-            throw new AiWorkoutPlanProviderException("The AI workout provider returned an invalid workout plan.");
+            throw CreateFailure(
+                AiWorkoutProviderFailureCategories.OpenAiNoSections,
+                "The AI workout provider returned an invalid workout plan.");
+        }
+
+        if (result.Sections.Count > 6)
+        {
+            throw CreateFailure(
+                AiWorkoutProviderFailureCategories.OpenAiValidationFailure,
+                "The AI workout provider returned an invalid workout plan.");
+        }
+
+        foreach (var section in result.Sections)
+        {
+            if (section is null ||
+                !IsSafeText(section.Name, 80))
+            {
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiValidationFailure,
+                    "The AI workout provider returned an invalid workout plan.");
+            }
+
+            if (section.Exercises is null || section.Exercises.Count < 1)
+            {
+                throw CreateFailure(
+                    AiWorkoutProviderFailureCategories.OpenAiNoExercises,
+                    "The AI workout provider returned an invalid workout plan.");
+            }
+        }
+
+        var returnedMainExerciseCount = result.Sections.Sum(section => section.Exercises.Count);
+        if (returnedMainExerciseCount > request.MaximumMainExerciseCount)
+        {
+            throw CreateFailure(
+                AiWorkoutProviderFailureCategories.OpenAiDurationExerciseCapExceeded,
+                "The AI workout provider returned an invalid workout plan.",
+                providerResponse,
+                httpStatus,
+                requestedDurationMinutes: request.DurationMinutes,
+                maximumMainExerciseCount: request.MaximumMainExerciseCount,
+                returnedMainExerciseCount: returnedMainExerciseCount,
+                providerSectionCount: result.Sections.Count);
         }
 
         var candidateIds = request.CandidateExercises
@@ -264,34 +437,77 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
 
         foreach (var section in result.Sections)
         {
-            if (section is null ||
-                string.IsNullOrWhiteSpace(section.Name) ||
-                section.Name.Length > 80 ||
-                section.Exercises is null ||
-                section.Exercises.Count is < 1)
-            {
-                throw new AiWorkoutPlanProviderException("The AI workout provider returned an invalid workout plan.");
-            }
 
             foreach (var exercise in section.Exercises)
             {
-                if (exercise is null ||
-                    !candidateIds.Contains(exercise.ExerciseCatalogItemId) ||
-                    !selectedIds.Add(exercise.ExerciseCatalogItemId) ||
-                    exercise.Sets is < 1 or > 8 ||
-                    string.IsNullOrWhiteSpace(exercise.Reps) ||
-                    exercise.Reps.Length > 40 ||
-                    exercise.RestSeconds is < 15 or > 300 ||
-                    exercise.SuggestedWeight?.Length > 60 ||
-                    exercise.Rationale?.Length > 240)
+                if (exercise is null)
                 {
-                    throw new AiWorkoutPlanProviderException("The AI workout provider returned an invalid workout plan.");
+                    throw CreateFailure(
+                        AiWorkoutProviderFailureCategories.OpenAiValidationFailure,
+                        "The AI workout provider returned an invalid workout plan.");
+                }
+
+                if (!candidateIds.Contains(exercise.ExerciseCatalogItemId))
+                {
+                    throw CreateFailure(
+                        AiWorkoutProviderFailureCategories.OpenAiUnknownExerciseId,
+                        "The AI workout provider returned an invalid workout plan.",
+                        rejectedExerciseId: exercise.ExerciseCatalogItemId);
+                }
+
+                if (!selectedIds.Add(exercise.ExerciseCatalogItemId))
+                {
+                    throw CreateFailure(
+                        AiWorkoutProviderFailureCategories.OpenAiDuplicateExerciseId,
+                        "The AI workout provider returned an invalid workout plan.",
+                        rejectedExerciseId: exercise.ExerciseCatalogItemId);
+                }
+
+                if (exercise.Sets is < 1 or > 8)
+                {
+                    throw CreateFailure(
+                        AiWorkoutProviderFailureCategories.OpenAiInvalidSets,
+                        "The AI workout provider returned an invalid workout plan.",
+                        rejectedExerciseId: exercise.ExerciseCatalogItemId);
+                }
+
+                if (!IsSafeText(exercise.Reps, 40))
+                {
+                    throw CreateFailure(
+                        AiWorkoutProviderFailureCategories.OpenAiInvalidReps,
+                        "The AI workout provider returned an invalid workout plan.",
+                        rejectedExerciseId: exercise.ExerciseCatalogItemId);
+                }
+
+                if (exercise.RestSeconds is < 15 or > 300)
+                {
+                    throw CreateFailure(
+                        AiWorkoutProviderFailureCategories.OpenAiInvalidRest,
+                        "The AI workout provider returned an invalid workout plan.",
+                        rejectedExerciseId: exercise.ExerciseCatalogItemId);
+                }
+
+                if (!IsSafeOptionalText(exercise.SuggestedWeight, 60) ||
+                    !IsSafeOptionalText(exercise.Rationale, 240))
+                {
+                    throw CreateFailure(
+                        AiWorkoutProviderFailureCategories.OpenAiValidationFailure,
+                        "The AI workout provider returned an invalid workout plan.",
+                        rejectedExerciseId: exercise.ExerciseCatalogItemId);
                 }
             }
         }
     }
 
-    private static void EnsureSuccessfulResponse(HttpResponseMessage response)
+    private static bool IsSafeText(string? value, int maximumLength) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        value.Length <= maximumLength &&
+        !value.Any(char.IsControl);
+
+    private static bool IsSafeOptionalText(string? value, int maximumLength) =>
+        string.IsNullOrWhiteSpace(value) || IsSafeText(value, maximumLength);
+
+    private void EnsureSuccessfulResponse(HttpResponseMessage response)
     {
         if (response.IsSuccessStatusCode)
         {
@@ -310,27 +526,61 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
                 "The AI workout provider request failed.",
         };
 
-        throw new AiWorkoutPlanProviderException(message);
+        throw CreateFailure(
+            AiWorkoutProviderFailureCategories.OpenAiHttpFailure,
+            message,
+            httpStatus: response.StatusCode);
     }
 
-    private static JsonElement CreateWorkoutPlanSchema()
+    private AiWorkoutPlanProviderException CreateFailure(
+        string errorCategory,
+        string safeMessage,
+        OpenAiResponse? providerResponse = null,
+        HttpStatusCode? httpStatus = null,
+        int? rejectedExerciseId = null,
+        int? requestedDurationMinutes = null,
+        int? maximumMainExerciseCount = null,
+        int? returnedMainExerciseCount = null,
+        int? providerSectionCount = null)
+    {
+        _logger.LogWarning(
+            "OpenAI workout response rejected. Category {ErrorCategory}, HttpStatus {HttpStatus}, ResponseId {ResponseId}, ResponseStatus {ResponseStatus}, HasIncompleteDetails {HasIncompleteDetails}, OutputItemCount {OutputItemCount}, RejectedExerciseId {RejectedExerciseId}, RequestedDurationMinutes {RequestedDurationMinutes}, MaximumMainExerciseCount {MaximumMainExerciseCount}, ReturnedMainExerciseCount {ReturnedMainExerciseCount}, ProviderSectionCount {ProviderSectionCount}.",
+            errorCategory,
+            httpStatus.HasValue ? (int)httpStatus.Value : null,
+            providerResponse?.Id,
+            providerResponse?.Status,
+            providerResponse?.IncompleteDetails is not null,
+            providerResponse?.Output?.Count ?? 0,
+            rejectedExerciseId,
+            requestedDurationMinutes,
+            maximumMainExerciseCount,
+            returnedMainExerciseCount,
+            providerSectionCount);
+
+        return new AiWorkoutPlanProviderException(safeMessage, errorCategory);
+    }
+
+    private static JsonElement CreateWorkoutPlanSchema(int maximumMainExerciseCount)
     {
         using var document = JsonDocument.Parse(
-            """
+            $$"""
             {
               "type": "object",
               "properties": {
                 "sections": {
                   "type": "array",
+                  "description": "Provider-generated main workout sections only. Across all sections combined, return no more than {{maximumMainExerciseCount}} exercises.",
                   "minItems": 1,
-                  "maxItems": 10,
+                  "maxItems": 6,
                   "items": {
                     "type": "object",
                     "properties": {
                       "name": { "type": "string", "maxLength": 80 },
                       "exercises": {
                         "type": "array",
+                        "description": "Main exercises in this section. The combined total across every section must not exceed {{maximumMainExerciseCount}}.",
                         "minItems": 1,
+                        "maxItems": {{maximumMainExerciseCount}},
                         "items": {
                           "type": "object",
                           "properties": {
@@ -338,8 +588,8 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
                             "sets": { "type": "integer", "minimum": 1, "maximum": 8 },
                             "reps": { "type": "string", "maxLength": 40 },
                             "restSeconds": { "type": "integer", "minimum": 15, "maximum": 300 },
-                            "suggestedWeight": { "type": ["string", "null"] },
-                            "rationale": { "type": ["string", "null"] }
+                            "suggestedWeight": { "type": ["string", "null"], "maxLength": 60 },
+                            "rationale": { "type": ["string", "null"], "maxLength": 240 }
                           },
                           "required": [
                             "exerciseCatalogItemId",
@@ -368,11 +618,23 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
 
     private sealed class OpenAiResponse
     {
+        [JsonPropertyName("id")]
+        public string? Id { get; init; }
+
         [JsonPropertyName("status")]
         public string? Status { get; init; }
 
         [JsonPropertyName("output")]
         public List<OpenAiOutputItem>? Output { get; init; }
+
+        [JsonPropertyName("output_text")]
+        public string? OutputText { get; init; }
+
+        [JsonPropertyName("incomplete_details")]
+        public OpenAiIncompleteDetails? IncompleteDetails { get; init; }
+
+        [JsonPropertyName("error")]
+        public JsonElement? Error { get; init; }
     }
 
     private sealed class OpenAiOutputItem
@@ -391,5 +653,14 @@ public sealed class OpenAiWorkoutPlanProvider : IAiWorkoutPlanProvider
 
         [JsonPropertyName("text")]
         public string? Text { get; init; }
+
+        [JsonPropertyName("refusal")]
+        public string? Refusal { get; init; }
+    }
+
+    private sealed class OpenAiIncompleteDetails
+    {
+        [JsonPropertyName("reason")]
+        public string? Reason { get; init; }
     }
 }

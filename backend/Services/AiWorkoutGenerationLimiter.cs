@@ -218,9 +218,12 @@ public sealed class AiWorkoutGenerationLimiter : IAiWorkoutGenerationLimiter
 
     private static string? GetSafeErrorMessage(string? errorCategory) => errorCategory switch
     {
+        null => null,
         "Cancelled" => "The AI workout provider request was cancelled.",
         "LocalFallbackFailure" => "The AI workout provider and local planner could not complete the workout plan.",
-        "ProviderFailure" => "The AI workout provider did not produce a usable workout plan.",
+        AiWorkoutProviderFailureCategories.ProviderFailure => "The AI workout provider did not produce a usable workout plan.",
+        _ when errorCategory?.StartsWith("OpenAi", StringComparison.Ordinal) == true =>
+            "The AI workout provider did not produce a usable workout plan.",
         _ => "The AI workout generation attempt did not complete.",
     };
 }
